@@ -1,0 +1,315 @@
+<!--
+  MCP Studio Main Content Area
+  Dynamic content routing based on current view
+-->
+<script lang="ts">
+  import { uiStore } from '$lib/stores/uiStore';
+  import Dashboard from '../Dashboard.svelte';
+  import ToolExplorer from '../ToolExplorer.svelte';
+  import ResourceBrowser from '../ResourceBrowser.svelte';
+  import PromptDesigner from '../PromptDesigner.svelte';
+  import SamplingDebugger from '../SamplingDebugger.svelte';
+  import ElicitationFlow from '../ElicitationFlow.svelte';
+  import AddServerModal from '../AddServerModal.svelte';
+
+  // Reactive view state using Svelte 5 runes
+  const ui = $derived($uiStore);
+  const currentView = $derived(ui.currentView);
+  const modals = $derived(ui.modals);
+
+  // Content component mapping
+  function getContentComponent(view: string) {
+    switch (view) {
+      case 'dashboard':
+        return Dashboard;
+      case 'tools':
+        return ToolExplorer;
+      case 'resources':
+        return ResourceBrowser;
+      case 'prompts':
+        return PromptDesigner;
+      case 'sampling':
+        return SamplingDebugger;
+      case 'elicitation':
+        return ElicitationFlow;
+      case 'collections':
+      case 'settings':
+        return PlaceholderView;
+      default:
+        return Dashboard;
+    }
+  }
+
+  // Placeholder component for unimplemented views
+  function PlaceholderView() {
+    return {
+      render: () => `
+        <div class="mcp-placeholder">
+          <div class="mcp-placeholder__icon">🚧</div>
+          <h2 class="mcp-placeholder__title">${currentView.charAt(0).toUpperCase() + currentView.slice(1)} View</h2>
+          <p class="mcp-placeholder__description">This view is currently under development.</p>
+          <p class="mcp-placeholder__note">Part of the enterprise MCP Studio roadmap.</p>
+        </div>
+      `
+    };
+  }
+</script>
+
+<div class="mcp-main-content">
+  <!-- Dynamic Content Area -->
+  <div class="mcp-content-viewport">
+    {#if currentView === 'dashboard'}
+      <Dashboard />
+    {:else if currentView === 'tools'}
+      <ToolExplorer />
+    {:else if currentView === 'resources'}
+      <ResourceBrowser />
+    {:else if currentView === 'prompts'}
+      <PromptDesigner />
+    {:else if currentView === 'sampling'}
+      <SamplingDebugger />
+    {:else if currentView === 'elicitation'}
+      <ElicitationFlow />
+    {:else}
+      <!-- Placeholder for unimplemented views -->
+      <div class="mcp-placeholder">
+        <div class="mcp-placeholder__content">
+          <div class="mcp-placeholder__icon">
+            {#if currentView === 'resources'}
+              🗄️
+            {:else if currentView === 'prompts'}
+              📝
+            {:else if currentView === 'sampling'}
+              🎯
+            {:else if currentView === 'elicitation'}
+              💬
+            {:else if currentView === 'collections'}
+              📁
+            {:else if currentView === 'settings'}
+              ⚙️
+            {:else}
+              🚧
+            {/if}
+          </div>
+          <h2 class="mcp-placeholder__title">
+            {currentView.charAt(0).toUpperCase() + currentView.slice(1)} View
+          </h2>
+          <p class="mcp-placeholder__description">
+            This view is currently under development as part of the enterprise MCP Studio roadmap.
+          </p>
+          <div class="mcp-placeholder__features">
+            <h3>Planned Features:</h3>
+            <ul>
+              {#if currentView === 'resources'}
+                <li>Resource browser with tree navigation</li>
+                <li>URI template management</li>
+                <li>Real-time resource subscriptions</li>
+                <li>Resource versioning and caching</li>
+              {:else if currentView === 'prompts'}
+                <li>Visual prompt designer</li>
+                <li>Template management system</li>
+                <li>A/B testing framework</li>
+                <li>Prompt performance analytics</li>
+              {:else if currentView === 'sampling'}
+                <li>Step-through debugging interface</li>
+                <li>Token tracking and analysis</li>
+                <li>Conversation history management</li>
+                <li>Model performance metrics</li>
+              {:else if currentView === 'elicitation'}
+                <li>Visual workflow designer</li>
+                <li>Conditional logic builder</li>
+                <li>Form validation system</li>
+                <li>Response routing engine</li>
+              {:else if currentView === 'collections'}
+                <li>Multi-server operation chains</li>
+                <li>Variable interpolation</li>
+                <li>Scenario management</li>
+                <li>Team collaboration features</li>
+              {:else if currentView === 'settings'}
+                <li>Theme and appearance settings</li>
+                <li>Connection preferences</li>
+                <li>Security configurations</li>
+                <li>Export/import functionality</li>
+              {/if}
+            </ul>
+          </div>
+          <div class="mcp-placeholder__actions">
+            <button 
+              class="btn btn-primary btn-sm"
+              onclick={() => uiStore.setView('dashboard')}
+            >
+              Return to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    {/if}
+  </div>
+</div>
+
+<!-- Modal System -->
+{#if modals.addServer}
+  <div class="mcp-modal-overlay" role="dialog" aria-modal="true">
+    <AddServerModal />
+  </div>
+{/if}
+
+<style>
+  .mcp-main-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    background: var(--mcp-surface-primary);
+  }
+
+  .mcp-content-viewport {
+    flex: 1;
+    overflow: auto;
+    height: 100%;
+  }
+
+  /* Placeholder Styles */
+  .mcp-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: var(--mcp-space-8);
+    background: var(--mcp-surface-primary);
+  }
+
+  .mcp-placeholder__content {
+    max-width: 600px;
+    text-align: center;
+  }
+
+  .mcp-placeholder__icon {
+    font-size: 4rem;
+    margin-bottom: var(--mcp-space-6);
+    opacity: 0.8;
+  }
+
+  .mcp-placeholder__title {
+    font-size: var(--mcp-text-3xl);
+    font-weight: var(--mcp-font-bold);
+    color: var(--mcp-text-primary);
+    margin: 0 0 var(--mcp-space-4) 0;
+  }
+
+  .mcp-placeholder__description {
+    font-size: var(--mcp-text-lg);
+    color: var(--mcp-text-secondary);
+    margin: 0 0 var(--mcp-space-8) 0;
+    line-height: var(--mcp-leading-relaxed);
+  }
+
+  .mcp-placeholder__features {
+    background: var(--mcp-surface-secondary);
+    border: 1px solid var(--mcp-border-primary);
+    border-radius: var(--mcp-radius-lg);
+    padding: var(--mcp-space-6);
+    margin-bottom: var(--mcp-space-8);
+    text-align: left;
+  }
+
+  .mcp-placeholder__features h3 {
+    font-size: var(--mcp-text-lg);
+    font-weight: var(--mcp-font-semibold);
+    color: var(--mcp-text-primary);
+    margin: 0 0 var(--mcp-space-3) 0;
+  }
+
+  .mcp-placeholder__features ul {
+    margin: 0;
+    padding-left: var(--mcp-space-5);
+    color: var(--mcp-text-secondary);
+  }
+
+  .mcp-placeholder__features li {
+    margin-bottom: var(--mcp-space-1-5);
+    line-height: var(--mcp-leading-relaxed);
+  }
+
+  .mcp-placeholder__actions {
+    display: flex;
+    justify-content: center;
+    gap: var(--mcp-space-3);
+  }
+
+  /* Modal System */
+  .mcp-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--mcp-z-modal);
+    padding: var(--mcp-space-4);
+  }
+
+  [data-theme="dark"] .mcp-modal-overlay {
+    background: rgba(0, 0, 0, 0.7);
+  }
+
+  /* Content scrollbar styling */
+  .mcp-content-viewport::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .mcp-content-viewport::-webkit-scrollbar-track {
+    background: var(--mcp-surface-secondary);
+  }
+
+  .mcp-content-viewport::-webkit-scrollbar-thumb {
+    background: var(--mcp-border-primary);
+    border-radius: 4px;
+  }
+
+  .mcp-content-viewport::-webkit-scrollbar-thumb:hover {
+    background: var(--mcp-border-secondary);
+  }
+
+  /* Focus management */
+  .mcp-content-viewport:focus {
+    outline: none;
+  }
+
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    .mcp-placeholder__features {
+      border: 2px solid var(--mcp-border-primary);
+    }
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .mcp-modal-overlay {
+      backdrop-filter: none;
+    }
+  }
+
+  /* Mobile adjustments */
+  @media (max-width: 767px) {
+    .mcp-placeholder {
+      padding: var(--mcp-space-4);
+    }
+    
+    .mcp-placeholder__title {
+      font-size: var(--mcp-text-2xl);
+    }
+    
+    .mcp-placeholder__description {
+      font-size: var(--mcp-text-base);
+    }
+    
+    .mcp-placeholder__features {
+      padding: var(--mcp-space-4);
+    }
+  }
+</style>

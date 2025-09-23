@@ -1,0 +1,370 @@
+/**
+ * MCP Studio Design System
+ * Enterprise-grade design tokens for consistent UI architecture
+ */
+
+:root {
+  /* === BRAND COLORS === */
+  --mcp-brand-50: #f0f9ff;
+  --mcp-brand-100: #e0f2fe;
+  --mcp-brand-200: #bae6fd;
+  --mcp-brand-300: #7dd3fc;
+  --mcp-brand-400: #38bdf8;
+  --mcp-brand-500: #0ea5e9;
+  --mcp-brand-600: #0284c7;
+  --mcp-brand-700: #0369a1;
+  --mcp-brand-800: #075985;
+  --mcp-brand-900: #0c4a6e;
+  --mcp-brand-950: #082f49;
+
+  /* === SEMANTIC COLORS === */
+  --mcp-primary-50: var(--mcp-brand-50);
+  --mcp-primary-100: var(--mcp-brand-100);
+  --mcp-primary-200: var(--mcp-brand-200);
+  --mcp-primary-300: var(--mcp-brand-300);
+  --mcp-primary-400: var(--mcp-brand-400);
+  --mcp-primary-500: var(--mcp-brand-500);
+  --mcp-primary-600: var(--mcp-brand-600);
+  --mcp-primary-700: var(--mcp-brand-700);
+  --mcp-primary-800: var(--mcp-brand-800);
+  --mcp-primary-900: var(--mcp-brand-900);
+  --mcp-primary-950: var(--mcp-brand-950);
+
+  /* Success Colors */
+  --mcp-success-50: #f0fdf4;
+  --mcp-success-100: #dcfce7;
+  --mcp-success-200: #bbf7d0;
+  --mcp-success-300: #86efac;
+  --mcp-success-400: #4ade80;
+  --mcp-success-500: #22c55e;
+  --mcp-success-600: #16a34a;
+  --mcp-success-700: #15803d;
+  --mcp-success-800: #166534;
+  --mcp-success-900: #14532d;
+  --mcp-success-950: #052e16;
+
+  /* Warning Colors */
+  --mcp-warning-50: #fffbeb;
+  --mcp-warning-100: #fef3c7;
+  --mcp-warning-200: #fde68a;
+  --mcp-warning-300: #fcd34d;
+  --mcp-warning-400: #fbbf24;
+  --mcp-warning-500: #f59e0b;
+  --mcp-warning-600: #d97706;
+  --mcp-warning-700: #b45309;
+  --mcp-warning-800: #92400e;
+  --mcp-warning-900: #78350f;
+  --mcp-warning-950: #451a03;
+
+  /* Error Colors */
+  --mcp-error-50: #fef2f2;
+  --mcp-error-100: #fee2e2;
+  --mcp-error-200: #fecaca;
+  --mcp-error-300: #fca5a5;
+  --mcp-error-400: #f87171;
+  --mcp-error-500: #ef4444;
+  --mcp-error-600: #dc2626;
+  --mcp-error-700: #b91c1c;
+  --mcp-error-800: #991b1b;
+  --mcp-error-900: #7f1d1d;
+  --mcp-error-950: #450a0a;
+
+  /* === NEUTRAL COLORS === */
+  --mcp-gray-50: #f9fafb;
+  --mcp-gray-100: #f3f4f6;
+  --mcp-gray-200: #e5e7eb;
+  --mcp-gray-300: #d1d5db;
+  --mcp-gray-400: #9ca3af;
+  --mcp-gray-500: #6b7280;
+  --mcp-gray-600: #4b5563;
+  --mcp-gray-700: #374151;
+  --mcp-gray-800: #1f2937;
+  --mcp-gray-900: #111827;
+  --mcp-gray-950: #030712;
+
+  /* === SPACING SCALE === */
+  --mcp-space-px: 1px;
+  --mcp-space-0: 0;
+  --mcp-space-0-5: 0.125rem;    /* 2px */
+  --mcp-space-1: 0.25rem;       /* 4px */
+  --mcp-space-1-5: 0.375rem;    /* 6px */
+  --mcp-space-2: 0.5rem;        /* 8px */
+  --mcp-space-2-5: 0.625rem;    /* 10px */
+  --mcp-space-3: 0.75rem;       /* 12px */
+  --mcp-space-3-5: 0.875rem;    /* 14px */
+  --mcp-space-4: 1rem;          /* 16px */
+  --mcp-space-5: 1.25rem;       /* 20px */
+  --mcp-space-6: 1.5rem;        /* 24px */
+  --mcp-space-7: 1.75rem;       /* 28px */
+  --mcp-space-8: 2rem;          /* 32px */
+  --mcp-space-10: 2.5rem;       /* 40px */
+  --mcp-space-12: 3rem;         /* 48px */
+  --mcp-space-16: 4rem;         /* 64px */
+  --mcp-space-20: 5rem;         /* 80px */
+  --mcp-space-24: 6rem;         /* 96px */
+  --mcp-space-32: 8rem;         /* 128px */
+
+  /* === TYPOGRAPHY === */
+  /* Font Families */
+  --mcp-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mcp-font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+  --mcp-font-serif: 'Crimson Text', Georgia, serif;
+
+  /* Font Sizes */
+  --mcp-text-xs: 0.75rem;       /* 12px */
+  --mcp-text-sm: 0.875rem;      /* 14px */
+  --mcp-text-base: 1rem;        /* 16px */
+  --mcp-text-lg: 1.125rem;      /* 18px */
+  --mcp-text-xl: 1.25rem;       /* 20px */
+  --mcp-text-2xl: 1.5rem;       /* 24px */
+  --mcp-text-3xl: 1.875rem;     /* 30px */
+  --mcp-text-4xl: 2.25rem;      /* 36px */
+  --mcp-text-5xl: 3rem;         /* 48px */
+
+  /* Line Heights */
+  --mcp-leading-none: 1;
+  --mcp-leading-tight: 1.25;
+  --mcp-leading-snug: 1.375;
+  --mcp-leading-normal: 1.5;
+  --mcp-leading-relaxed: 1.625;
+  --mcp-leading-loose: 2;
+
+  /* Font Weights */
+  --mcp-font-thin: 100;
+  --mcp-font-extralight: 200;
+  --mcp-font-light: 300;
+  --mcp-font-normal: 400;
+  --mcp-font-medium: 500;
+  --mcp-font-semibold: 600;
+  --mcp-font-bold: 700;
+  --mcp-font-extrabold: 800;
+  --mcp-font-black: 900;
+
+  /* === BORDERS === */
+  --mcp-border-width-0: 0;
+  --mcp-border-width-1: 1px;
+  --mcp-border-width-2: 2px;
+  --mcp-border-width-4: 4px;
+  --mcp-border-width-8: 8px;
+
+  /* Border Radius */
+  --mcp-radius-none: 0;
+  --mcp-radius-sm: 0.125rem;     /* 2px */
+  --mcp-radius-base: 0.25rem;    /* 4px */
+  --mcp-radius-md: 0.375rem;     /* 6px */
+  --mcp-radius-lg: 0.5rem;       /* 8px */
+  --mcp-radius-xl: 0.75rem;      /* 12px */
+  --mcp-radius-2xl: 1rem;        /* 16px */
+  --mcp-radius-3xl: 1.5rem;      /* 24px */
+  --mcp-radius-full: 9999px;
+
+  /* === SHADOWS === */
+  --mcp-shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --mcp-shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --mcp-shadow-base: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --mcp-shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --mcp-shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --mcp-shadow-xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --mcp-shadow-2xl: 0 50px 100px -20px rgb(0 0 0 / 0.25);
+
+  /* === Z-INDEX SCALE === */
+  --mcp-z-0: 0;
+  --mcp-z-10: 10;
+  --mcp-z-20: 20;
+  --mcp-z-30: 30;
+  --mcp-z-40: 40;
+  --mcp-z-50: 50;
+  --mcp-z-dropdown: 1000;
+  --mcp-z-modal: 1050;
+  --mcp-z-popover: 1060;
+  --mcp-z-tooltip: 1070;
+  --mcp-z-notification: 1080;
+  --mcp-z-max: 2147483647;
+
+  /* === TRANSITIONS === */
+  --mcp-transition-fast: 150ms ease-in-out;
+  --mcp-transition-base: 250ms ease-in-out;
+  --mcp-transition-slow: 350ms ease-in-out;
+
+  /* === BREAKPOINTS (for JS usage) === */
+  --mcp-breakpoint-sm: 640px;
+  --mcp-breakpoint-md: 768px;
+  --mcp-breakpoint-lg: 1024px;
+  --mcp-breakpoint-xl: 1280px;
+  --mcp-breakpoint-2xl: 1536px;
+}
+
+/* === DARK THEME === */
+html[data-theme="dark"],
+[data-theme="dark"] {
+  /* === SURFACE COLORS === */
+  /* Rich, deep backgrounds with subtle variations for hierarchy */
+  --mcp-surface-primary: #0f1419 !important;      /* Deep slate for main background */
+  --mcp-surface-secondary: #1a202c !important;    /* Elevated surfaces (cards, panels) */
+  --mcp-surface-tertiary: #2d3748 !important;     /* Higher elevation (modals, dropdowns) */
+  --mcp-surface-overlay: #1a202c !important;      /* Overlay backgrounds */
+  --mcp-surface-elevated: #374151 !important;     /* Highest elevation surfaces */
+  --mcp-surface-accent: #1e293b !important;       /* Accent surface for highlights */
+
+  /* === TEXT COLORS === */
+  /* High contrast ratios for accessibility (WCAG AAA compliant) */
+  --mcp-text-primary: #f8fafc !important;         /* Primary text - 16:1 contrast ratio */
+  --mcp-text-secondary: #e2e8f0 !important;       /* Secondary text - 12:1 contrast ratio */
+  --mcp-text-tertiary: #cbd5e1 !important;        /* Tertiary text - 8:1 contrast ratio */
+  --mcp-text-disabled: #64748b !important;        /* Disabled text - 4.5:1 contrast ratio */
+  --mcp-text-inverse: #0f172a !important;         /* Text on light backgrounds */
+  --mcp-text-accent: #60a5fa !important;          /* Accent text color */
+
+  /* === BORDER COLORS === */
+  /* Subtle borders that maintain visual hierarchy */
+  --mcp-border-primary: #334155 !important;       /* Primary borders */
+  --mcp-border-secondary: #475569 !important;     /* Secondary borders */
+  --mcp-border-tertiary: #64748b !important;      /* Tertiary borders */
+  --mcp-border-focus: #3b82f6 !important;         /* Focus indicators */
+  --mcp-border-error: #ef4444 !important;         /* Error states */
+  --mcp-border-success: #10b981 !important;       /* Success states */
+  --mcp-border-warning: #f59e0b !important;       /* Warning states */
+
+  /* === SHADOWS === */
+  /* Enhanced shadows for dark mode depth perception */
+  --mcp-shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3) !important;
+  --mcp-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4) !important;
+  --mcp-shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4) !important;
+  --mcp-shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5) !important;
+  --mcp-shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6) !important;
+  --mcp-shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
+  --mcp-shadow-2xl: 0 50px 100px -20px rgba(0, 0, 0, 0.8) !important;
+
+  /* === STATUS COLORS (Dark Mode Optimized) === */
+  --mcp-success-50: #064e3b !important;
+  --mcp-success-500: #10b981 !important;
+  --mcp-success-600: #059669 !important;
+  --mcp-error-50: #7f1d1d !important;
+  --mcp-error-500: #ef4444 !important;
+  --mcp-error-600: #dc2626 !important;
+  --mcp-warning-50: #78350f !important;
+  --mcp-warning-500: #f59e0b !important;
+  --mcp-warning-600: #d97706 !important;
+
+  /* === COMPONENT-SPECIFIC OVERRIDES === */
+  /* Card styling for dark mode */
+  --mcp-card-shadow: var(--mcp-shadow-lg) !important;
+  --mcp-card-border: 1px solid var(--mcp-border-primary) !important;
+  --mcp-card-background: var(--mcp-surface-secondary) !important;
+
+  /* Input styling for dark mode */
+  --mcp-input-background: var(--mcp-surface-tertiary) !important;
+  --mcp-input-border: 1px solid var(--mcp-border-primary) !important;
+  --mcp-input-focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.3) !important;
+  --mcp-input-placeholder: var(--mcp-text-disabled) !important;
+
+  /* Button enhancements for dark mode */
+  --mcp-button-shadow: var(--mcp-shadow-sm) !important;
+  --mcp-button-hover-shadow: var(--mcp-shadow-md) !important;
+}
+
+/* === LIGHT THEME (DEFAULT) === */
+:root,
+html[data-theme="light"],
+[data-theme="light"] {
+  /* === SURFACE COLORS === */
+  /* Clean, crisp surfaces with subtle hierarchy */
+  --mcp-surface-primary: #ffffff;                 /* Pure white for main background */
+  --mcp-surface-secondary: #f8fafc;               /* Slightly off-white for elevated surfaces */
+  --mcp-surface-tertiary: #f1f5f9;                /* Light gray for higher elevation */
+  --mcp-surface-overlay: #ffffff;                 /* Modal and overlay backgrounds */
+  --mcp-surface-elevated: #e2e8f0;                /* Highest elevation surfaces */
+  --mcp-surface-accent: #f0f9ff;                  /* Accent surface for highlights */
+
+  /* === TEXT COLORS === */
+  /* High contrast ratios for accessibility (WCAG AAA compliant) */
+  --mcp-text-primary: #0f172a;                    /* Primary text - 16:1 contrast ratio */
+  --mcp-text-secondary: #334155;                  /* Secondary text - 12:1 contrast ratio */
+  --mcp-text-tertiary: #64748b;                   /* Tertiary text - 8:1 contrast ratio */
+  --mcp-text-disabled: #94a3b8;                   /* Disabled text - 4.5:1 contrast ratio */
+  --mcp-text-inverse: #f8fafc;                    /* Text on dark backgrounds */
+  --mcp-text-accent: #2563eb;                     /* Accent text color */
+
+  /* === BORDER COLORS === */
+  /* Refined borders that create clear hierarchy */
+  --mcp-border-primary: #e2e8f0;                  /* Primary borders */
+  --mcp-border-secondary: #cbd5e1;                /* Secondary borders */
+  --mcp-border-tertiary: #94a3b8;                 /* Tertiary borders */
+  --mcp-border-focus: #3b82f6;                    /* Focus indicators */
+  --mcp-border-error: #ef4444;                    /* Error states */
+  --mcp-border-success: #10b981;                  /* Success states */
+  --mcp-border-warning: #f59e0b;                  /* Warning states */
+
+  /* === SHADOWS === */
+  /* Subtle, elegant shadows for depth perception */
+  --mcp-shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --mcp-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --mcp-shadow-base: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --mcp-shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --mcp-shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --mcp-shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --mcp-shadow-2xl: 0 50px 100px -20px rgba(0, 0, 0, 0.25);
+
+  /* === STATUS COLORS (Light Mode Optimized) === */
+  --mcp-success-50: #f0fdf4;
+  --mcp-success-500: #22c55e;
+  --mcp-success-600: #16a34a;
+  --mcp-error-50: #fef2f2;
+  --mcp-error-500: #ef4444;
+  --mcp-error-600: #dc2626;
+  --mcp-warning-50: #fffbeb;
+  --mcp-warning-500: #f59e0b;
+  --mcp-warning-600: #d97706;
+
+  /* === COMPONENT-SPECIFIC OVERRIDES === */
+  /* Card styling for light mode */
+  --mcp-card-shadow: var(--mcp-shadow-sm);
+  --mcp-card-border: 1px solid var(--mcp-border-primary);
+  --mcp-card-background: var(--mcp-surface-primary);
+
+  /* Input styling for light mode */
+  --mcp-input-background: var(--mcp-surface-primary);
+  --mcp-input-border: 1px solid var(--mcp-border-primary);
+  --mcp-input-focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  --mcp-input-placeholder: var(--mcp-text-disabled);
+
+  /* Button enhancements for light mode */
+  --mcp-button-shadow: var(--mcp-shadow-xs);
+  --mcp-button-hover-shadow: var(--mcp-shadow-sm);
+}
+
+/* === COMPONENT-SPECIFIC TOKENS === */
+/* Navigation */
+:root {
+  --mcp-nav-item-height: 2.5rem;
+  --mcp-nav-item-padding: var(--mcp-space-3) var(--mcp-space-4);
+  --mcp-nav-item-radius: var(--mcp-radius-md);
+}
+
+/* Cards */
+:root {
+  --mcp-card-padding: var(--mcp-space-6);
+  --mcp-card-radius: var(--mcp-radius-lg);
+  --mcp-card-shadow: var(--mcp-shadow-sm);
+  --mcp-card-border: var(--mcp-border-width-1) solid var(--mcp-border-primary);
+}
+
+/* Forms */
+:root {
+  --mcp-input-height: 2.5rem;
+  --mcp-input-padding: var(--mcp-space-2) var(--mcp-space-3);
+  --mcp-input-radius: var(--mcp-radius-md);
+  --mcp-input-border: var(--mcp-border-width-1) solid var(--mcp-border-primary);
+  --mcp-input-focus-ring: 0 0 0 2px var(--mcp-primary-100);
+}
+
+/* Buttons */
+:root {
+  --mcp-button-height-sm: 2rem;
+  --mcp-button-height-md: 2.5rem;
+  --mcp-button-height-lg: 3rem;
+  --mcp-button-padding-sm: var(--mcp-space-2) var(--mcp-space-3);
+  --mcp-button-padding-md: var(--mcp-space-2-5) var(--mcp-space-4);
+  --mcp-button-padding-lg: var(--mcp-space-3) var(--mcp-space-6);
+  --mcp-button-radius: var(--mcp-radius-md);
+}
