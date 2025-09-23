@@ -1,0 +1,72 @@
+[package]
+name = "turbomcpstudio"
+version = "0.1.0"
+description = "Native desktop application for Model Context Protocol development - the Postman for MCP"
+authors = ["MCP Studio Team"]
+edition = "2021"
+
+[lib]
+name = "turbomcpstudio_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+# Tauri core
+tauri = { version = "2.0", features = [] }
+tauri-plugin-opener = "2.0"
+tauri-plugin-sql = { version = "2.0", features = ["sqlite"] }
+tauri-plugin-fs = "2.0"
+tauri-plugin-process = "2.0"
+tauri-plugin-dialog = "2.0"
+
+# TurboMCP integration - using local development version
+turbomcp = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp" }
+turbomcp-client = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp-client" }
+turbomcp-transport = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp-transport", features = ["stdio", "http", "websocket", "tcp", "unix", "compression", "tls"] }
+turbomcp-core = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp-core" }
+turbomcp-protocol = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp-protocol" }
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Data structures
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+urlencoding = "2.1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Process management
+sysinfo = "0.32"
+
+# Concurrency
+parking_lot = "0.12"
+dashmap = "6.1"
+
+[features]
+default = ["stdio", "http", "websocket", "tcp", "unix"]
+stdio = []
+http = []
+websocket = []
+tcp = []
+unix = []
+plugins = []  # Plugin system support for TurboMCP 1.0.9+
+full = ["stdio", "http", "websocket", "tcp", "unix", "plugins"]  # All features for production
+
