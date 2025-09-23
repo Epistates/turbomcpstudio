@@ -1,0 +1,295 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* MCP Studio Design System */
+@import './lib/styles/design-tokens.css';
+@import './lib/styles/components.css';
+
+/* Custom base styles for MCP Studio */
+@layer base {
+  html {
+    font-family: var(--mcp-font-sans);
+  }
+
+  body {
+    background-color: var(--mcp-surface-primary);
+    color: var(--mcp-text-primary);
+    transition: background-color var(--mcp-transition-fast), color var(--mcp-transition-fast);
+  }
+}
+
+/* Custom component styles */
+@layer components {
+  /* MCP Studio specific button styles */
+  .btn-primary {
+    @apply bg-mcp-primary-600 hover:bg-mcp-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-mcp-primary-500 focus:ring-offset-2;
+  }
+  
+  .btn-secondary {
+    background-color: var(--mcp-surface-tertiary);
+    color: var(--mcp-text-primary);
+    @apply font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+    border: 1px solid var(--mcp-border-primary);
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--mcp-surface-elevated);
+    border-color: var(--mcp-border-secondary);
+  }
+  
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2;
+  }
+  
+  /* Card styles */
+  .card {
+    background-color: var(--mcp-surface-primary);
+    border-radius: var(--mcp-radius-lg);
+    box-shadow: var(--mcp-shadow-sm);
+    border: var(--mcp-card-border);
+    padding: var(--mcp-card-padding);
+  }
+  
+  /* Status indicators */
+  .status-connected {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800;
+  }
+  
+  .status-disconnected {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    background-color: var(--mcp-gray-100);
+    color: var(--mcp-gray-700);
+  }
+
+  [data-theme="dark"] .status-disconnected {
+    background-color: var(--mcp-gray-800);
+    color: var(--mcp-gray-300);
+  }
+  
+  .status-connecting {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800;
+  }
+  
+  .status-error {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800;
+  }
+  
+  /* Protocol message styles */
+  .message-request {
+    @apply border-l-4 border-protocol-request bg-blue-50 p-3 rounded-r-lg;
+  }
+  
+  .message-response {
+    @apply border-l-4 border-protocol-response bg-green-50 p-3 rounded-r-lg;
+  }
+  
+  .message-notification {
+    @apply border-l-4 border-protocol-notification bg-purple-50 p-3 rounded-r-lg;
+  }
+  
+  .message-error {
+    @apply border-l-4 border-protocol-error bg-red-50 p-3 rounded-r-lg;
+  }
+  
+  /* Form styles */
+  .form-input {
+    @apply block w-full rounded-md shadow-sm focus:border-mcp-primary-500 focus:ring-mcp-primary-500 sm:text-sm;
+    background-color: var(--mcp-input-background);
+    color: var(--mcp-text-primary);
+    border: 1px solid var(--mcp-border-primary);
+  }
+  
+  .form-label {
+    @apply block text-sm font-medium mb-1;
+    color: var(--mcp-text-secondary);
+  }
+  
+  .form-error {
+    @apply mt-1 text-sm text-red-600;
+  }
+  
+  /* Navigation styles */
+  .nav-item {
+    @apply flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200;
+  }
+  
+  .nav-item-active {
+    @apply bg-mcp-primary-100 text-mcp-primary-700;
+  }
+  
+  .nav-item-inactive {
+    color: var(--mcp-text-secondary);
+    transition: all var(--mcp-transition-fast);
+  }
+
+  .nav-item-inactive:hover {
+    background-color: var(--mcp-surface-tertiary);
+    color: var(--mcp-text-primary);
+  }
+}
+
+/* Global dark mode overrides for Tailwind classes */
+@layer base {
+  /* Dark mode overrides for hardcoded Tailwind gray colors */
+  html[data-theme="dark"] .text-gray-900,
+  [data-theme="dark"] .text-gray-900 {
+    color: var(--mcp-text-primary) !important;
+  }
+
+  html[data-theme="dark"] .text-gray-600,
+  [data-theme="dark"] .text-gray-600 {
+    color: var(--mcp-text-secondary) !important;
+  }
+
+  html[data-theme="dark"] .text-gray-500,
+  [data-theme="dark"] .text-gray-500 {
+    color: var(--mcp-text-tertiary) !important;
+  }
+
+  html[data-theme="dark"] .text-gray-400,
+  [data-theme="dark"] .text-gray-400 {
+    color: var(--mcp-text-tertiary) !important;
+  }
+
+  html[data-theme="dark"] .text-gray-700,
+  [data-theme="dark"] .text-gray-700 {
+    color: var(--mcp-text-secondary) !important;
+  }
+
+  html[data-theme="dark"] .bg-gray-50,
+  [data-theme="dark"] .bg-gray-50 {
+    background-color: var(--mcp-surface-secondary) !important;
+  }
+
+  html[data-theme="dark"] .bg-gray-100,
+  [data-theme="dark"] .bg-gray-100 {
+    background-color: var(--mcp-surface-tertiary) !important;
+  }
+
+  html[data-theme="dark"] .bg-gray-200,
+  [data-theme="dark"] .bg-gray-200 {
+    background-color: var(--mcp-surface-elevated) !important;
+  }
+
+  html[data-theme="dark"] .bg-white,
+  [data-theme="dark"] .bg-white {
+    background-color: var(--mcp-surface-secondary) !important;
+  }
+
+  html[data-theme="dark"] .border-gray-200,
+  [data-theme="dark"] .border-gray-200 {
+    border-color: var(--mcp-border-secondary) !important;
+  }
+
+  html[data-theme="dark"] .border-gray-300,
+  [data-theme="dark"] .border-gray-300 {
+    border-color: var(--mcp-border-primary) !important;
+  }
+
+  /* Hover states */
+  html[data-theme="dark"] .hover\\:bg-gray-50:hover,
+  [data-theme="dark"] .hover\\:bg-gray-50:hover {
+    background-color: var(--mcp-surface-tertiary) !important;
+  }
+
+  html[data-theme="dark"] .hover\\:bg-gray-100:hover,
+  [data-theme="dark"] .hover\\:bg-gray-100:hover {
+    background-color: var(--mcp-surface-elevated) !important;
+  }
+
+  html[data-theme="dark"] .hover\\:text-gray-600:hover,
+  [data-theme="dark"] .hover\\:text-gray-600:hover {
+    color: var(--mcp-text-primary) !important;
+  }
+
+  html[data-theme="dark"] .hover\\:text-gray-700:hover,
+  [data-theme="dark"] .hover\\:text-gray-700:hover {
+    color: var(--mcp-text-primary) !important;
+  }
+
+  html[data-theme="dark"] .hover\\:text-gray-900:hover,
+  [data-theme="dark"] .hover\\:text-gray-900:hover {
+    color: var(--mcp-text-primary) !important;
+  }
+
+  /* Special overrides for specific patterns */
+  html[data-theme="dark"] .bg-gray-900,
+  [data-theme="dark"] .bg-gray-900 {
+    background-color: var(--mcp-surface-elevated) !important;
+  }
+
+  html[data-theme="dark"] .text-gray-100,
+  [data-theme="dark"] .text-gray-100 {
+    color: var(--mcp-text-primary) !important;
+  }
+}
+
+/* Custom utilities */
+@layer utilities {
+  /* Scrollbar styles */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5);
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.7);
+  }
+  
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+  
+  .animate-slide-in-right {
+    animation: slideInRight 0.3s ease-out;
+  }
+  
+  .animate-pulse-ring {
+    animation: pulseRing 2s infinite;
+  }
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulseRing {
+  0% {
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(14, 165, 233, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0);
+  }
+}

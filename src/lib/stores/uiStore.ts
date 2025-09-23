@@ -1,0 +1,134 @@
+import { writable } from 'svelte/store';
+
+export type View = 'dashboard' | 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | 'collections' | 'settings';
+
+interface UiStoreState {
+  currentView: View;
+  sidebarCollapsed: boolean;
+  error?: string;
+  notification?: {
+    type: 'success' | 'error' | 'warning' | 'info';
+    message: string;
+    timeout?: number;
+  };
+  loading: boolean;
+  modals: {
+    addServer: boolean;
+    serverConfig: boolean;
+    toolCall: boolean;
+  };
+}
+
+const initialState: UiStoreState = {
+  currentView: 'dashboard',
+  sidebarCollapsed: false,
+  error: undefined,
+  notification: undefined,
+  loading: false,
+  modals: {
+    addServer: false,
+    serverConfig: false,
+    toolCall: false,
+  },
+};
+
+function createUiStore() {
+  const { subscribe, set, update } = writable<UiStoreState>(initialState);
+
+  return {
+    subscribe,
+
+    // Navigate to a different view
+    setView(view: View) {
+      update(state => ({ ...state, currentView: view }));
+    },
+
+    // Toggle sidebar
+    toggleSidebar() {
+      update(state => ({ ...state, sidebarCollapsed: !state.sidebarCollapsed }));
+    },
+
+    // Set loading state
+    setLoading(loading: boolean) {
+      update(state => ({ ...state, loading }));
+    },
+
+    // Set error message
+    setError(error: string | undefined) {
+      update(state => ({ ...state, error }));
+    },
+
+    // Clear error
+    clearError() {
+      update(state => ({ ...state, error: undefined }));
+    },
+
+    // Show notification
+    showNotification(
+      type: 'success' | 'error' | 'warning' | 'info',
+      message: string,
+      timeout = 5000
+    ) {
+      update(state => ({
+        ...state,
+        notification: { type, message, timeout },
+      }));
+
+      if (timeout > 0) {
+        setTimeout(() => {
+          update(state => ({ ...state, notification: undefined }));
+        }, timeout);
+      }
+    },
+
+    // Clear notification
+    clearNotification() {
+      update(state => ({ ...state, notification: undefined }));
+    },
+
+    // Modal management
+    openModal(modal: keyof UiStoreState['modals']) {
+      update(state => ({
+        ...state,
+        modals: { ...state.modals, [modal]: true },
+      }));
+    },
+
+    closeModal(modal: keyof UiStoreState['modals']) {
+      update(state => ({
+        ...state,
+        modals: { ...state.modals, [modal]: false },
+      }));
+    },
+
+    closeAllModals() {
+      update(state => ({
+        ...state,
+        modals: {
+          addServer: false,
+          serverConfig: false,
+          toolCall: false,
+        },
+      }));
+    },
+
+    // Helper methods
+    showSuccess(message: string) {
+      this.showNotification('success', message);
+    },
+
+    showError(message: string) {
+      this.showNotification('error', message);
+    },
+
+    showWarning(message: string) {
+      this.showNotification('warning', message);
+    },
+
+    showInfo(message: string) {
+      this.showNotification('info', message);
+    },
+  };
+}
+
+export const uiStore = createUiStore();
