@@ -77,7 +77,7 @@
   }
 
   function formatUptime(seconds: number) {
-    if (seconds < 60) return `${seconds}s`;
+    if (!seconds || seconds < 60) return `${seconds || 0}s`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
     return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
   }
@@ -144,10 +144,10 @@
       <div class="flex items-center space-x-4 text-xs text-gray-500">
         <span class="flex items-center">
           <Activity size={12} class="mr-1" />
-          {server.config.transport?.type?.toUpperCase() || 'UNKNOWN'}
+          {server.config.transport_config?.type?.toUpperCase() || 'UNKNOWN'}
         </span>
 
-        {#if server.config.transport?.type === 'stdio' && server.process_info}
+        {#if server.config.transport_config?.type === 'stdio' && server.process_info}
           <span class="flex items-center">
             <Cpu size={12} class="mr-1" />
             PID {server.process_info.pid}
@@ -201,10 +201,10 @@
           <MessageCircle size={12} class="text-gray-400" />
         </div>
         <p class="text-sm font-semibold text-gray-900 mt-1">
-          {server.metrics.messages_sent + server.metrics.messages_received}
+          {(server.metrics.requests_sent || 0) + (server.metrics.responses_received || 0)}
         </p>
         <p class="text-xs text-gray-500">
-          ↑{server.metrics.messages_sent} ↓{server.metrics.messages_received}
+          ↑{server.metrics.requests_sent || 0} ↓{server.metrics.responses_received || 0}
         </p>
       </div>
 
@@ -214,7 +214,7 @@
           <Zap size={12} class="text-gray-400" />
         </div>
         <p class="text-sm font-semibold text-gray-900 mt-1">
-          {Math.round(server.metrics.avg_response_time_ms)}ms
+          {Math.round(server.metrics.avg_response_time_ms || 0)}ms
         </p>
       </div>
 
@@ -224,10 +224,10 @@
           <Activity size={12} class="text-gray-400" />
         </div>
         <p class="text-sm font-semibold text-gray-900 mt-1">
-          {formatBytes(server.metrics.bytes_sent + server.metrics.bytes_received)}
+          {formatBytes((server.metrics.bytes_sent || 0) + (server.metrics.bytes_received || 0))}
         </p>
         <p class="text-xs text-gray-500">
-          ↑{formatBytes(server.metrics.bytes_sent)} ↓{formatBytes(server.metrics.bytes_received)}
+          ↑{formatBytes(server.metrics.bytes_sent || 0)} ↓{formatBytes(server.metrics.bytes_received || 0)}
         </p>
       </div>
 
@@ -237,7 +237,7 @@
           <Clock size={12} class="text-gray-400" />
         </div>
         <p class="text-sm font-semibold text-gray-900 mt-1">
-          {formatUptime(server.metrics.uptime_seconds)}
+          {server.metrics.connected_at ? formatUptime(Math.floor((Date.now() - new Date(server.metrics.connected_at).getTime()) / 1000)) : '0s'}
         </p>
       </div>
     </div>

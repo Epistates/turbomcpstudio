@@ -4,12 +4,13 @@
   import ToolExplorer from './ToolExplorer.svelte';
   import ResourceBrowser from './ResourceBrowser.svelte';
   import PromptDesigner from './PromptDesigner.svelte';
-  import SamplingTester from './SamplingTester.svelte';
+  import SamplingWorkbench from './SamplingWorkbench.svelte';
   import ElicitationFlow from './ElicitationFlow.svelte';
   import CollectionsManager from './CollectionsManager.svelte';
   import ServerOverview from './ServerOverview.svelte';
   import AddServerModal from './AddServerModal.svelte';
   import ServerConfigModal from './ServerConfigModal.svelte';
+  import Settings from './Settings.svelte';
   import { 
     Plus, 
     Activity, 
@@ -277,12 +278,12 @@
                 </div>
                 <div class="flex justify-between">
                   <span style="color: var(--mcp-text-secondary)">Transport</span>
-                  <span class="capitalize">{selectedServer.config.transport?.type || 'unknown'}</span>
+                  <span class="capitalize">{selectedServer.config.transport_config?.type || 'unknown'}</span>
                 </div>
                 {#if selectedServer.metrics}
                   <div class="flex justify-between">
                     <span style="color: var(--mcp-text-secondary)">Messages</span>
-                    <span>{(selectedServer?.metrics?.messages_sent || 0) + (selectedServer?.metrics?.messages_received || 0)}</span>
+                    <span>{(selectedServer?.metrics?.requests_sent || 0) + (selectedServer?.metrics?.responses_received || 0)}</span>
                   </div>
                   <div class="flex justify-between">
                     <span style="color: var(--mcp-text-secondary)">Avg Response</span>
@@ -306,13 +307,16 @@
     <PromptDesigner />
 
   {:else if currentView === 'sampling'}
-    <SamplingTester {selectedServerId} />
+    <SamplingWorkbench {selectedServerId} />
 
   {:else if currentView === 'elicitation'}
     <ElicitationFlow />
 
   {:else if currentView === 'collections'}
     <CollectionsManager />
+
+  {:else if currentView === 'settings'}
+    <Settings />
 
   {:else}
     <!-- Other views placeholder -->

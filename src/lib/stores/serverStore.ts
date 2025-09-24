@@ -5,7 +5,7 @@ export interface ServerConfig {
   id: string;
   name: string;
   description?: string;
-  transport: TransportConfig;
+  transport_config: TransportConfig;
   environment_variables: Record<string, string>;
   created_at: string;
   updated_at: string;
@@ -47,14 +47,14 @@ export interface ProcessInfo {
 }
 
 export interface ConnectionMetrics {
-  messages_sent: number;
-  messages_received: number;
-  bytes_sent: number;
-  bytes_received: number;
+  connected_at?: string;
+  requests_sent: number;
+  responses_received: number;
   avg_response_time_ms: number;
   error_count: number;
   last_error?: string;
-  uptime_seconds: number;
+  bytes_sent: number;
+  bytes_received: number;
 }
 
 export interface ToolDefinition {
@@ -130,13 +130,14 @@ function createServerStore() {
           config,
           status: 'disconnected' as const,
           metrics: {
-            messages_sent: 0,
-            messages_received: 0,
-            bytes_sent: 0,
-            bytes_received: 0,
+            connected_at: undefined,
+            requests_sent: 0,
+            responses_received: 0,
             avg_response_time_ms: 0,
             error_count: 0,
-            uptime_seconds: 0,
+            last_error: undefined,
+            bytes_sent: 0,
+            bytes_received: 0,
           },
         }));
 
@@ -262,13 +263,14 @@ function createServerStore() {
           config,
           status: 'disconnected',
           metrics: {
-            messages_sent: 0,
-            messages_received: 0,
-            bytes_sent: 0,
-            bytes_received: 0,
+            connected_at: undefined,
+            requests_sent: 0,
+            responses_received: 0,
             avg_response_time_ms: 0,
             error_count: 0,
-            uptime_seconds: 0,
+            last_error: undefined,
+            bytes_sent: 0,
+            bytes_received: 0,
           },
         };
 
@@ -375,7 +377,7 @@ function createServerStore() {
         const request = {
           name: config.name,
           description: config.description,
-          transport: config.transport,
+          transport: config.transport_config,
           environment_variables: config.environment_variables,
         };
         const result: boolean = await invoke('test_server_config', { request });
@@ -591,7 +593,7 @@ function createServerStore() {
       }));
     },
 
-    // Initialize the store by loading saved configurations (debounced to prevent race conditions)
+    // Initialize the store by loading servers and templates
     async initialize() {
       console.log('🚀 ServerStore.initialize() called');
 
@@ -609,9 +611,9 @@ function createServerStore() {
 
       try {
         // Load all data in parallel for better performance
-        console.log('📡 Loading saved configurations and templates...');
+        console.log('📡 Loading servers and templates...');
         await Promise.allSettled([
-          this.loadSavedConfigurations(),
+          this.loadServers(), // Now returns ALL servers (connected and disconnected)
           this.loadTemplates()
         ]);
         console.log('✅ Server store initialization completed');

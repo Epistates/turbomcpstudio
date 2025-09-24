@@ -51,7 +51,7 @@
     if (selectedServer && !editMode) {
       editForm.name = selectedServer.config.name;
       editForm.description = selectedServer.config.description || '';
-      editForm.transport = JSON.parse(JSON.stringify(selectedServer.config.transport));
+      editForm.transport = JSON.parse(JSON.stringify(selectedServer.config.transport_config));
       editForm.environment_variables = JSON.parse(JSON.stringify(selectedServer.config.environment_variables || {}));
     }
   });
@@ -66,7 +66,7 @@
     if (selectedServer) {
       editForm.name = selectedServer.config.name;
       editForm.description = selectedServer.config.description || '';
-      editForm.transport = JSON.parse(JSON.stringify(selectedServer.config.transport));
+      editForm.transport = JSON.parse(JSON.stringify(selectedServer.config.transport_config));
       editForm.environment_variables = JSON.parse(JSON.stringify(selectedServer.config.environment_variables || {}));
       editMode = true;
     }
@@ -193,8 +193,8 @@
       <!-- Header -->
       <div class="flex items-center justify-between p-6 border-b border-gray-200">
         <div class="flex items-center">
-          {#if selectedServer.config.transport}
-            {@const IconComponent = getTransportIcon(selectedServer.config.transport.type)}
+          {#if selectedServer.config.transport_config}
+            {@const IconComponent = getTransportIcon(selectedServer.config.transport_config.type)}
             <div class="p-2 bg-gray-100 rounded-lg mr-4">
               <IconComponent size={20} class="text-gray-600" />
             </div>
@@ -205,7 +205,7 @@
             </h2>
             <div class="flex items-center mt-1">
               <span class="text-sm text-gray-600 mr-3">
-                {selectedServer.config.transport?.type?.toUpperCase() || 'UNKNOWN'} Transport
+                {selectedServer.config.transport_config?.type?.toUpperCase() || 'UNKNOWN'} Transport
               </span>
               <div class="flex items-center px-2 py-1 rounded-full text-xs font-medium {getStatusColor(selectedServer.status)}">
                 {#if selectedServer.status === 'connected'}
@@ -285,50 +285,50 @@
                     </p>
                   {/if}
                   <p class="text-sm text-gray-900 mt-1 capitalize">
-                    {selectedServer.config.transport?.type || 'Unknown'}
+                    {selectedServer.config.transport_config?.type || 'Unknown'}
                   </p>
                 </div>
 
                 <!-- Transport-specific details -->
-                {#if selectedServer.config.transport?.type === 'stdio'}
+                {#if selectedServer.config.transport_config?.type === 'stdio'}
                   <div>
                     <label class="text-sm font-medium text-gray-700">Command</label>
                     <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                      {selectedServer.config.transport.command}
+                      {selectedServer.config.transport_config.command}
                     </p>
                   </div>
 
-                  {#if selectedServer.config.transport.args && selectedServer.config.transport.args.length > 0}
+                  {#if selectedServer.config.transport_config.args && selectedServer.config.transport_config.args.length > 0}
                     <div>
                       <label class="text-sm font-medium text-gray-700">Arguments</label>
                       <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                        {selectedServer.config.transport.args.join(' ')}
+                        {selectedServer.config.transport_config.args.join(' ')}
                       </p>
                     </div>
                   {/if}
 
-                  {#if selectedServer.config.transport.working_directory}
+                  {#if selectedServer.config.transport_config.working_directory}
                     <div>
                       <label class="text-sm font-medium text-gray-700">Working Directory</label>
                       <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                        {selectedServer.config.transport.working_directory}
+                        {selectedServer.config.transport_config.working_directory}
                       </p>
                     </div>
                   {/if}
 
-                {:else if selectedServer.config.transport?.type === 'http' || selectedServer.config.transport?.type === 'websocket'}
+                {:else if selectedServer.config.transport_config?.type === 'http' || selectedServer.config.transport_config?.type === 'websocket'}
                   <div>
                     <label class="text-sm font-medium text-gray-700">URL</label>
                     <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                      {selectedServer.config.transport.url}
+                      {selectedServer.config.transport_config.url}
                     </p>
                   </div>
 
-                  {#if selectedServer.config.transport.headers && Object.keys(selectedServer.config.transport.headers).length > 0}
+                  {#if selectedServer.config.transport_config.headers && Object.keys(selectedServer.config.transport_config.headers).length > 0}
                     <div>
                       <label class="text-sm font-medium text-gray-700">Headers</label>
                       <div class="mt-1 space-y-1">
-                        {#each Object.entries(selectedServer.config.transport.headers) as [key, value]}
+                        {#each Object.entries(selectedServer.config.transport_config.headers) as [key, value]}
                           <div class="text-sm bg-gray-50 p-2 rounded font-mono">
                             <span class="text-gray-600">{key}:</span> {value}
                           </div>
@@ -337,27 +337,27 @@
                     </div>
                   {/if}
 
-                {:else if selectedServer.config.transport?.type === 'tcp'}
+                {:else if selectedServer.config.transport_config?.type === 'tcp'}
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label class="text-sm font-medium text-gray-700">Host</label>
                       <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                        {selectedServer.config.transport.host}
+                        {selectedServer.config.transport_config.host}
                       </p>
                     </div>
                     <div>
                       <label class="text-sm font-medium text-gray-700">Port</label>
                       <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                        {selectedServer.config.transport.port}
+                        {selectedServer.config.transport_config.port}
                       </p>
                     </div>
                   </div>
 
-                {:else if selectedServer.config.transport?.type === 'unix'}
+                {:else if selectedServer.config.transport_config?.type === 'unix'}
                   <div>
                     <label class="text-sm font-medium text-gray-700">Socket Path</label>
                     <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                      {selectedServer.config.transport.path}
+                      {selectedServer.config.transport_config.path}
                     </p>
                   </div>
                 {/if}
@@ -472,12 +472,12 @@
                 <h3 class="text-lg font-semibold text-gray-900 mb-4">Connection Metrics</h3>
                 <div class="grid grid-cols-2 gap-4">
                   <div class="bg-gray-50 rounded-lg p-3">
-                    <p class="text-xs text-gray-600">Messages Sent</p>
-                    <p class="text-lg font-semibold text-gray-900">{selectedServer.metrics.messages_sent}</p>
+                    <p class="text-xs text-gray-600">Requests Sent</p>
+                    <p class="text-lg font-semibold text-gray-900">{selectedServer.metrics.requests_sent}</p>
                   </div>
                   <div class="bg-gray-50 rounded-lg p-3">
-                    <p class="text-xs text-gray-600">Messages Received</p>
-                    <p class="text-lg font-semibold text-gray-900">{selectedServer.metrics.messages_received}</p>
+                    <p class="text-xs text-gray-600">Responses Received</p>
+                    <p class="text-lg font-semibold text-gray-900">{selectedServer.metrics.responses_received}</p>
                   </div>
                   <div class="bg-gray-50 rounded-lg p-3">
                     <p class="text-xs text-gray-600">Data Sent</p>

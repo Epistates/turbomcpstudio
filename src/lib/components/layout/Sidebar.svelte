@@ -150,12 +150,13 @@
     // Debug log the transport object structure
     console.log('Transport object:', JSON.stringify(transport, null, 2));
 
-    // Check for the serde tagged format first
+    // Rust enum with serde(tag = "type", rename_all = "camelCase") serializes as:
+    // { "type": "stdio", "command": "...", ... }
     if (transport.type) {
       return transport.type.toUpperCase();
     }
 
-    // Check for individual transport variants (if serde serializes them as object keys)
+    // Fallback checks for other possible formats
     if (transport.stdio) return 'STDIO';
     if (transport.http) return 'HTTP';
     if (transport.websocket) return 'WEBSOCKET';
@@ -290,11 +291,11 @@
 
                     <div class="mcp-sidebar__server-meta">
                       <span class="mcp-sidebar__server-transport">
-                        {getTransportType(server.config.transport)}
+                        {getTransportType(server.config.transport_config)}
                       </span>
                       {#if server.metrics}
                         <span class="mcp-sidebar__server-messages">
-                          {server.metrics.messages_sent + server.metrics.messages_received} msgs
+                          {server.metrics.requests_sent + server.metrics.responses_received} msgs
                         </span>
                       {/if}
                     </div>

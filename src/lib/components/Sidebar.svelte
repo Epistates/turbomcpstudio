@@ -134,10 +134,10 @@
                   </p>
                 {/if}
                 <div class="mt-1 flex items-center space-x-2 text-xs text-gray-400">
-                  <span class="capitalize">{server.config.transport.type}</span>
+                  <span class="capitalize">{server.config.transport_config.type}</span>
                   {#if server.metrics}
                     <span>•</span>
-                    <span>{server.metrics.messages_sent + server.metrics.messages_received} msgs</span>
+                    <span>{server.metrics.requests_sent + server.metrics.responses_received} msgs</span>
                   {/if}
                 </div>
               </div>
