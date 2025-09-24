@@ -1,0 +1,1171 @@
+
+> turbomcpstudio@0.1.0 tauri /Users/nickpaterno/work/turbomcpstudio
+> tauri "dev"
+
+     Running BeforeDevCommand (`pnpm dev`)
+
+> turbomcpstudio@0.1.0 dev /Users/nickpaterno/work/turbomcpstudio
+> vite dev
+
+
+  VITE v6.3.6  ready in 326 ms
+
+  ➜  Local:   http://localhost:1420/
+     Running DevCommand (`cargo  run --no-default-features --features stdio,http,websocket,tcp,unix --color always --`)
+        Info Watching /Users/nickpaterno/work/turbomcpstudio/src-tauri for changes...
+[0m[1m[33mwarning[0m[0m[1m: unused import: `LLMProviderType`[0m
+[0m [0m[0m[1m[38;5;12m--> [0m[0msrc/llm_config.rs:3:42[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m3[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    LLMConfiguration, LLMProviderStatus, LLMProviderType,[0m
+[0m  [0m[0m[1m[38;5;12m|[0m[0m                                          [0m[0m[1m[33m^^^^^^^^^^^^^^^[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m  [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(unused_imports)]` on by default[0m
+
+[0m[1m[33mwarning[0m[0m[1m: unused import: `error`[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/llm_config.rs:11:15[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m11[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0muse tracing::{error, info, warn};[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m               [0m[0m[1m[33m^^^^^[0m
+
+[0m[1m[33mwarning[0m[0m[1m: unused import: `DelegatingSamplingHandler`[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:20:22[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m20[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    SamplingHandler, DelegatingSamplingHandler,[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m                      [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[0m[1m[33mwarning[0m[0m[1m: unused imports: `ContentBlock`, `ImageContent`, `PromptMessage`, `ResourceContent`, and `TextContent`[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/types/server_types.rs:13:48[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m13[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    ServerCapabilities, Tool, ToolInputSchema, PromptMessage,[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m                                                [0m[0m[1m[33m^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m14[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    ContentBlock, TextContent, ImageContent, ResourceContent,[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[33m^^^^^^^^^^^^[0m[0m  [0m[0m[1m[33m^^^^^^^^^^^[0m[0m  [0m[0m[1m[33m^^^^^^^^^^^^[0m[0m  [0m[0m[1m[33m^^^^^^^^^^^^^^^[0m
+
+[0m[1m[33mwarning[0m[0m[1m: unused import: `collections::*`[0m
+[0m [0m[0m[1m[38;5;12m--> [0m[0msrc/types/mod.rs:5:9[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m5[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub use collections::*;[0m
+[0m  [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^^^^^^^^[0m
+
+[0m[1m[33mwarning[0m[0m[1m: unused variable: `api_key`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/llm_config.rs:218:13[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m218[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m        let api_key = self.get_api_key(provider_id).await?;[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m             [0m[0m[1m[33m^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_api_key`[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(unused_variables)]` on by default[0m
+
+[0m[1m[33mwarning[0m[0m[1m: unused variable: `handler`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:713:21[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m713[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m        if let Some(handler) = llm_config.get_active_sampling_handler().await {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                     [0m[0m[1m[33m^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_handler`[0m
+
+[0m[1m[33mwarning[0m[0m[1m: unused variable: `client`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:719:29[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m719[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m                if let Some(client) = connection.client.read().as_ref() {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                             [0m[0m[1m[33m^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_client`[0m
+
+[0m[1m[33mwarning[0m[0m[1m: unused variable: `connected_at`[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:2180:21[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m2180[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m        if let Some(connected_at) = *connection.connected_at.read() {[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                     [0m[0m[1m[33m^^^^^^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_connected_at`[0m
+
+[0m[1m[33mwarning[0m[0m[1m: unused variable: `llm_config`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:699:9[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m699[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m        llm_config: &crate::llm_config::LLMConfigManager,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_llm_config`[0m
+
+[0m[1m[33mwarning[0m[0m[1m: unused variable: `uptime_seconds`[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:1610:37[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m1610[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m...[0m[0m                   let uptime_seconds = connected_at.elapsed().as_secs();[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                           [0m[0m[1m[33m^^^^^^^^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_uptime_seconds`[0m
+
+[0m[1m[33mwarning[0m[0m[1m: unused variable: `metrics`[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:1611:41[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m1611[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m...[0m[0m                   let mut metrics = connection.metrics.write();[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                               [0m[0m[1m[33m^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_metrics`[0m
+
+[0m[1m[33mwarning[0m[0m[1m: variable does not need to be mutable[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:1611:37[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m1611[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m...[0m[0m                   let mut metrics = connection.metrics.write();[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                           [0m[0m[1m[38;5;12m----[0m[0m[1m[33m^^^^^^^[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                           [0m[0m[1m[38;5;12m|[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                           [0m[0m[1m[38;5;12mhelp: remove this `mut`[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m     [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(unused_mut)]` on by default[0m
+
+[0m[1m[33mwarning[0m[0m[1m: associated items `new`, `create_essential_tables`, `save_message`, `get_message_history`, and `clear_message_history` are never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/database.rs:14:18[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m12[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl Database {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m-------------[0m[0m [0m[0m[1m[38;5;12massociated items in this implementation[0m
+[0m[1m[38;5;12m13[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    /// Create a new database connection with lightweight initialization[0m
+[0m[1m[38;5;12m14[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn new(database_path: &str) -> McpResult<Self> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m120[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    async fn create_essential_tables(&self) -> McpResult<()> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m              [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m671[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn save_message(&self, message: &MessageHistory) -> McpResult<()> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m699[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn get_message_history([0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m761[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn clear_message_history(&self, server_id: Uuid) -> McpResult<()> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(dead_code)]` on by default[0m
+
+[0m[1m[33mwarning[0m[0m[1m: variant `Stdio` is never constructed[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:102:5[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m101[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub enum McpTransportClient {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m          [0m[0m[1m[38;5;12m------------------[0m[0m [0m[0m[1m[38;5;12mvariant in this enum[0m
+[0m[1m[38;5;12m102[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    Stdio(SharedClient<StdioTransport>),[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[33m^^^^^[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `McpTransportClient` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis[0m
+
+[0m[1m[33mwarning[0m[0m[1m: associated items `create_basic_tool_schema`, `transport_type`, `register_elicitation_handler`, `register_progress_handler`, `register_log_handler`, and `register_resource_update_handler` are never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:120:8[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m118[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl McpTransportClient {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m-----------------------[0m[0m [0m[0m[1m[38;5;12massociated items in this implementation[0m
+[0m[1m[38;5;12m119[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    /// Create a basic tool schema for tools where we don't have full schema information[0m
+[0m[1m[38;5;12m120[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    fn create_basic_tool_schema(_name: &str) -> ToolInputSchema {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m        [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m312[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn transport_type(&self) -> &'static str {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m399[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn register_elicitation_handler(&self, handler: Arc<dyn ElicitationHandler>) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m421[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn register_progress_handler(&self, handler: Arc<dyn ProgressHandler>) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m443[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn register_log_handler(&self, handler: Arc<dyn LogHandler>) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m465[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn register_resource_update_handler(&self, handler: Arc<dyn ResourceUpdateHandler>) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[0m[1m[33mwarning[0m[0m[1m: field `elicitation_handler` is never read[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:585:5[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m571[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub struct McpClientManager {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m----------------[0m[0m [0m[0m[1m[38;5;12mfield in this struct[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m585[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    elicitation_handler: Option<Arc<dyn ElicitationHandler>>,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^[0m
+
+[0m[1m[33mwarning[0m[0m[1m: fields `child`, `started_at`, `command`, and `args` are never read[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:616:9[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m615[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub struct ManagedProcess {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m--------------[0m[0m [0m[0m[1m[38;5;12mfields in this struct[0m
+[0m[1m[38;5;12m616[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub child: Child,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^[0m
+[0m[1m[38;5;12m617[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub pid: u32,[0m
+[0m[1m[38;5;12m618[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub started_at: chrono::DateTime<chrono::Utc>,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^^^^[0m
+[0m[1m[38;5;12m619[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub command: String,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^[0m
+[0m[1m[38;5;12m620[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub args: Vec<String>,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^[0m
+
+[0m[1m[33mwarning[0m[0m[1m: associated items `create_sampling_handler_from_config`, `get_process_info`, and `get_process_info_static` are never used[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:698:8[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m656[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl McpClientManager {[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m---------------------[0m[0m [0m[0m[1m[38;5;12massociated items in this implementation[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m698[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    fn create_sampling_handler_from_config([0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m        [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m1534[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    async fn get_process_info(&self, process: &ManagedProcess) -> Option<ProcessInfo> {[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m              [0m[0m[1m[33m^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m1700[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    async fn get_process_info_static([0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m              [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[0m[1m[33mwarning[0m[0m[1m: constant `COLLECTION_FORMAT_VERSION` is never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/types/collections.rs:418:11[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m418[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub const COLLECTION_FORMAT_VERSION: &str = "1.0.0";[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m           [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[0m[1m[33mwarning[0m[0m[1m: associated items `new`, `add_step`, `update_step`, and `remove_step` are never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/types/collections.rs:433:12[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m431[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl Collection {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m---------------[0m[0m [0m[0m[1m[38;5;12massociated items in this implementation[0m
+[0m[1m[38;5;12m432[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    /// Create a new empty collection[0m
+[0m[1m[38;5;12m433[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn new(name: String, description: Option<String>) -> Self {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m453[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn add_step(&mut self, step: WorkflowStep) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m459[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn update_step(&mut self, step_id: Uuid, step: WorkflowStep) -> Result<(), String> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m470[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn remove_step(&mut self, step_id: Uuid) -> Result<(), String> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^^^^^^^^^[0m
+
+[0m[1m[33mwarning[0m[0m[1m: associated function `new` is never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/types/collections.rs:533:12[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m531[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl WorkflowStep {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m-----------------[0m[0m [0m[0m[1m[38;5;12massociated function in this implementation[0m
+[0m[1m[38;5;12m532[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    /// Create a new workflow step[0m
+[0m[1m[38;5;12m533[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn new(name: String, operation: McpOperation) -> Self {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^[0m
+
+[0m[1m[33mwarning[0m[0m[1m: field `secrets` is never read[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/workflow_engine.rs:44:5[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m42[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub struct VariableStore {[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m-------------[0m[0m [0m[0m[1m[38;5;12mfield in this struct[0m
+[0m[1m[38;5;12m43[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    variables: HashMap<String, Value>,[0m
+[0m[1m[38;5;12m44[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    secrets: HashMap<String, String>, // Encrypted storage for sensitive data[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[33m^^^^^^^[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m   [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `VariableStore` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis[0m
+
+[0m[1m[33mwarning[0m[0m[1m: field `dependencies_met` is never read[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/workflow_engine.rs:56:9[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m49[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub struct StepExecutionState {[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m------------------[0m[0m [0m[0m[1m[38;5;12mfield in this struct[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m56[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub dependencies_met: bool,[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^^^^^^^^^^[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m   [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `StepExecutionState` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis[0m
+
+[0m[1m[33mwarning[0m[0m[1m: method `get_execution` is never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/workflow_engine.rs:653:18[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m60[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl WorkflowEngine {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m-------------------[0m[0m [0m[0m[1m[38;5;12mmethod in this implementation[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m653[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn get_execution(&self, execution_id: Uuid) -> McpResult<Option<WorkflowExecution>> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^[0m
+
+[1m[33mwarning[0m[1m:[0m `turbomcpstudio` (lib) generated 25 warnings (run `cargo fix --lib -p turbomcpstudio` to apply 6 suggestions)
+[1m[32m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 0.19s
+[1m[32m     Running[0m `target/debug/turbomcpstudio`
+[2m2025-09-24T14:36:39.567453Z[0m [32m INFO[0m [2mturbomcpstudio_lib::mcp_client[0m[2m:[0m MCP Client Manager initialized - ready for enterprise connections
+[2m2025-09-24T14:36:39.567507Z[0m [32m INFO[0m [2mturbomcpstudio_lib::mcp_client[0m[2m:[0m Available transports: STDIO, HTTP, WebSocket, TCP, Unix
+[2m2025-09-24T14:36:39.567514Z[0m [32m INFO[0m [2mturbomcpstudio_lib::mcp_client[0m[2m:[0m TurboMCP v1.0.11 integration ready with plugin and LLM registry support
+[2m2025-09-24T14:36:39.567521Z[0m [33m WARN[0m [2mturbomcpstudio_lib::mcp_client[0m[2m:[0m No LLM providers registered - sampling will be unavailable
+[2m2025-09-24T14:36:39.567609Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m MCP Studio setup complete, background initialization started
+[2m2025-09-24T14:36:39.567829Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m Starting background initialization
+[2m2025-09-24T14:36:39.567870Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m App data directory: "/Users/nickpaterno/.turbomcpstudio"
+[2m2025-09-24T14:36:39.567888Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m Data directory created successfully
+[2m2025-09-24T14:36:39.567904Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m Attempting to initialize database at: "/Users/nickpaterno/.turbomcpstudio/mcp_studio.db"
+[2m2025-09-24T14:36:39.567922Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database initialization: path=/Users/nickpaterno/.turbomcpstudio/mcp_studio.db
+[2m2025-09-24T14:36:39.567927Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database file path: "/Users/nickpaterno/.turbomcpstudio/mcp_studio.db"
+[2m2025-09-24T14:36:39.567944Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Ensuring parent directory exists: "/Users/nickpaterno/.turbomcpstudio"
+[2m2025-09-24T14:36:39.568156Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Directory is writable: "/Users/nickpaterno/.turbomcpstudio"
+[2m2025-09-24T14:36:39.568173Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database URL: sqlite:///Users/nickpaterno/.turbomcpstudio/mcp_studio.db?mode=rwc
+[2m2025-09-24T14:36:39.568184Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database file exists: true
+[2m2025-09-24T14:36:39.568188Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database path: "/Users/nickpaterno/.turbomcpstudio/mcp_studio.db"
+[2m2025-09-24T14:36:39.569624Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"PRAGMA foreign_keys = ON; …" [3mdb.statement[0m[2m=[0m"\n\nPRAGMA foreign_keys = ON; \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m160.042µs [3melapsed_secs[0m[2m=[0m0.000160042
+[2m2025-09-24T14:36:39.569685Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Successfully connected to database
+[2m2025-09-24T14:36:39.569693Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Starting database migrations
+[2m2025-09-24T14:36:39.569698Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating server_configs table
+[2m2025-09-24T14:36:39.570209Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS server_configs (\n                id TEXT PRIMARY KEY,\n                name TEXT NOT NULL,\n                description TEXT,\n                transport_type TEXT NOT NULL,\n                transport_config TEXT NOT NULL,\n                environment_variables TEXT NOT NULL,\n                created_at TEXT NOT NULL,\n                updated_at TEXT NOT NULL\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m405.792µs [3melapsed_secs[0m[2m=[0m0.000405792
+[2m2025-09-24T14:36:39.570255Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m server_configs table created successfully
+[2m2025-09-24T14:36:39.570266Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating enhanced collections table
+[2m2025-09-24T14:36:39.570387Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"PRAGMA foreign_keys = ON; …" [3mdb.statement[0m[2m=[0m"\n\nPRAGMA foreign_keys = ON; \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m8.458µs [3melapsed_secs[0m[2m=[0m8.458e-6
+[2m2025-09-24T14:36:39.570557Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS collections (\n                id TEXT PRIMARY KEY,\n                name TEXT NOT NULL,\n                description TEXT,\n                tags TEXT NOT NULL,\n                workflow TEXT NOT NULL,\n                variables TEXT NOT NULL,\n                environment TEXT NOT NULL,\n                created_at TEXT NOT NULL,\n                updated_at TEXT NOT NULL,\n                created_by TEXT,\n                version TEXT NOT NULL,\n                last_run TEXT,\n                run_count INTEGER NOT NULL DEFAULT 0\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m126.5µs [3melapsed_secs[0m[2m=[0m0.0001265
+[2m2025-09-24T14:36:39.570580Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Enhanced collections table created successfully
+[2m2025-09-24T14:36:39.570589Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating workflow_executions table
+[2m2025-09-24T14:36:39.570677Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS workflow_executions (\n                id TEXT PRIMARY KEY,\n                collection_id TEXT NOT NULL,\n                collection_version TEXT NOT NULL,\n                started_at TEXT NOT NULL,\n                completed_at TEXT,\n                status TEXT NOT NULL,\n                step_results TEXT NOT NULL,\n                final_variables TEXT NOT NULL,\n                summary TEXT NOT NULL,\n                environment_name TEXT NOT NULL,\n                user_variables TEXT NOT NULL,\n                FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m31.25µs [3melapsed_secs[0m[2m=[0m3.125e-5
+[2m2025-09-24T14:36:39.570707Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m workflow_executions table created successfully
+[2m2025-09-24T14:36:39.570717Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating collection_templates table
+[2m2025-09-24T14:36:39.570793Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS collection_templates (\n                id TEXT PRIMARY KEY,\n                name TEXT NOT NULL,\n                description TEXT NOT NULL,\n                category TEXT NOT NULL,\n                tags TEXT NOT NULL,\n                author TEXT,\n                documentation_url TEXT,\n                required_server_types TEXT NOT NULL,\n                template_collection TEXT NOT NULL,\n                setup_instructions TEXT NOT NULL,\n                usage_examples TEXT NOT NULL,\n                created_at TEXT NOT NULL,\n                updated_at TEXT NOT NULL\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m21.666µs [3melapsed_secs[0m[2m=[0m2.1666e-5
+[2m2025-09-24T14:36:39.570818Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m collection_templates table created successfully
+[2m2025-09-24T14:36:39.570845Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating message_history table
+[2m2025-09-24T14:36:39.570904Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS message_history (\n                id TEXT PRIMARY KEY,\n                server_id TEXT NOT NULL,\n                timestamp TEXT NOT NULL,\n                direction TEXT NOT NULL,\n                content TEXT NOT NULL,\n                size_bytes INTEGER NOT NULL,\n                processing_time_ms INTEGER,\n                FOREIGN KEY(server_id) REFERENCES server_configs(id)\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m19.958µs [3melapsed_secs[0m[2m=[0m1.9958e-5
+[2m2025-09-24T14:36:39.570925Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m message_history table created successfully
+[2m2025-09-24T14:36:39.570932Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating workspaces table
+[2m2025-09-24T14:36:39.570982Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS workspaces (\n                id TEXT PRIMARY KEY,\n                name TEXT NOT NULL,\n                description TEXT,\n                collections TEXT NOT NULL,\n                members TEXT NOT NULL,\n                settings TEXT NOT NULL,\n                created_at TEXT NOT NULL,\n                updated_at TEXT NOT NULL\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m15.917µs [3melapsed_secs[0m[2m=[0m1.5917e-5
+[2m2025-09-24T14:36:39.571007Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m workspaces table created successfully
+[2m2025-09-24T14:36:39.571013Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating server_sessions table
+[2m2025-09-24T14:36:39.571065Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS server_sessions (\n                id TEXT PRIMARY KEY,\n                server_id TEXT NOT NULL,\n                started_at TEXT NOT NULL,\n                ended_at TEXT,\n                status TEXT NOT NULL,\n                capabilities TEXT,\n                metrics TEXT NOT NULL,\n                process_info TEXT,\n                FOREIGN KEY(server_id) REFERENCES server_configs(id)\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m15.375µs [3melapsed_secs[0m[2m=[0m1.5375e-5
+[2m2025-09-24T14:36:39.571083Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m server_sessions table created successfully
+[2m2025-09-24T14:36:39.571096Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating database indexes
+[2m2025-09-24T14:36:39.571115Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating idx_message_history_server_id index
+[2m2025-09-24T14:36:39.571163Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE INDEX IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE INDEX IF NOT EXISTS idx_message_history_server_id ON message_history(server_id)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m15.583µs [3melapsed_secs[0m[2m=[0m1.5583e-5
+[2m2025-09-24T14:36:39.571181Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating idx_message_history_timestamp index
+[2m2025-09-24T14:36:39.571222Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE INDEX IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE INDEX IF NOT EXISTS idx_message_history_timestamp ON message_history(timestamp)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m13.083µs [3melapsed_secs[0m[2m=[0m1.3083e-5
+[2m2025-09-24T14:36:39.571237Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating idx_server_sessions_server_id index
+[2m2025-09-24T14:36:39.571283Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE INDEX IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE INDEX IF NOT EXISTS idx_server_sessions_server_id ON server_sessions(server_id)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m10.666µs [3melapsed_secs[0m[2m=[0m1.0666e-5
+[2m2025-09-24T14:36:39.571299Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database migrations completed successfully
+[2m2025-09-24T14:36:39.571305Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database migrations completed successfully
+[2m2025-09-24T14:36:39.571310Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m ✅ Successfully using persistent database at "/Users/nickpaterno/.turbomcpstudio/mcp_studio.db"
+[2m2025-09-24T14:36:39.571327Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m Database initialized successfully
+[2m2025-09-24T14:36:39.571356Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m LLM providers initialized
+[2m2025-09-24T14:36:39.571361Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m MCP Studio background initialization complete
+[2m2025-09-24T14:36:39.571372Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m app-ready event emitted
+10:36:40 AM [vite-plugin-svelte] src/routes/+layout.svelte:136:4 Using `<slot>` to render parent content is deprecated. Use `{@render ...}` tags instead
+https://svelte.dev/e/slot_element_deprecated
+10:36:40 AM [vite-plugin-svelte] src/lib/components/layout/MasterLayout.svelte:276:2 Unused CSS selector "[data-theme="dark"] .mcp-mobile-overlay"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/layout/Header.svelte:283:2 Unused CSS selector ".mcp-header__search-icon"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/layout/Header.svelte:394:2 Unused CSS selector "[data-theme="dark"] .mcp-header__status-indicator--connected"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/layout/Header.svelte:399:2 Unused CSS selector "[data-theme="dark"] .mcp-header__status-indicator--partial"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/layout/Header.svelte:404:2 Unused CSS selector "[data-theme="dark"] .mcp-header__status-indicator--disconnected"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/layout/MainContent.svelte:261:2 Unused CSS selector "[data-theme="dark"] .mcp-modal-overlay"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/layout/Sidebar.svelte:699:2 Unused CSS selector "[data-theme="dark"] .mcp-sidebar__add-button"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/layout/Sidebar.svelte:704:2 Unused CSS selector "[data-theme="dark"] .mcp-sidebar__add-button:hover"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/layout/Sidebar.svelte:708:2 Unused CSS selector "[data-theme="dark"] .nav-item-active"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/layout/Sidebar.svelte:715:2 Unused CSS selector "[data-theme="dark"] .mcp-sidebar__server-item:hover"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/PromptDesigner.svelte:400:31 Quoted attributes on components and custom elements will be stringified in a future version of Svelte. If this isn't what you want, remove the quotes
+https://svelte.dev/e/attribute_quoted
+10:36:40 AM [vite-plugin-svelte] src/lib/components/PromptDesigner.svelte:407:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/PromptDesigner.svelte:594:20 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingTester.svelte:255:16 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingTester.svelte:268:18 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingTester.svelte:278:18 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingTester.svelte:294:16 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingTester.svelte:307:16 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingTester.svelte:320:16 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingTester.svelte:340:16 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingTester.svelte:349:16 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingTester.svelte:365:18 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingTester.svelte:378:18 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingTester.svelte:390:16 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingTester.svelte:406:16 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingTester.svelte:416:18 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ElicitationFlow.svelte:309:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ElicitationFlow.svelte:567:22 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:630:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:641:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:677:16 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:702:16 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:715:18 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:735:18 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:757:16 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:776:16 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:812:18 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:822:18 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:835:16 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:848:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:967:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:1040:2 Unused CSS selector ".transport-option-icon-svg"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:1045:2 Unused CSS selector ".transport-option-button:hover .transport-option-icon-svg"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:1098:2 Unused CSS selector ".json-import-icon-svg"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/AddServerModal.svelte:1103:2 Unused CSS selector ".json-import-button:hover .json-import-icon-svg"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ResourceBrowser.svelte:646:20 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:675:8 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:702:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:766:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:775:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:785:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:827:24 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:908:20 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:928:20 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:966:24 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1007:24 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1722:2 Unused CSS selector "html[data-theme="dark"] .kbd"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1723:2 Unused CSS selector "[data-theme="dark"] .kbd"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1751:2 Unused CSS selector "html[data-theme="dark"] .form-label"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1752:2 Unused CSS selector "[data-theme="dark"] .form-label"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1771:2 Unused CSS selector "html[data-theme="dark"] .form-input"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1772:2 Unused CSS selector "[data-theme="dark"] .form-input"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1796:2 Unused CSS selector "html[data-theme="dark"] .form-input::-moz-placeholder"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1796:57 Unused CSS selector "[data-theme="dark"] .form-input::-moz-placeholder"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1800:2 Unused CSS selector "html[data-theme="dark"] .form-input::placeholder"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1801:2 Unused CSS selector "[data-theme="dark"] .form-input::placeholder"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1805:2 Unused CSS selector "html[data-theme="dark"] .form-input:is(.dark *)::-moz-placeholder"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1805:69 Unused CSS selector "[data-theme="dark"] .form-input:is(.dark *)::-moz-placeholder"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1809:2 Unused CSS selector "html[data-theme="dark"] .form-input:is(.dark *)::placeholder"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/SamplingWorkbench.svelte:1810:2 Unused CSS selector "[data-theme="dark"] .form-input:is(.dark *)::placeholder"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/CollectionsManager.svelte:463:14 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+10:36:40 AM [vite-plugin-svelte] src/lib/components/CollectionsManager.svelte:463:14 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+10:36:40 AM [vite-plugin-svelte] src/lib/components/CollectionsManager.svelte:716:8 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/CollectionsManager.svelte:814:14 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/CollectionsManager.svelte:827:18 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/CollectionsManager.svelte:833:24 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/Settings.svelte:690:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/Settings.svelte:750:2 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+10:36:40 AM [vite-plugin-svelte] src/lib/components/Settings.svelte:750:2 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+10:36:40 AM [vite-plugin-svelte] src/lib/components/Settings.svelte:751:4 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+10:36:40 AM [vite-plugin-svelte] src/lib/components/Settings.svelte:751:4 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+10:36:40 AM [vite-plugin-svelte] src/lib/components/Settings.svelte:773:12 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/Settings.svelte:798:10 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:251:18 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:265:18 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:281:18 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:295:20 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:303:22 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:312:22 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:321:20 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:329:22 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:343:22 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:349:22 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:358:20 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:368:20 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:427:20 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ServerConfigModal.svelte:433:20 A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ui/EmptyCapabilityState.svelte:157:2 Unused CSS selector ".empty-capability-state__icon-bg"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ui/EmptyCapabilityState.svelte:217:2 Unused CSS selector "[data-theme="dark"] .empty-capability-state__suggestion"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ExecutionMonitor.svelte:794:2 Unused CSS selector "[data-theme="dark"] .execution-monitor__operation-type"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ExecutionMonitor.svelte:799:2 Unused CSS selector "[data-theme="dark"] .execution-monitor__event--step_started"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ExecutionMonitor.svelte:803:2 Unused CSS selector "[data-theme="dark"] .execution-monitor__event--step_completed"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ExecutionMonitor.svelte:804:2 Unused CSS selector "[data-theme="dark"] .execution-monitor__event--execution_completed"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ExecutionMonitor.svelte:808:2 Unused CSS selector "[data-theme="dark"] .execution-monitor__event--step_failed"
+https://svelte.dev/e/css_unused_selector
+10:36:40 AM [vite-plugin-svelte] src/lib/components/ExecutionMonitor.svelte:809:2 Unused CSS selector "[data-theme="dark"] .execution-monitor__event--execution_failed"
+https://svelte.dev/e/css_unused_selector
+[2m2025-09-24T14:36:40.982842Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"SELECT id, name, description, …" [3mdb.statement[0m[2m=[0m"\n\nSELECT id, name, description, transport_type, transport_config, environment_variables, created_at, updated_at FROM server_configs ORDER BY name\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m3 [3melapsed[0m[2m=[0m150.166µs [3melapsed_secs[0m[2m=[0m0.000150166
+        Info File src-tauri/src/llm_config.rs.tmp.27693.1758724623751 changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --features stdio,http,websocket,tcp,unix --color always --`)
+        Info File src-tauri/src/llm_config.rs.tmp.27693.1758724623751 changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --features stdio,http,websocket,tcp,unix --color always --`)
+        Info File src-tauri/src/llm_config.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --features stdio,http,websocket,tcp,unix --color always --`)
+[1m[32m   Compiling[0m turbomcpstudio v0.1.0 (/Users/nickpaterno/work/turbomcpstudio/src-tauri)
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused import: `LLMProviderType`[0m
+[0m [0m[0m[1m[38;5;12m--> [0m[0msrc/llm_config.rs:3:42[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m3[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    LLMConfiguration, LLMProviderStatus, LLMProviderType,[0m
+[0m  [0m[0m[1m[38;5;12m|[0m[0m                                          [0m[0m[1m[33m^^^^^^^^^^^^^^^[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m  [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(unused_imports)]` on by default[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused import: `error`[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/llm_config.rs:11:15[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m11[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0muse tracing::{error, info, warn};[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m               [0m[0m[1m[33m^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused import: `DelegatingSamplingHandler`[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:20:22[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m20[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    SamplingHandler, DelegatingSamplingHandler,[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m                      [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused imports: `ContentBlock`, `ImageContent`, `PromptMessage`, `ResourceContent`, and `TextContent`[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/types/server_types.rs:13:48[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m13[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    ServerCapabilities, Tool, ToolInputSchema, PromptMessage,[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m                                                [0m[0m[1m[33m^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m14[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    ContentBlock, TextContent, ImageContent, ResourceContent,[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[33m^^^^^^^^^^^^[0m[0m  [0m[0m[1m[33m^^^^^^^^^^^[0m[0m  [0m[0m[1m[33m^^^^^^^^^^^^[0m[0m  [0m[0m[1m[33m^^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused import: `collections::*`[0m
+[0m [0m[0m[1m[38;5;12m--> [0m[0msrc/types/mod.rs:5:9[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m5[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub use collections::*;[0m
+[0m  [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `api_key`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/llm_config.rs:229:13[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m229[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m        let api_key = self.get_api_key(provider_id).await?;[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m             [0m[0m[1m[33m^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_api_key`[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(unused_variables)]` on by default[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `handler`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:713:21[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m713[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m        if let Some(handler) = llm_config.get_active_sampling_handler().await {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                     [0m[0m[1m[33m^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_handler`[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `client`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:719:29[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m719[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m                if let Some(client) = connection.client.read().as_ref() {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                             [0m[0m[1m[33m^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_client`[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `connected_at`[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:2180:21[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m2180[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m        if let Some(connected_at) = *connection.connected_at.read() {[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                     [0m[0m[1m[33m^^^^^^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_connected_at`[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `llm_config`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:699:9[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m699[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m        llm_config: &crate::llm_config::LLMConfigManager,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_llm_config`[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `uptime_seconds`[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:1610:37[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m1610[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m...[0m[0m                   let uptime_seconds = connected_at.elapsed().as_secs();[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                           [0m[0m[1m[33m^^^^^^^^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_uptime_seconds`[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `metrics`[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:1611:41[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m1611[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m...[0m[0m                   let mut metrics = connection.metrics.write();[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                               [0m[0m[1m[33m^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_metrics`[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: variable does not need to be mutable[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:1611:37[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m1611[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m...[0m[0m                   let mut metrics = connection.metrics.write();[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                           [0m[0m[1m[38;5;12m----[0m[0m[1m[33m^^^^^^^[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                           [0m[0m[1m[38;5;12m|[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                           [0m[0m[1m[38;5;12mhelp: remove this `mut`[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m     [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(unused_mut)]` on by default[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: associated items `new`, `create_essential_tables`, `save_message`, `get_message_history`, and `clear_message_history` are never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/database.rs:14:18[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m12[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl Database {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m-------------[0m[0m [0m[0m[1m[38;5;12massociated items in this implementation[0m
+[0m[1m[38;5;12m13[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    /// Create a new database connection with lightweight initialization[0m
+[0m[1m[38;5;12m14[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn new(database_path: &str) -> McpResult<Self> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m120[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    async fn create_essential_tables(&self) -> McpResult<()> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m              [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m671[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn save_message(&self, message: &MessageHistory) -> McpResult<()> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m699[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn get_message_history([0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m761[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn clear_message_history(&self, server_id: Uuid) -> McpResult<()> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(dead_code)]` on by default[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: variant `Stdio` is never constructed[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:102:5[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m101[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub enum McpTransportClient {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m          [0m[0m[1m[38;5;12m------------------[0m[0m [0m[0m[1m[38;5;12mvariant in this enum[0m
+[0m[1m[38;5;12m102[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    Stdio(SharedClient<StdioTransport>),[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[33m^^^^^[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `McpTransportClient` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: associated items `create_basic_tool_schema`, `transport_type`, `register_elicitation_handler`, `register_progress_handler`, `register_log_handler`, and `register_resource_update_handler` are never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:120:8[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m118[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl McpTransportClient {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m-----------------------[0m[0m [0m[0m[1m[38;5;12massociated items in this implementation[0m
+[0m[1m[38;5;12m119[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    /// Create a basic tool schema for tools where we don't have full schema information[0m
+[0m[1m[38;5;12m120[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    fn create_basic_tool_schema(_name: &str) -> ToolInputSchema {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m        [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m312[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn transport_type(&self) -> &'static str {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m399[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn register_elicitation_handler(&self, handler: Arc<dyn ElicitationHandler>) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m421[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn register_progress_handler(&self, handler: Arc<dyn ProgressHandler>) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m443[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn register_log_handler(&self, handler: Arc<dyn LogHandler>) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m465[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn register_resource_update_handler(&self, handler: Arc<dyn ResourceUpdateHandler>) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: field `elicitation_handler` is never read[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:585:5[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m571[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub struct McpClientManager {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m----------------[0m[0m [0m[0m[1m[38;5;12mfield in this struct[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m585[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    elicitation_handler: Option<Arc<dyn ElicitationHandler>>,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: fields `child`, `started_at`, `command`, and `args` are never read[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:616:9[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m615[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub struct ManagedProcess {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m--------------[0m[0m [0m[0m[1m[38;5;12mfields in this struct[0m
+[0m[1m[38;5;12m616[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub child: Child,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^[0m
+[0m[1m[38;5;12m617[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub pid: u32,[0m
+[0m[1m[38;5;12m618[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub started_at: chrono::DateTime<chrono::Utc>,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^^^^[0m
+[0m[1m[38;5;12m619[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub command: String,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^[0m
+[0m[1m[38;5;12m620[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub args: Vec<String>,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: associated items `create_sampling_handler_from_config`, `get_process_info`, and `get_process_info_static` are never used[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:698:8[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m656[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl McpClientManager {[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m---------------------[0m[0m [0m[0m[1m[38;5;12massociated items in this implementation[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m698[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    fn create_sampling_handler_from_config([0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m        [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m1534[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    async fn get_process_info(&self, process: &ManagedProcess) -> Option<ProcessInfo> {[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m              [0m[0m[1m[33m^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m1700[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    async fn get_process_info_static([0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m              [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: constant `COLLECTION_FORMAT_VERSION` is never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/types/collections.rs:418:11[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m418[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub const COLLECTION_FORMAT_VERSION: &str = "1.0.0";[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m           [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: associated items `new`, `add_step`, `update_step`, and `remove_step` are never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/types/collections.rs:433:12[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m431[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl Collection {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m---------------[0m[0m [0m[0m[1m[38;5;12massociated items in this implementation[0m
+[0m[1m[38;5;12m432[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    /// Create a new empty collection[0m
+[0m[1m[38;5;12m433[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn new(name: String, description: Option<String>) -> Self {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m453[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn add_step(&mut self, step: WorkflowStep) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m459[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn update_step(&mut self, step_id: Uuid, step: WorkflowStep) -> Result<(), String> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m470[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn remove_step(&mut self, step_id: Uuid) -> Result<(), String> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: associated function `new` is never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/types/collections.rs:533:12[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m531[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl WorkflowStep {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m-----------------[0m[0m [0m[0m[1m[38;5;12massociated function in this implementation[0m
+[0m[1m[38;5;12m532[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    /// Create a new workflow step[0m
+[0m[1m[38;5;12m533[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn new(name: String, operation: McpOperation) -> Self {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: field `secrets` is never read[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/workflow_engine.rs:44:5[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m42[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub struct VariableStore {[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m-------------[0m[0m [0m[0m[1m[38;5;12mfield in this struct[0m
+[0m[1m[38;5;12m43[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    variables: HashMap<String, Value>,[0m
+[0m[1m[38;5;12m44[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    secrets: HashMap<String, String>, // Encrypted storage for sensitive data[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[33m^^^^^^^[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m   [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `VariableStore` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: field `dependencies_met` is never read[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/workflow_engine.rs:56:9[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m49[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub struct StepExecutionState {[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m------------------[0m[0m [0m[0m[1m[38;5;12mfield in this struct[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m56[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub dependencies_met: bool,[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^^^^^^^^^^[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m   [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `StepExecutionState` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: method `get_execution` is never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/workflow_engine.rs:653:18[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m60[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl WorkflowEngine {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m-------------------[0m[0m [0m[0m[1m[38;5;12mmethod in this implementation[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m653[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn get_execution(&self, execution_id: Uuid) -> McpResult<Option<WorkflowExecution>> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[1m[33mwarning[0m[1m:[0m `turbomcpstudio` (lib) generated 25 warnings (run `cargo fix --lib -p turbomcpstudio` to apply 6 suggestions)
+[1m[36m    Building[0m [=======================> ] 700/701: turbomcpstudio(bin)         [K[1m[32m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 4.35s
+[1m[32m     Running[0m `target/debug/turbomcpstudio`
+[2m2025-09-24T14:37:09.993101Z[0m [32m INFO[0m [2mturbomcpstudio_lib::mcp_client[0m[2m:[0m MCP Client Manager initialized - ready for enterprise connections
+[2m2025-09-24T14:37:09.993171Z[0m [32m INFO[0m [2mturbomcpstudio_lib::mcp_client[0m[2m:[0m Available transports: STDIO, HTTP, WebSocket, TCP, Unix
+[2m2025-09-24T14:37:09.993180Z[0m [32m INFO[0m [2mturbomcpstudio_lib::mcp_client[0m[2m:[0m TurboMCP v1.0.11 integration ready with plugin and LLM registry support
+[2m2025-09-24T14:37:09.993187Z[0m [33m WARN[0m [2mturbomcpstudio_lib::mcp_client[0m[2m:[0m No LLM providers registered - sampling will be unavailable
+[2m2025-09-24T14:37:09.993276Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m MCP Studio setup complete, background initialization started
+[2m2025-09-24T14:37:09.993448Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m Starting background initialization
+[2m2025-09-24T14:37:09.993476Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m App data directory: "/Users/nickpaterno/.turbomcpstudio"
+[2m2025-09-24T14:37:09.993494Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m Data directory created successfully
+[2m2025-09-24T14:37:09.993512Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m Attempting to initialize database at: "/Users/nickpaterno/.turbomcpstudio/mcp_studio.db"
+[2m2025-09-24T14:37:09.993530Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database initialization: path=/Users/nickpaterno/.turbomcpstudio/mcp_studio.db
+[2m2025-09-24T14:37:09.993537Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database file path: "/Users/nickpaterno/.turbomcpstudio/mcp_studio.db"
+[2m2025-09-24T14:37:09.993552Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Ensuring parent directory exists: "/Users/nickpaterno/.turbomcpstudio"
+[2m2025-09-24T14:37:09.993784Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Directory is writable: "/Users/nickpaterno/.turbomcpstudio"
+[2m2025-09-24T14:37:09.993799Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database URL: sqlite:///Users/nickpaterno/.turbomcpstudio/mcp_studio.db?mode=rwc
+[2m2025-09-24T14:37:09.993807Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database file exists: true
+[2m2025-09-24T14:37:09.993811Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database path: "/Users/nickpaterno/.turbomcpstudio/mcp_studio.db"
+[2m2025-09-24T14:37:09.995174Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"PRAGMA foreign_keys = ON; …" [3mdb.statement[0m[2m=[0m"\n\nPRAGMA foreign_keys = ON; \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m156.625µs [3melapsed_secs[0m[2m=[0m0.000156625
+[2m2025-09-24T14:37:09.995238Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Successfully connected to database
+[2m2025-09-24T14:37:09.995246Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Starting database migrations
+[2m2025-09-24T14:37:09.995251Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating server_configs table
+[2m2025-09-24T14:37:09.995718Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS server_configs (\n                id TEXT PRIMARY KEY,\n                name TEXT NOT NULL,\n                description TEXT,\n                transport_type TEXT NOT NULL,\n                transport_config TEXT NOT NULL,\n                environment_variables TEXT NOT NULL,\n                created_at TEXT NOT NULL,\n                updated_at TEXT NOT NULL\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m379.041µs [3melapsed_secs[0m[2m=[0m0.000379041
+[2m2025-09-24T14:37:09.995770Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m server_configs table created successfully
+[2m2025-09-24T14:37:09.995781Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating enhanced collections table
+[2m2025-09-24T14:37:09.995902Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"PRAGMA foreign_keys = ON; …" [3mdb.statement[0m[2m=[0m"\n\nPRAGMA foreign_keys = ON; \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m10.541µs [3melapsed_secs[0m[2m=[0m1.0541e-5
+[2m2025-09-24T14:37:09.996080Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS collections (\n                id TEXT PRIMARY KEY,\n                name TEXT NOT NULL,\n                description TEXT,\n                tags TEXT NOT NULL,\n                workflow TEXT NOT NULL,\n                variables TEXT NOT NULL,\n                environment TEXT NOT NULL,\n                created_at TEXT NOT NULL,\n                updated_at TEXT NOT NULL,\n                created_by TEXT,\n                version TEXT NOT NULL,\n                last_run TEXT,\n                run_count INTEGER NOT NULL DEFAULT 0\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m131.791µs [3melapsed_secs[0m[2m=[0m0.000131791
+[2m2025-09-24T14:37:09.996103Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Enhanced collections table created successfully
+[2m2025-09-24T14:37:09.996110Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating workflow_executions table
+[2m2025-09-24T14:37:09.996170Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS workflow_executions (\n                id TEXT PRIMARY KEY,\n                collection_id TEXT NOT NULL,\n                collection_version TEXT NOT NULL,\n                started_at TEXT NOT NULL,\n                completed_at TEXT,\n                status TEXT NOT NULL,\n                step_results TEXT NOT NULL,\n                final_variables TEXT NOT NULL,\n                summary TEXT NOT NULL,\n                environment_name TEXT NOT NULL,\n                user_variables TEXT NOT NULL,\n                FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m17.625µs [3melapsed_secs[0m[2m=[0m1.7625e-5
+[2m2025-09-24T14:37:09.996195Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m workflow_executions table created successfully
+[2m2025-09-24T14:37:09.996203Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating collection_templates table
+[2m2025-09-24T14:37:09.996263Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS collection_templates (\n                id TEXT PRIMARY KEY,\n                name TEXT NOT NULL,\n                description TEXT NOT NULL,\n                category TEXT NOT NULL,\n                tags TEXT NOT NULL,\n                author TEXT,\n                documentation_url TEXT,\n                required_server_types TEXT NOT NULL,\n                template_collection TEXT NOT NULL,\n                setup_instructions TEXT NOT NULL,\n                usage_examples TEXT NOT NULL,\n                created_at TEXT NOT NULL,\n                updated_at TEXT NOT NULL\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m16.959µs [3melapsed_secs[0m[2m=[0m1.6959e-5
+[2m2025-09-24T14:37:09.996285Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m collection_templates table created successfully
+[2m2025-09-24T14:37:09.996301Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating message_history table
+[2m2025-09-24T14:37:09.996371Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS message_history (\n                id TEXT PRIMARY KEY,\n                server_id TEXT NOT NULL,\n                timestamp TEXT NOT NULL,\n                direction TEXT NOT NULL,\n                content TEXT NOT NULL,\n                size_bytes INTEGER NOT NULL,\n                processing_time_ms INTEGER,\n                FOREIGN KEY(server_id) REFERENCES server_configs(id)\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m26.417µs [3melapsed_secs[0m[2m=[0m2.6417e-5
+[2m2025-09-24T14:37:09.996393Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m message_history table created successfully
+[2m2025-09-24T14:37:09.996399Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating workspaces table
+[2m2025-09-24T14:37:09.996452Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS workspaces (\n                id TEXT PRIMARY KEY,\n                name TEXT NOT NULL,\n                description TEXT,\n                collections TEXT NOT NULL,\n                members TEXT NOT NULL,\n                settings TEXT NOT NULL,\n                created_at TEXT NOT NULL,\n                updated_at TEXT NOT NULL\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m19.292µs [3melapsed_secs[0m[2m=[0m1.9292e-5
+[2m2025-09-24T14:37:09.996471Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m workspaces table created successfully
+[2m2025-09-24T14:37:09.996476Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating server_sessions table
+[2m2025-09-24T14:37:09.996532Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS server_sessions (\n                id TEXT PRIMARY KEY,\n                server_id TEXT NOT NULL,\n                started_at TEXT NOT NULL,\n                ended_at TEXT,\n                status TEXT NOT NULL,\n                capabilities TEXT,\n                metrics TEXT NOT NULL,\n                process_info TEXT,\n                FOREIGN KEY(server_id) REFERENCES server_configs(id)\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m16.584µs [3melapsed_secs[0m[2m=[0m1.6584e-5
+[2m2025-09-24T14:37:09.996550Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m server_sessions table created successfully
+[2m2025-09-24T14:37:09.996556Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating database indexes
+[2m2025-09-24T14:37:09.996570Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating idx_message_history_server_id index
+[2m2025-09-24T14:37:09.996614Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE INDEX IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE INDEX IF NOT EXISTS idx_message_history_server_id ON message_history(server_id)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m12.083µs [3melapsed_secs[0m[2m=[0m1.2083e-5
+[2m2025-09-24T14:37:09.996631Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating idx_message_history_timestamp index
+[2m2025-09-24T14:37:09.996667Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE INDEX IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE INDEX IF NOT EXISTS idx_message_history_timestamp ON message_history(timestamp)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m10.291µs [3melapsed_secs[0m[2m=[0m1.0291e-5
+[2m2025-09-24T14:37:09.996683Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating idx_server_sessions_server_id index
+[2m2025-09-24T14:37:09.996728Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE INDEX IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE INDEX IF NOT EXISTS idx_server_sessions_server_id ON server_sessions(server_id)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m9.791µs [3melapsed_secs[0m[2m=[0m9.791e-6
+[2m2025-09-24T14:37:09.996745Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database migrations completed successfully
+[2m2025-09-24T14:37:09.996751Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database migrations completed successfully
+[2m2025-09-24T14:37:09.996756Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m ✅ Successfully using persistent database at "/Users/nickpaterno/.turbomcpstudio/mcp_studio.db"
+[2m2025-09-24T14:37:09.996772Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m Database initialized successfully
+[2m2025-09-24T14:37:09.996801Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m LLM providers initialized
+[2m2025-09-24T14:37:09.996805Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m MCP Studio background initialization complete
+[2m2025-09-24T14:37:09.996815Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m app-ready event emitted
+[2m2025-09-24T14:37:10.165234Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"SELECT id, name, description, …" [3mdb.statement[0m[2m=[0m"\n\nSELECT id, name, description, transport_type, transport_config, environment_variables, created_at, updated_at FROM server_configs ORDER BY name\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m3 [3melapsed[0m[2m=[0m128.708µs [3melapsed_secs[0m[2m=[0m0.000128708
+        Info File src-tauri/src/llm_config.rs.tmp.27693.1758724661169 changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --features stdio,http,websocket,tcp,unix --color always --`)
+        Info File src-tauri/src/llm_config.rs.tmp.27693.1758724661169 changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --features stdio,http,websocket,tcp,unix --color always --`)
+        Info File src-tauri/src/llm_config.rs changed. Rebuilding application...
+     Running DevCommand (`cargo  run --no-default-features --features stdio,http,websocket,tcp,unix --color always --`)
+[1m[32m   Compiling[0m turbomcpstudio v0.1.0 (/Users/nickpaterno/work/turbomcpstudio/src-tauri)
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused import: `LLMProviderType`[0m
+[0m [0m[0m[1m[38;5;12m--> [0m[0msrc/llm_config.rs:3:42[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m3[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    LLMConfiguration, LLMProviderStatus, LLMProviderType,[0m
+[0m  [0m[0m[1m[38;5;12m|[0m[0m                                          [0m[0m[1m[33m^^^^^^^^^^^^^^^[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m  [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(unused_imports)]` on by default[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused import: `error`[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/llm_config.rs:11:15[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m11[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0muse tracing::{error, info, warn};[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m               [0m[0m[1m[33m^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused import: `DelegatingSamplingHandler`[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:20:22[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m20[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    SamplingHandler, DelegatingSamplingHandler,[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m                      [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused imports: `ContentBlock`, `ImageContent`, `PromptMessage`, `ResourceContent`, and `TextContent`[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/types/server_types.rs:13:48[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m13[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    ServerCapabilities, Tool, ToolInputSchema, PromptMessage,[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m                                                [0m[0m[1m[33m^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m14[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    ContentBlock, TextContent, ImageContent, ResourceContent,[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[33m^^^^^^^^^^^^[0m[0m  [0m[0m[1m[33m^^^^^^^^^^^[0m[0m  [0m[0m[1m[33m^^^^^^^^^^^^[0m[0m  [0m[0m[1m[33m^^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused import: `collections::*`[0m
+[0m [0m[0m[1m[38;5;12m--> [0m[0msrc/types/mod.rs:5:9[0m
+[0m  [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m5[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub use collections::*;[0m
+[0m  [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `api_key`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/llm_config.rs:239:13[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m239[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m        let api_key = self.get_api_key(provider_id).await?;[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m             [0m[0m[1m[33m^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_api_key`[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(unused_variables)]` on by default[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `handler`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:713:21[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m713[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m        if let Some(handler) = llm_config.get_active_sampling_handler().await {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                     [0m[0m[1m[33m^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_handler`[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `client`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:719:29[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m719[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m                if let Some(client) = connection.client.read().as_ref() {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                             [0m[0m[1m[33m^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_client`[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `connected_at`[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:2180:21[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m2180[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m        if let Some(connected_at) = *connection.connected_at.read() {[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                     [0m[0m[1m[33m^^^^^^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_connected_at`[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `llm_config`[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:699:9[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m699[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m        llm_config: &crate::llm_config::LLMConfigManager,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_llm_config`[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `uptime_seconds`[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:1610:37[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m1610[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m...[0m[0m                   let uptime_seconds = connected_at.elapsed().as_secs();[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                           [0m[0m[1m[33m^^^^^^^^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_uptime_seconds`[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: unused variable: `metrics`[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:1611:41[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m1611[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m...[0m[0m                   let mut metrics = connection.metrics.write();[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                               [0m[0m[1m[33m^^^^^^^[0m[0m [0m[0m[1m[33mhelp: if this is intentional, prefix it with an underscore: `_metrics`[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: variable does not need to be mutable[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:1611:37[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m1611[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m...[0m[0m                   let mut metrics = connection.metrics.write();[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                           [0m[0m[1m[38;5;12m----[0m[0m[1m[33m^^^^^^^[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                           [0m[0m[1m[38;5;12m|[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m                           [0m[0m[1m[38;5;12mhelp: remove this `mut`[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m     [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(unused_mut)]` on by default[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: associated items `new`, `create_essential_tables`, `save_message`, `get_message_history`, and `clear_message_history` are never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/database.rs:14:18[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m12[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl Database {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m-------------[0m[0m [0m[0m[1m[38;5;12massociated items in this implementation[0m
+[0m[1m[38;5;12m13[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    /// Create a new database connection with lightweight initialization[0m
+[0m[1m[38;5;12m14[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn new(database_path: &str) -> McpResult<Self> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m120[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    async fn create_essential_tables(&self) -> McpResult<()> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m              [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m671[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn save_message(&self, message: &MessageHistory) -> McpResult<()> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m699[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn get_message_history([0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m761[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn clear_message_history(&self, server_id: Uuid) -> McpResult<()> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `#[warn(dead_code)]` on by default[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: variant `Stdio` is never constructed[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:102:5[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m101[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub enum McpTransportClient {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m          [0m[0m[1m[38;5;12m------------------[0m[0m [0m[0m[1m[38;5;12mvariant in this enum[0m
+[0m[1m[38;5;12m102[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    Stdio(SharedClient<StdioTransport>),[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[33m^^^^^[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m    [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `McpTransportClient` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: associated items `create_basic_tool_schema`, `transport_type`, `register_elicitation_handler`, `register_progress_handler`, `register_log_handler`, and `register_resource_update_handler` are never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:120:8[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m118[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl McpTransportClient {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m-----------------------[0m[0m [0m[0m[1m[38;5;12massociated items in this implementation[0m
+[0m[1m[38;5;12m119[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    /// Create a basic tool schema for tools where we don't have full schema information[0m
+[0m[1m[38;5;12m120[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    fn create_basic_tool_schema(_name: &str) -> ToolInputSchema {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m        [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m312[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn transport_type(&self) -> &'static str {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m399[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn register_elicitation_handler(&self, handler: Arc<dyn ElicitationHandler>) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m421[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn register_progress_handler(&self, handler: Arc<dyn ProgressHandler>) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m443[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn register_log_handler(&self, handler: Arc<dyn LogHandler>) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m465[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn register_resource_update_handler(&self, handler: Arc<dyn ResourceUpdateHandler>) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: field `elicitation_handler` is never read[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:585:5[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m571[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub struct McpClientManager {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m----------------[0m[0m [0m[0m[1m[38;5;12mfield in this struct[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m585[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    elicitation_handler: Option<Arc<dyn ElicitationHandler>>,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: fields `child`, `started_at`, `command`, and `args` are never read[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:616:9[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m615[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub struct ManagedProcess {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m--------------[0m[0m [0m[0m[1m[38;5;12mfields in this struct[0m
+[0m[1m[38;5;12m616[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub child: Child,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^[0m
+[0m[1m[38;5;12m617[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub pid: u32,[0m
+[0m[1m[38;5;12m618[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub started_at: chrono::DateTime<chrono::Utc>,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^^^^[0m
+[0m[1m[38;5;12m619[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub command: String,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^[0m
+[0m[1m[38;5;12m620[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub args: Vec<String>,[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: associated items `create_sampling_handler_from_config`, `get_process_info`, and `get_process_info_static` are never used[0m
+[0m    [0m[0m[1m[38;5;12m--> [0m[0msrc/mcp_client.rs:698:8[0m
+[0m     [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m656[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl McpClientManager {[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m---------------------[0m[0m [0m[0m[1m[38;5;12massociated items in this implementation[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m698[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    fn create_sampling_handler_from_config([0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m        [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m1534[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    async fn get_process_info(&self, process: &ManagedProcess) -> Option<ProcessInfo> {[0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m              [0m[0m[1m[33m^^^^^^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m1700[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    async fn get_process_info_static([0m
+[0m     [0m[0m[1m[38;5;12m|[0m[0m              [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: constant `COLLECTION_FORMAT_VERSION` is never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/types/collections.rs:418:11[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m418[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub const COLLECTION_FORMAT_VERSION: &str = "1.0.0";[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m           [0m[0m[1m[33m^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: associated items `new`, `add_step`, `update_step`, and `remove_step` are never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/types/collections.rs:433:12[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m431[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl Collection {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m---------------[0m[0m [0m[0m[1m[38;5;12massociated items in this implementation[0m
+[0m[1m[38;5;12m432[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    /// Create a new empty collection[0m
+[0m[1m[38;5;12m433[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn new(name: String, description: Option<String>) -> Self {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m453[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn add_step(&mut self, step: WorkflowStep) {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m459[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn update_step(&mut self, step_id: Uuid, step: WorkflowStep) -> Result<(), String> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^^^^^^^^^[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m470[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn remove_step(&mut self, step_id: Uuid) -> Result<(), String> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: associated function `new` is never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/types/collections.rs:533:12[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m531[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl WorkflowStep {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m-----------------[0m[0m [0m[0m[1m[38;5;12massociated function in this implementation[0m
+[0m[1m[38;5;12m532[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    /// Create a new workflow step[0m
+[0m[1m[38;5;12m533[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub fn new(name: String, operation: McpOperation) -> Self {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[33m^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: field `secrets` is never read[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/workflow_engine.rs:44:5[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m42[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub struct VariableStore {[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m-------------[0m[0m [0m[0m[1m[38;5;12mfield in this struct[0m
+[0m[1m[38;5;12m43[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    variables: HashMap<String, Value>,[0m
+[0m[1m[38;5;12m44[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    secrets: HashMap<String, String>, // Encrypted storage for sensitive data[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m     [0m[0m[1m[33m^^^^^^^[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m   [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `VariableStore` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: field `dependencies_met` is never read[0m
+[0m  [0m[0m[1m[38;5;12m--> [0m[0msrc/workflow_engine.rs:56:9[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m49[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0mpub struct StepExecutionState {[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m            [0m[0m[1m[38;5;12m------------------[0m[0m [0m[0m[1m[38;5;12mfield in this struct[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m56[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub dependencies_met: bool,[0m
+[0m   [0m[0m[1m[38;5;12m|[0m[0m         [0m[0m[1m[33m^^^^^^^^^^^^^^^^[0m
+[0m   [0m[0m[1m[38;5;12m|[0m
+[0m   [0m[0m[1m[38;5;12m= [0m[0m[1mnote[0m[0m: `StepExecutionState` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[0m[1m[33mwarning[0m[0m[1m: method `get_execution` is never used[0m
+[0m   [0m[0m[1m[38;5;12m--> [0m[0msrc/workflow_engine.rs:653:18[0m
+[0m    [0m[0m[1m[38;5;12m|[0m
+[0m[1m[38;5;12m60[0m[0m  [0m[0m[1m[38;5;12m|[0m[0m [0m[0mimpl WorkflowEngine {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m [0m[0m[1m[38;5;12m-------------------[0m[0m [0m[0m[1m[38;5;12mmethod in this implementation[0m
+[0m[1m[38;5;12m...[0m
+[0m[1m[38;5;12m653[0m[0m [0m[0m[1m[38;5;12m|[0m[0m [0m[0m    pub async fn get_execution(&self, execution_id: Uuid) -> McpResult<Option<WorkflowExecution>> {[0m
+[0m    [0m[0m[1m[38;5;12m|[0m[0m                  [0m[0m[1m[33m^^^^^^^^^^^^^[0m
+
+[1m[36m    Building[0m [=======================> ] 699/701: turbomcpstudio              [K[1m[33mwarning[0m[1m:[0m `turbomcpstudio` (lib) generated 25 warnings (run `cargo fix --lib -p turbomcpstudio` to apply 6 suggestions)
+[1m[36m    Building[0m [=======================> ] 700/701: turbomcpstudio(bin)         [K[1m[32m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 4.57s
+[1m[32m     Running[0m `target/debug/turbomcpstudio`
+[2m2025-09-24T14:37:47.664036Z[0m [32m INFO[0m [2mturbomcpstudio_lib::mcp_client[0m[2m:[0m MCP Client Manager initialized - ready for enterprise connections
+[2m2025-09-24T14:37:47.664092Z[0m [32m INFO[0m [2mturbomcpstudio_lib::mcp_client[0m[2m:[0m Available transports: STDIO, HTTP, WebSocket, TCP, Unix
+[2m2025-09-24T14:37:47.664102Z[0m [32m INFO[0m [2mturbomcpstudio_lib::mcp_client[0m[2m:[0m TurboMCP v1.0.11 integration ready with plugin and LLM registry support
+[2m2025-09-24T14:37:47.664109Z[0m [33m WARN[0m [2mturbomcpstudio_lib::mcp_client[0m[2m:[0m No LLM providers registered - sampling will be unavailable
+[2m2025-09-24T14:37:47.664198Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m MCP Studio setup complete, background initialization started
+[2m2025-09-24T14:37:47.664382Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m Starting background initialization
+[2m2025-09-24T14:37:47.664413Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m App data directory: "/Users/nickpaterno/.turbomcpstudio"
+[2m2025-09-24T14:37:47.664432Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m Data directory created successfully
+[2m2025-09-24T14:37:47.664449Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m Attempting to initialize database at: "/Users/nickpaterno/.turbomcpstudio/mcp_studio.db"
+[2m2025-09-24T14:37:47.664468Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database initialization: path=/Users/nickpaterno/.turbomcpstudio/mcp_studio.db
+[2m2025-09-24T14:37:47.664485Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database file path: "/Users/nickpaterno/.turbomcpstudio/mcp_studio.db"
+[2m2025-09-24T14:37:47.664491Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Ensuring parent directory exists: "/Users/nickpaterno/.turbomcpstudio"
+[2m2025-09-24T14:37:47.664759Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Directory is writable: "/Users/nickpaterno/.turbomcpstudio"
+[2m2025-09-24T14:37:47.664787Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database URL: sqlite:///Users/nickpaterno/.turbomcpstudio/mcp_studio.db?mode=rwc
+[2m2025-09-24T14:37:47.664800Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database file exists: true
+[2m2025-09-24T14:37:47.664806Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database path: "/Users/nickpaterno/.turbomcpstudio/mcp_studio.db"
+[2m2025-09-24T14:37:47.666330Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"PRAGMA foreign_keys = ON; …" [3mdb.statement[0m[2m=[0m"\n\nPRAGMA foreign_keys = ON; \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m166.375µs [3melapsed_secs[0m[2m=[0m0.000166375
+[2m2025-09-24T14:37:47.666409Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Successfully connected to database
+[2m2025-09-24T14:37:47.666425Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Starting database migrations
+[2m2025-09-24T14:37:47.666431Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating server_configs table
+[2m2025-09-24T14:37:47.666901Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS server_configs (\n                id TEXT PRIMARY KEY,\n                name TEXT NOT NULL,\n                description TEXT,\n                transport_type TEXT NOT NULL,\n                transport_config TEXT NOT NULL,\n                environment_variables TEXT NOT NULL,\n                created_at TEXT NOT NULL,\n                updated_at TEXT NOT NULL\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m355.75µs [3melapsed_secs[0m[2m=[0m0.00035575
+[2m2025-09-24T14:37:47.666963Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m server_configs table created successfully
+[2m2025-09-24T14:37:47.666976Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating enhanced collections table
+[2m2025-09-24T14:37:47.667120Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"PRAGMA foreign_keys = ON; …" [3mdb.statement[0m[2m=[0m"\n\nPRAGMA foreign_keys = ON; \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m10.667µs [3melapsed_secs[0m[2m=[0m1.0667e-5
+[2m2025-09-24T14:37:47.667305Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS collections (\n                id TEXT PRIMARY KEY,\n                name TEXT NOT NULL,\n                description TEXT,\n                tags TEXT NOT NULL,\n                workflow TEXT NOT NULL,\n                variables TEXT NOT NULL,\n                environment TEXT NOT NULL,\n                created_at TEXT NOT NULL,\n                updated_at TEXT NOT NULL,\n                created_by TEXT,\n                version TEXT NOT NULL,\n                last_run TEXT,\n                run_count INTEGER NOT NULL DEFAULT 0\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m135.541µs [3melapsed_secs[0m[2m=[0m0.000135541
+[2m2025-09-24T14:37:47.667329Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Enhanced collections table created successfully
+[2m2025-09-24T14:37:47.667343Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating workflow_executions table
+[2m2025-09-24T14:37:47.667419Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS workflow_executions (\n                id TEXT PRIMARY KEY,\n                collection_id TEXT NOT NULL,\n                collection_version TEXT NOT NULL,\n                started_at TEXT NOT NULL,\n                completed_at TEXT,\n                status TEXT NOT NULL,\n                step_results TEXT NOT NULL,\n                final_variables TEXT NOT NULL,\n                summary TEXT NOT NULL,\n                environment_name TEXT NOT NULL,\n                user_variables TEXT NOT NULL,\n                FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m26.458µs [3melapsed_secs[0m[2m=[0m2.6458e-5
+[2m2025-09-24T14:37:47.667444Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m workflow_executions table created successfully
+[2m2025-09-24T14:37:47.667454Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating collection_templates table
+[2m2025-09-24T14:37:47.667527Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS collection_templates (\n                id TEXT PRIMARY KEY,\n                name TEXT NOT NULL,\n                description TEXT NOT NULL,\n                category TEXT NOT NULL,\n                tags TEXT NOT NULL,\n                author TEXT,\n                documentation_url TEXT,\n                required_server_types TEXT NOT NULL,\n                template_collection TEXT NOT NULL,\n                setup_instructions TEXT NOT NULL,\n                usage_examples TEXT NOT NULL,\n                created_at TEXT NOT NULL,\n                updated_at TEXT NOT NULL\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m25.125µs [3melapsed_secs[0m[2m=[0m2.5125e-5
+[2m2025-09-24T14:37:47.667551Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m collection_templates table created successfully
+[2m2025-09-24T14:37:47.667569Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating message_history table
+[2m2025-09-24T14:37:47.667628Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS message_history (\n                id TEXT PRIMARY KEY,\n                server_id TEXT NOT NULL,\n                timestamp TEXT NOT NULL,\n                direction TEXT NOT NULL,\n                content TEXT NOT NULL,\n                size_bytes INTEGER NOT NULL,\n                processing_time_ms INTEGER,\n                FOREIGN KEY(server_id) REFERENCES server_configs(id)\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m18.625µs [3melapsed_secs[0m[2m=[0m1.8625e-5
+[2m2025-09-24T14:37:47.667649Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m message_history table created successfully
+[2m2025-09-24T14:37:47.667658Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating workspaces table
+[2m2025-09-24T14:37:47.667707Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS workspaces (\n                id TEXT PRIMARY KEY,\n                name TEXT NOT NULL,\n                description TEXT,\n                collections TEXT NOT NULL,\n                members TEXT NOT NULL,\n                settings TEXT NOT NULL,\n                created_at TEXT NOT NULL,\n                updated_at TEXT NOT NULL\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m16.5µs [3melapsed_secs[0m[2m=[0m1.65e-5
+[2m2025-09-24T14:37:47.667727Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m workspaces table created successfully
+[2m2025-09-24T14:37:47.667734Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating server_sessions table
+[2m2025-09-24T14:37:47.667786Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\n\n            CREATE TABLE IF NOT EXISTS server_sessions (\n                id TEXT PRIMARY KEY,\n                server_id TEXT NOT NULL,\n                started_at TEXT NOT NULL,\n                ended_at TEXT,\n                status TEXT NOT NULL,\n                capabilities TEXT,\n                metrics TEXT NOT NULL,\n                process_info TEXT,\n                FOREIGN KEY(server_id) REFERENCES server_configs(id)\n            )\n            \n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m14.75µs [3melapsed_secs[0m[2m=[0m1.475e-5
+[2m2025-09-24T14:37:47.667805Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m server_sessions table created successfully
+[2m2025-09-24T14:37:47.667812Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating database indexes
+[2m2025-09-24T14:37:47.667829Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating idx_message_history_server_id index
+[2m2025-09-24T14:37:47.667872Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE INDEX IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE INDEX IF NOT EXISTS idx_message_history_server_id ON message_history(server_id)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m12.5µs [3melapsed_secs[0m[2m=[0m1.25e-5
+[2m2025-09-24T14:37:47.667901Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating idx_message_history_timestamp index
+[2m2025-09-24T14:37:47.667946Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE INDEX IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE INDEX IF NOT EXISTS idx_message_history_timestamp ON message_history(timestamp)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m14.375µs [3melapsed_secs[0m[2m=[0m1.4375e-5
+[2m2025-09-24T14:37:47.667965Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Creating idx_server_sessions_server_id index
+[2m2025-09-24T14:37:47.668002Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE INDEX IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE INDEX IF NOT EXISTS idx_server_sessions_server_id ON server_sessions(server_id)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m10.667µs [3melapsed_secs[0m[2m=[0m1.0667e-5
+[2m2025-09-24T14:37:47.668020Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database migrations completed successfully
+[2m2025-09-24T14:37:47.668027Z[0m [32m INFO[0m [2mturbomcpstudio_lib::database[0m[2m:[0m Database migrations completed successfully
+[2m2025-09-24T14:37:47.668033Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m ✅ Successfully using persistent database at "/Users/nickpaterno/.turbomcpstudio/mcp_studio.db"
+[2m2025-09-24T14:37:47.668049Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m Database initialized successfully
+[2m2025-09-24T14:37:47.668081Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m LLM providers initialized
+[2m2025-09-24T14:37:47.668086Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m MCP Studio background initialization complete
+[2m2025-09-24T14:37:47.668099Z[0m [32m INFO[0m [2mturbomcpstudio_lib[0m[2m:[0m app-ready event emitted
+[2m2025-09-24T14:37:47.826426Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"SELECT id, name, description, …" [3mdb.statement[0m[2m=[0m"\n\nSELECT id, name, description, transport_type, transport_config, environment_variables, created_at, updated_at FROM server_configs ORDER BY name\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m3 [3melapsed[0m[2m=[0m143.541µs [3melapsed_secs[0m[2m=[0m0.000143541
+10:38:02 AM [vite] (client) page reload .svelte-kit/generated/client/nodes/0.js
+10:38:02 AM [vite] (client) page reload .svelte-kit/generated/client/nodes/1.js
+10:38:02 AM [vite] (client) page reload .svelte-kit/generated/client/nodes/2.js
+10:38:02 AM [vite] (client) page reload .svelte-kit/generated/client/app.js
+10:38:02 AM [vite] (client) page reload .svelte-kit/generated/client/matchers.js
+10:38:02 AM [vite] (ssr) page reload .svelte-kit/generated/server/internal.js
+10:38:02 AM [vite] (client) page reload .svelte-kit/generated/root.js
+10:38:02 AM [vite] (ssr) page reload .svelte-kit/generated/root.js
+[2m2025-09-24T14:38:02.362383Z[0m [34mDEBUG[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"SELECT id, name, description, …" [3mdb.statement[0m[2m=[0m"\n\nSELECT id, name, description, transport_type, transport_config, environment_variables, created_at, updated_at FROM server_configs ORDER BY name\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m3 [3melapsed[0m[2m=[0m130.125µs [3melapsed_secs[0m[2m=[0m0.000130125
