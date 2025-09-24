@@ -30,7 +30,26 @@
             "dialog:allow-open",
             "dialog:default",
             "core:event:allow-listen",
-            "core:event:default"
+            "core:event:default",
+            "http:allow-fetch",
+            "http:default",
+            {
+              "identifier": "http:allow-fetch",
+              "allow": [
+                {
+                  "url": "http://localhost:*"
+                },
+                {
+                  "url": "http://127.0.0.1:*"
+                },
+                {
+                  "url": "http://192.168.*.*:*"
+                },
+                {
+                  "url": "https://*"
+                }
+              ]
+            }
           ]
         }
       ]

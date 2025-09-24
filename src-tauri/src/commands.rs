@@ -1,5 +1,5 @@
 use crate::database::Database;
-use crate::types::{ServerConfig, ServerInfo, ToolDefinition, TransportConfig};
+use crate::types::{ServerConfig, ServerInfo, ToolDefinition, TransportConfig, ConnectionStatus, ConnectionMetrics};
 use crate::types::collections::{Collection, WorkflowExecution};
 use crate::workflow_engine::WorkflowEngine;
 use crate::AppState;
@@ -92,14 +92,56 @@ pub async fn get_server_info(
 
 /// List all configured servers
 #[tauri::command]
-pub async fn list_servers(app_state: State<'_, AppState>) -> Result<Vec<ServerInfo>, String> {
-    // List servers using the actual manager
-    let servers = app_state
-        .mcp_manager
-        .list_servers()
-        .await
-        .map_err(|e| format!("Failed to list servers: {}", e))?;
+pub async fn list_servers(
+    app_state: State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<ServerInfo>, String> {
+    // Debug: Uncomment for debugging
+    // println!("🔍 list_servers called");
 
+    // Get all saved server configurations from database
+    let database = app_handle
+        .try_state::<Database>()
+        .ok_or_else(|| "Database not yet initialized".to_string())?;
+
+    let server_configs = database
+        .list_server_configs()
+        .await
+        .map_err(|e| format!("Failed to load server configs: {}", e))?;
+
+    // Debug: Found {} server configs in database
+
+    let mut servers = Vec::new();
+
+    // For each saved config, check if it's actively connected and get its status
+    for config in server_configs {
+        let server_id = config.id;
+        // Debug: Processing server
+
+        // Try to get connection status from MCP manager
+        match app_state.mcp_manager.get_server_info(server_id).await {
+            Ok(active_server_info) => {
+                // Server is actively connected - use the live info
+                // Debug: Server is connected
+                servers.push(active_server_info);
+            }
+            Err(e) => {
+                // Server is not connected - create ServerInfo with disconnected status
+                // Debug: Server is disconnected
+                servers.push(ServerInfo {
+                    id: server_id,
+                    config,
+                    status: ConnectionStatus::Disconnected,
+                    capabilities: None,
+                    process_info: None,
+                    metrics: ConnectionMetrics::default(),
+                    last_seen: chrono::Utc::now(),
+                });
+            }
+        }
+    }
+
+    // Debug: Returning servers to frontend
     Ok(servers)
 }
 
@@ -116,7 +158,7 @@ pub async fn create_server_config(
         id: server_id,
         name: request.name,
         description: request.description,
-        transport: request.transport,
+        transport_config: request.transport,
         environment_variables: request.environment_variables,
         created_at: now,
         updated_at: now,
@@ -464,7 +506,7 @@ pub async fn update_server_config(
         ),
         Err(_) => false, // Server not found or error, treat as not connected
     };
-    let connection_changed = existing_config.transport != request.transport;
+    let connection_changed = existing_config.transport_config != request.transport;
 
     // If server is connected and connection details changed, disconnect first
     if is_connected && connection_changed {
@@ -477,7 +519,7 @@ pub async fn update_server_config(
         id: server_id,
         name: request.name,
         description: request.description,
-        transport: request.transport,
+        transport_config: request.transport,
         environment_variables: request.environment_variables,
         created_at: existing_config.created_at, // Preserve original creation time
         updated_at: now,
@@ -617,14 +659,141 @@ pub async fn create_sampling_request(
 ) -> Result<serde_json::Value, String> {
     let uuid = Uuid::parse_str(&server_id).map_err(|e| format!("Invalid server ID: {}", e))?;
 
-    // Create sampling request using the actual manager with TurboMCP integration
+    // Create sampling request using runtime LLM configuration
     let result = app_state
         .mcp_manager
-        .create_sampling_request(uuid, messages, max_tokens, temperature)
+        .create_sampling_request_with_config(uuid, messages, max_tokens, temperature, &app_state.llm_config)
         .await
         .map_err(|e| format!("Failed to create sampling request: {}", e))?;
 
     Ok(result)
+}
+
+// ================================================================================================
+// LLM Configuration Commands
+// ================================================================================================
+
+/// Get current LLM configuration
+#[tauri::command]
+pub async fn get_llm_config(app_state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let config = app_state.llm_config.get_config().await;
+    serde_json::to_value(config).map_err(|e| format!("Serialization error: {}", e))
+}
+
+/// Get LLM provider statuses
+#[tauri::command]
+pub async fn get_llm_provider_statuses(app_state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let statuses = app_state.llm_config.get_provider_statuses().await;
+    serde_json::to_value(statuses).map_err(|e| format!("Serialization error: {}", e))
+}
+
+/// Set API key for a provider
+#[tauri::command]
+pub async fn set_llm_api_key(
+    provider_id: String,
+    api_key: String,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    use crate::types::SetAPIKeyRequest;
+
+    let request = SetAPIKeyRequest {
+        provider_id: provider_id.clone(),
+        api_key,
+    };
+
+    app_state
+        .llm_config
+        .set_api_key(request)
+        .await
+        .map_err(|e| format!("Failed to set API key: {}", e))?;
+
+    // Update sampling handler with new configuration
+    if let Err(e) = app_state.mcp_manager.update_sampling_handler(&app_state.llm_config).await {
+        tracing::warn!("Failed to update sampling handler: {}", e);
+    }
+
+    Ok(())
+}
+
+/// Remove API key for a provider
+#[tauri::command]
+pub async fn remove_llm_api_key(
+    provider_id: String,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    app_state
+        .llm_config
+        .remove_api_key(&provider_id)
+        .await
+        .map_err(|e| format!("Failed to remove API key: {}", e))?;
+
+    // Update sampling handler
+    if let Err(e) = app_state.mcp_manager.update_sampling_handler(&app_state.llm_config).await {
+        tracing::warn!("Failed to update sampling handler: {}", e);
+    }
+
+    Ok(())
+}
+
+/// Set the active LLM provider
+#[tauri::command]
+pub async fn set_active_llm_provider(
+    provider_id: String,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    app_state
+        .llm_config
+        .set_active_provider(provider_id)
+        .await
+        .map_err(|e| format!("Failed to set active provider: {}", e))?;
+
+    // Update sampling handler
+    if let Err(e) = app_state.mcp_manager.update_sampling_handler(&app_state.llm_config).await {
+        tracing::warn!("Failed to update sampling handler: {}", e);
+    }
+
+    Ok(())
+}
+
+/// Update LLM provider configuration
+#[tauri::command]
+pub async fn update_llm_provider_config(
+    config: serde_json::Value,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    use crate::types::UpdateLLMConfigRequest;
+
+    let request: UpdateLLMConfigRequest = serde_json::from_value(config)
+        .map_err(|e| format!("Invalid configuration: {}", e))?;
+
+    app_state
+        .llm_config
+        .update_provider_config(request)
+        .await
+        .map_err(|e| format!("Failed to update provider config: {}", e))?;
+
+    // Update sampling handler
+    if let Err(e) = app_state.mcp_manager.update_sampling_handler(&app_state.llm_config).await {
+        tracing::warn!("Failed to update sampling handler: {}", e);
+    }
+
+    Ok(())
+}
+
+/// Check if sampling is available
+#[tauri::command]
+pub async fn is_sampling_available(app_state: State<'_, AppState>) -> Result<bool, String> {
+    Ok(app_state.mcp_manager.is_sampling_available(&app_state.llm_config).await)
+}
+
+/// Validate LLM configuration
+#[tauri::command]
+pub async fn validate_llm_config(app_state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    app_state
+        .llm_config
+        .validate_configuration()
+        .await
+        .map_err(|e| format!("Validation failed: {}", e))
 }
 
 /// Send an elicitation response (respond to server-initiated user input request)
@@ -734,7 +903,7 @@ pub async fn execute_workflow(
     app_handle: tauri::AppHandle,
 ) -> Result<WorkflowExecution, String> {
     // Create workflow engine with MCP manager and app handle for real-time events
-    let workflow_engine = WorkflowEngine::new(app_state.mcp_manager.clone(), app_handle);
+    let workflow_engine = WorkflowEngine::new(app_state.mcp_manager.clone(), app_state.llm_config.clone(), app_handle);
 
     // Execute the workflow with environment selection (None = default)
     let execution = workflow_engine
@@ -771,7 +940,7 @@ pub async fn stop_workflow_execution(
     let uuid = Uuid::parse_str(&execution_id).map_err(|e| format!("Invalid execution ID: {}", e))?;
 
     // Create workflow engine and stop execution
-    let workflow_engine = WorkflowEngine::new(app_state.mcp_manager.clone(), app_handle);
+    let workflow_engine = WorkflowEngine::new(app_state.mcp_manager.clone(), app_state.llm_config.clone(), app_handle);
     workflow_engine
         .stop_execution(uuid)
         .await

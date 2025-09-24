@@ -322,7 +322,7 @@ impl Database {
 
     /// Save a server configuration
     pub async fn save_server_config(&self, config: &ServerConfig) -> McpResult<()> {
-        let transport_config = serde_json::to_string(&config.transport)?;
+        let transport_config = serde_json::to_string(&config.transport_config)?;
         let env_vars = serde_json::to_string(&config.environment_variables)?;
 
         sqlx::query(
@@ -335,7 +335,7 @@ impl Database {
         .bind(config.id.to_string())
         .bind(&config.name)
         .bind(config.description.as_deref())
-        .bind(match &config.transport {
+        .bind(match &config.transport_config {
             crate::types::TransportConfig::Stdio { .. } => "stdio",
             crate::types::TransportConfig::Http { .. } => "http",
             crate::types::TransportConfig::WebSocket { .. } => "websocket",
@@ -372,7 +372,7 @@ impl Database {
                     .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?,
                 name: row.get("name"),
                 description: row.get("description"),
-                transport: transport_config,
+                transport_config,
                 environment_variables: env_vars,
                 created_at: chrono::DateTime::parse_from_rfc3339(
                     &row.get::<String, _>("created_at"),
@@ -411,7 +411,7 @@ impl Database {
                     .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?,
                 name: row.get("name"),
                 description: row.get("description"),
-                transport: transport_config,
+                transport_config,
                 environment_variables: env_vars,
                 created_at: chrono::DateTime::parse_from_rfc3339(
                     &row.get::<String, _>("created_at"),
@@ -671,8 +671,8 @@ impl Database {
     pub async fn save_message(&self, message: &MessageHistory) -> McpResult<()> {
         let content = serde_json::to_string(&message.content)?;
         let direction = match message.direction {
-            crate::types::MessageDirection::Sent => "sent",
-            crate::types::MessageDirection::Received => "received",
+            crate::types::MessageDirection::ClientToServer => "client_to_server",
+            crate::types::MessageDirection::ServerToClient => "server_to_client",
         };
 
         sqlx::query(
@@ -732,9 +732,9 @@ impl Database {
             let content: serde_json::Value =
                 serde_json::from_str(&row.get::<String, _>("content"))?;
             let direction = match row.get::<String, _>("direction").as_str() {
-                "sent" => crate::types::MessageDirection::Sent,
-                "received" => crate::types::MessageDirection::Received,
-                _ => crate::types::MessageDirection::Received,
+                "client_to_server" => crate::types::MessageDirection::ClientToServer,
+                "server_to_client" => crate::types::MessageDirection::ServerToClient,
+                _ => crate::types::MessageDirection::ServerToClient,
             };
 
             messages.push(MessageHistory {
@@ -746,11 +746,11 @@ impl Database {
                     .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?
                     .with_timezone(&chrono::Utc),
                 direction,
-                content,
-                size_bytes: row.get::<i64, _>("size_bytes") as usize,
+                content: content.to_string(),
+                size_bytes: row.get::<i64, _>("size_bytes"),
                 processing_time_ms: row
                     .get::<Option<i64>, _>("processing_time_ms")
-                    .map(|t| t as u64),
+                    .map(|t| t),
             });
         }
 

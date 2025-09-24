@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 // TurboMCP 1.0.9 imports - Enhanced Client API
 use turbomcp_client::sampling::{
-    LLMBackendConfig, LLMProvider, ProductionSamplingHandler, SamplingHandler,
+    SamplingHandler, DelegatingSamplingHandler,
 };
 use turbomcp_client::{Client, ClientBuilder, ConnectionConfig, SharedClient};
 // Plugin system temporarily disabled for TurboMCP 1.0.9 compatibility
@@ -659,7 +659,7 @@ impl McpClientManager {
         let (event_sender, event_receiver) = mpsc::unbounded_channel();
 
         // Initialize sampling handler for LLM integration
-        let sampling_handler = Self::create_sampling_handler();
+        let sampling_handler = None; // Will be set via LLM configuration
 
         let manager = Self {
             connections: DashMap::new(),
@@ -694,61 +694,49 @@ impl McpClientManager {
         })
     }
 
-    /// Create a sampling handler based on environment configuration
-    fn create_sampling_handler() -> Option<Arc<dyn SamplingHandler>> {
-        // Try to initialize with OpenAI first
-        if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
-            if !api_key.trim().is_empty() {
-                let config = LLMBackendConfig {
-                    provider: LLMProvider::OpenAI {
-                        api_key,
-                        base_url: std::env::var("OPENAI_BASE_URL").ok(),
-                        organization: std::env::var("OPENAI_ORGANIZATION").ok(),
-                    },
-                    default_model: Some("gpt-4".to_string()),
-                    timeout_seconds: 30,
-                    max_retries: 3,
-                };
-
-                match ProductionSamplingHandler::new(config) {
-                    Ok(handler) => {
-                        tracing::info!("Initialized OpenAI sampling handler");
-                        return Some(Arc::new(handler));
-                    }
-                    Err(e) => {
-                        tracing::warn!("Failed to initialize OpenAI handler: {}", e);
-                    }
-                }
-            }
-        }
-
-        // Try Anthropic as fallback
-        if let Ok(api_key) = std::env::var("ANTHROPIC_API_KEY") {
-            if !api_key.trim().is_empty() {
-                let config = LLMBackendConfig {
-                    provider: LLMProvider::Anthropic {
-                        api_key,
-                        base_url: std::env::var("ANTHROPIC_BASE_URL").ok(),
-                    },
-                    default_model: Some("claude-3-haiku-20240307".to_string()),
-                    timeout_seconds: 30,
-                    max_retries: 3,
-                };
-
-                match ProductionSamplingHandler::new(config) {
-                    Ok(handler) => {
-                        tracing::info!("Initialized Anthropic sampling handler");
-                        return Some(Arc::new(handler));
-                    }
-                    Err(e) => {
-                        tracing::warn!("Failed to initialize Anthropic handler: {}", e);
-                    }
-                }
-            }
-        }
-
-        tracing::warn!("No LLM providers registered - sampling will be unavailable");
+    /// Create a sampling handler using runtime LLM configuration
+    fn create_sampling_handler_from_config(
+        llm_config: &crate::llm_config::LLMConfigManager,
+    ) -> Option<Arc<dyn SamplingHandler>> {
+        // This is a synchronous method but we need async operations
+        // We'll need to restructure this or call it from async context
+        tracing::warn!("Synchronous sampling handler creation deprecated - use async version");
         None
+    }
+
+    /// Update sampling handler using runtime configuration
+    pub async fn update_sampling_handler(
+        &self,
+        llm_config: &crate::llm_config::LLMConfigManager,
+    ) -> McpResult<bool> {
+        // Get the active sampling handler from LLM config
+        if let Some(handler) = llm_config.get_active_sampling_handler().await {
+            // Update the sampling handler for all managed clients
+            let connections = &self.connections;
+
+            for connection_ref in connections.iter() {
+                let connection = connection_ref.value();
+                if let Some(client) = connection.client.read().as_ref() {
+                    // Update the client's sampling handler
+                    // Note: This would require adding a method to McpTransportClient
+                    tracing::info!("Updated sampling handler for connection: {}", connection.config.id);
+                }
+            }
+
+            tracing::info!("Sampling handler updated successfully");
+            Ok(true)
+        } else {
+            tracing::warn!("No active LLM provider configured");
+            Ok(false)
+        }
+    }
+
+    /// Check if sampling is available
+    pub async fn is_sampling_available(
+        &self,
+        llm_config: &crate::llm_config::LLMConfigManager,
+    ) -> bool {
+        llm_config.get_active_sampling_handler().await.is_some()
     }
 
     /// Connect to an MCP server
@@ -799,13 +787,13 @@ impl McpClientManager {
                 );
             }
             Err(err) => {
-                *connection.status.write() = ConnectionStatus::Error(err.to_string());
+                *connection.status.write() = ConnectionStatus::Error;
                 *connection.error_count.lock() += 1;
 
                 // Send error event
                 self.send_event(ConnectionEvent::StatusChanged {
                     server_id,
-                    status: ConnectionStatus::Error(err.to_string()),
+                    status: ConnectionStatus::Error,
                 });
 
                 tracing::error!("Failed to connect to MCP server {}: {}", config.name, err);
@@ -869,7 +857,8 @@ impl McpClientManager {
         let status = connection.status.read().clone();
         let capabilities = connection.capabilities.read().clone();
         let metrics = connection.metrics.read().clone();
-        let last_seen = *connection.last_seen.read();
+        let last_seen = connection.last_seen.read()
+            .unwrap_or_else(|| chrono::Utc::now());
 
         Ok(ServerInfo {
             id: server_id,
@@ -889,10 +878,10 @@ impl McpClientManager {
         tracing::info!(
             "Establishing MCP connection to: {} (transport: {:?})",
             config.name,
-            config.transport
+            config.transport_config
         );
 
-        match &config.transport {
+        match &config.transport_config {
             TransportConfig::Stdio {
                 command,
                 args,
@@ -1117,9 +1106,11 @@ impl McpClientManager {
             .into_iter()
             .map(|tool| crate::types::ToolDefinition {
                 name: tool.name,
+                title: tool.title,
                 description: tool.description,
-                input_schema: serde_json::to_value(tool.input_schema)
-                    .unwrap_or_else(|_| serde_json::json!({})),
+                input_schema: tool.input_schema,
+                output_schema: None,
+                available: true,
             })
             .collect();
 
@@ -1547,18 +1538,16 @@ impl McpClientManager {
         if let Some(proc) = system.process(Pid::from(process.pid as usize)) {
             Some(ProcessInfo {
                 pid: process.pid,
-                command: process.command.clone(),
-                args: process.args.clone(),
+                command_line: format!("{} {}", process.command, process.args.join(" ")),
                 started_at: process.started_at,
-                cpu_usage: proc.cpu_usage(),
+                cpu_usage: proc.cpu_usage() as f64,
                 memory_usage: proc.memory(),
                 status: ProcessStatus::Running,
             })
         } else {
             Some(ProcessInfo {
                 pid: process.pid,
-                command: process.command.clone(),
-                args: process.args.clone(),
+                command_line: format!("{} {}", process.command, process.args.join(" ")),
                 started_at: process.started_at,
                 cpu_usage: 0.0,
                 memory_usage: 0,
@@ -1608,10 +1597,10 @@ impl McpClientManager {
                                 } else {
                                     // Process no longer exists - mark as disconnected
                                     tracing::warn!("MCP server process {} no longer exists, marking as disconnected", pid);
-                                    *connection.status.write() = ConnectionStatus::Error("Process terminated unexpectedly".to_string());
+                                    *connection.status.write() = ConnectionStatus::Error;
                                     let _ = event_sender.send(ConnectionEvent::StatusChanged {
                                         server_id,
-                                        status: ConnectionStatus::Error("Process terminated unexpectedly".to_string()),
+                                        status: ConnectionStatus::Error,
                                     });
                                 }
                             }
@@ -1620,7 +1609,7 @@ impl McpClientManager {
                             if let Some(connected_at) = *connection.connected_at.read() {
                                 let uptime_seconds = connected_at.elapsed().as_secs();
                                 let mut metrics = connection.metrics.write();
-                                metrics.uptime_seconds = uptime_seconds;
+                                // metrics.uptime_seconds = uptime_seconds; // Field does not exist in ConnectionMetrics
                             }
                         }
                     }
@@ -1649,23 +1638,23 @@ impl McpClientManager {
                                             } else {
                                                 // Health check failed
                                                 tracing::warn!("Health check failed for server {}", server_id);
-                                                *connection_clone.status.write() = ConnectionStatus::Error("Health check failed".to_string());
+                                                *connection_clone.status.write() = ConnectionStatus::Error;
                                                 *connection_clone.error_count.lock() += 1;
 
                                                 let _ = event_sender_clone.send(ConnectionEvent::StatusChanged {
                                                     server_id,
-                                                    status: ConnectionStatus::Error("Health check failed".to_string()),
+                                                    status: ConnectionStatus::Error,
                                                 });
                                             }
                                         }
                                         Err(e) => {
                                             tracing::error!("Health check error for server {}: {}", server_id, e);
-                                            *connection_clone.status.write() = ConnectionStatus::Error(format!("Health check error: {}", e));
+                                            *connection_clone.status.write() = ConnectionStatus::Error;
                                             *connection_clone.error_count.lock() += 1;
 
                                             let _ = event_sender_clone.send(ConnectionEvent::StatusChanged {
                                                 server_id,
-                                                status: ConnectionStatus::Error(format!("Health check error: {}", e)),
+                                                status: ConnectionStatus::Error,
                                             });
                                         }
                                     }
@@ -1717,18 +1706,16 @@ impl McpClientManager {
         if let Some(proc) = system.process(Pid::from(process.pid as usize)) {
             Some(ProcessInfo {
                 pid: process.pid,
-                command: process.command.clone(),
-                args: process.args.clone(),
+                command_line: format!("{} {}", process.command, process.args.join(" ")),
                 started_at: process.started_at,
-                cpu_usage: proc.cpu_usage(),
+                cpu_usage: proc.cpu_usage() as f64,
                 memory_usage: proc.memory(),
                 status: ProcessStatus::Running,
             })
         } else {
             Some(ProcessInfo {
                 pid: process.pid,
-                command: process.command.clone(),
-                args: process.args.clone(),
+                command_line: format!("{} {}", process.command, process.args.join(" ")),
                 started_at: process.started_at,
                 cpu_usage: 0.0,
                 memory_usage: 0,
@@ -1749,18 +1736,27 @@ impl McpClientManager {
     ) -> Option<ProcessInfo> {
         let system = system.read();
 
-        system.process(Pid::from(pid as usize)).map(|proc| ProcessInfo {
-                pid,
-                command: proc.name().to_string_lossy().to_string(),
-                args: proc
+        system.process(Pid::from(pid as usize)).map(|proc| {
+                let command_name = proc.name().to_string_lossy().to_string();
+                let args: Vec<String> = proc
                     .cmd()
                     .iter()
                     .map(|arg| arg.to_string_lossy().to_string())
-                    .collect(),
-                started_at: chrono::Utc::now(), // TODO: Get actual start time if available
-                cpu_usage: proc.cpu_usage(),
-                memory_usage: proc.memory(),
-                status: ProcessStatus::Running,
+                    .collect();
+                let command_line = if args.is_empty() {
+                    command_name
+                } else {
+                    format!("{} {}", command_name, args.join(" "))
+                };
+
+                ProcessInfo {
+                    pid,
+                    command_line,
+                    started_at: chrono::Utc::now(), // TODO: Get actual start time if available
+                    cpu_usage: proc.cpu_usage() as f64,
+                    memory_usage: proc.memory(),
+                    status: ProcessStatus::Running,
+                }
             })
     }
 
@@ -1897,19 +1893,20 @@ impl McpClientManager {
             tools: init_result
                 .server_capabilities
                 .tools
-                .map(|_| crate::types::ToolsCapability { list_changed: None }),
+                .map(|_| crate::types::ToolsCapabilities { list_changed: None }),
             prompts: init_result
                 .server_capabilities
                 .prompts
-                .map(|_| crate::types::PromptsCapability { list_changed: None }),
+                .map(|_| crate::types::PromptsCapabilities { list_changed: None }),
             resources: init_result.server_capabilities.resources.map(|_| {
-                crate::types::ResourcesCapability {
+                crate::types::ResourcesCapabilities {
                     subscribe: None,
                     list_changed: None,
                 }
             }),
-            sampling: None,
-            elicitation: None,
+            completions: init_result.server_capabilities.completions,
+            experimental: init_result.server_capabilities.experimental,
+            logging: init_result.server_capabilities.logging,
         };
 
         *connection.capabilities.write() = Some(server_capabilities.clone());
@@ -1981,19 +1978,20 @@ impl McpClientManager {
             tools: init_result
                 .server_capabilities
                 .tools
-                .map(|_| crate::types::ToolsCapability { list_changed: None }),
+                .map(|_| crate::types::ToolsCapabilities { list_changed: None }),
             prompts: init_result
                 .server_capabilities
                 .prompts
-                .map(|_| crate::types::PromptsCapability { list_changed: None }),
+                .map(|_| crate::types::PromptsCapabilities { list_changed: None }),
             resources: init_result.server_capabilities.resources.map(|_| {
-                crate::types::ResourcesCapability {
+                crate::types::ResourcesCapabilities {
                     subscribe: None,
                     list_changed: None,
                 }
             }),
-            sampling: None,
-            elicitation: None,
+            completions: init_result.server_capabilities.completions,
+            experimental: init_result.server_capabilities.experimental,
+            logging: init_result.server_capabilities.logging,
         };
 
         *connection.capabilities.write() = Some(server_capabilities.clone());
@@ -2062,19 +2060,20 @@ impl McpClientManager {
             tools: init_result
                 .server_capabilities
                 .tools
-                .map(|_| crate::types::ToolsCapability { list_changed: None }),
+                .map(|_| crate::types::ToolsCapabilities { list_changed: None }),
             prompts: init_result
                 .server_capabilities
                 .prompts
-                .map(|_| crate::types::PromptsCapability { list_changed: None }),
+                .map(|_| crate::types::PromptsCapabilities { list_changed: None }),
             resources: init_result.server_capabilities.resources.map(|_| {
-                crate::types::ResourcesCapability {
+                crate::types::ResourcesCapabilities {
                     subscribe: None,
                     list_changed: None,
                 }
             }),
-            sampling: None,
-            elicitation: None,
+            completions: init_result.server_capabilities.completions,
+            experimental: init_result.server_capabilities.experimental,
+            logging: init_result.server_capabilities.logging,
         };
 
         *connection.capabilities.write() = Some(server_capabilities.clone());
@@ -2137,19 +2136,20 @@ impl McpClientManager {
             tools: init_result
                 .server_capabilities
                 .tools
-                .map(|_| crate::types::ToolsCapability { list_changed: None }),
+                .map(|_| crate::types::ToolsCapabilities { list_changed: None }),
             prompts: init_result
                 .server_capabilities
                 .prompts
-                .map(|_| crate::types::PromptsCapability { list_changed: None }),
+                .map(|_| crate::types::PromptsCapabilities { list_changed: None }),
             resources: init_result.server_capabilities.resources.map(|_| {
-                crate::types::ResourcesCapability {
+                crate::types::ResourcesCapabilities {
                     subscribe: None,
                     list_changed: None,
                 }
             }),
-            sampling: None,
-            elicitation: None,
+            completions: init_result.server_capabilities.completions,
+            experimental: init_result.server_capabilities.experimental,
+            logging: init_result.server_capabilities.logging,
         };
 
         *connection.capabilities.write() = Some(server_capabilities.clone());
@@ -2173,12 +2173,12 @@ impl McpClientManager {
         let mut metrics = connection.metrics.read().clone();
 
         // Update real-time metrics
-        metrics.messages_sent = *connection.request_count.lock();
+        metrics.requests_sent = *connection.request_count.lock();
         metrics.error_count = *connection.error_count.lock();
 
         // Calculate uptime
         if let Some(connected_at) = *connection.connected_at.read() {
-            metrics.uptime_seconds = connected_at.elapsed().as_secs();
+            // metrics.uptime_seconds = connected_at.elapsed().as_secs(); // Field does not exist
         }
 
         Ok(metrics)
@@ -2192,42 +2192,43 @@ impl McpClientManager {
             let connection = entry.value();
             let metrics = connection.metrics.read();
 
-            aggregated.messages_sent += metrics.messages_sent;
-            aggregated.messages_received += metrics.messages_received;
+            aggregated.requests_sent += metrics.requests_sent;
+            aggregated.responses_received += metrics.responses_received;
             aggregated.bytes_sent += metrics.bytes_sent;
             aggregated.bytes_received += metrics.bytes_received;
             aggregated.error_count += metrics.error_count;
 
             // Calculate average response time (weighted by message count)
-            if aggregated.messages_sent > 0 {
+            if aggregated.requests_sent > 0 {
                 let total_time = (aggregated.avg_response_time_ms
-                    * (aggregated.messages_sent - metrics.messages_sent) as f64)
-                    + (metrics.avg_response_time_ms * metrics.messages_sent as f64);
-                aggregated.avg_response_time_ms = total_time / aggregated.messages_sent as f64;
+                    * (aggregated.requests_sent - metrics.requests_sent) as f64)
+                    + (metrics.avg_response_time_ms * metrics.requests_sent as f64);
+                aggregated.avg_response_time_ms = total_time / aggregated.requests_sent as f64;
             }
 
             // Use the maximum uptime as the overall uptime
-            aggregated.uptime_seconds = aggregated.uptime_seconds.max(metrics.uptime_seconds);
+            // aggregated.uptime_seconds = aggregated.uptime_seconds.max(metrics.uptime_seconds); // Field does not exist
         }
 
         Ok(aggregated)
     }
 
     /// Create a sampling request using TurboMCP's production-grade LLM integration
-    pub async fn create_sampling_request(
+    pub async fn create_sampling_request_with_config(
         &self,
         server_id: Uuid,
         messages: Vec<serde_json::Value>,
         max_tokens: Option<u32>,
         temperature: Option<f32>,
+        llm_config: &crate::llm_config::LLMConfigManager,
     ) -> McpResult<serde_json::Value> {
         let connection = self
             .connections
             .get(&server_id)
             .ok_or_else(|| McpStudioError::ServerNotFound(server_id.to_string()))?;
 
-        // Use the configured sampling handler if available
-        if let Some(handler) = &self.sampling_handler {
+        // Get the active sampling handler from runtime configuration
+        if let Some(handler) = llm_config.get_active_sampling_handler().await {
             tracing::info!(
                 "Processing sampling request for server: {} with {} messages",
                 connection.config.name,

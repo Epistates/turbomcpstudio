@@ -39,6 +39,9 @@ pub enum McpStudioError {
     #[error("Invalid configuration: {0}")]
     ConfigError(String),
 
+    #[error("Configuration error: {0}")]
+    Configuration(String),
+
     #[error("Server not found: {0}")]
     ServerNotFound(String),
 

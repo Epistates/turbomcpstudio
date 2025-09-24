@@ -9,6 +9,7 @@
 
 use crate::error::{McpResult, McpStudioError};
 use crate::mcp_client::McpClientManager;
+use crate::llm_config::LLMConfigManager;
 use crate::types::collections::*;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -22,6 +23,7 @@ use regex::Regex;
 /// World-class workflow execution engine
 pub struct WorkflowEngine {
     mcp_manager: Arc<McpClientManager>,
+    llm_config: Arc<LLMConfigManager>,
     active_executions: Arc<RwLock<HashMap<Uuid, ExecutionContext>>>,
     app_handle: AppHandle,
 }
@@ -57,9 +59,10 @@ pub struct StepExecutionState {
 
 impl WorkflowEngine {
     /// Create a new workflow execution engine
-    pub fn new(mcp_manager: Arc<McpClientManager>, app_handle: AppHandle) -> Self {
+    pub fn new(mcp_manager: Arc<McpClientManager>, llm_config: Arc<LLMConfigManager>, app_handle: AppHandle) -> Self {
         Self {
             mcp_manager,
+            llm_config,
             active_executions: Arc::new(RwLock::new(HashMap::new())),
             app_handle,
         }
@@ -456,11 +459,12 @@ impl WorkflowEngine {
             }))
             .collect();
 
-        self.mcp_manager.create_sampling_request(
+        self.mcp_manager.create_sampling_request_with_config(
             server_id,
             messages_value,
             max_tokens,
             temperature,
+            &self.llm_config,
         ).await
     }
 
@@ -671,6 +675,7 @@ impl Clone for WorkflowEngine {
     fn clone(&self) -> Self {
         Self {
             mcp_manager: self.mcp_manager.clone(),
+            llm_config: self.llm_config.clone(),
             active_executions: self.active_executions.clone(),
             app_handle: self.app_handle.clone(),
         }

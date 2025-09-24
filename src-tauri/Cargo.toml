@@ -20,6 +20,7 @@ tauri-plugin-sql = { version = "2.0", features = ["sqlite"] }
 tauri-plugin-fs = "2.0"
 tauri-plugin-process = "2.0"
 tauri-plugin-dialog = "2.0"
+tauri-plugin-http = "2.0"
 
 # TurboMCP integration - using local development version
 turbomcp = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp" }
@@ -48,7 +49,6 @@ anyhow = "1.0"
 
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
-urlencoding = "2.1"
 
 # Logging
 tracing = "0.1"
@@ -60,6 +60,9 @@ sysinfo = "0.32"
 # Concurrency
 parking_lot = "0.12"
 dashmap = "6.1"
+
+# Secure storage
+keyring = "2.3"
 
 [features]
 default = ["stdio", "http", "websocket", "tcp", "unix"]

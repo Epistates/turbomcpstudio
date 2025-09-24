@@ -1,11 +1,13 @@
 mod commands;
 mod database;
 mod error;
+mod llm_config;
 mod mcp_client;
 mod types;
 mod workflow_engine;
 use database::Database;
 use error::McpStudioError;
+use llm_config::LLMConfigManager;
 use mcp_client::McpClientManager;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
@@ -14,6 +16,7 @@ use tauri::{Emitter, Manager};
 #[derive(Clone)]
 pub struct AppState {
     pub mcp_manager: Arc<McpClientManager>,
+    pub llm_config: Arc<LLMConfigManager>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -29,16 +32,20 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_http::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
 
-            // Initialize MCP client manager immediately (lightweight)
+            // Initialize managers immediately (lightweight)
             let (mcp_manager, mut event_receiver) = McpClientManager::new();
             let mcp_manager = Arc::new(mcp_manager);
+
+            let llm_config = Arc::new(LLMConfigManager::new());
 
             // Store lightweight state immediately to unblock UI
             app.manage(AppState {
                 mcp_manager: mcp_manager.clone(),
+                llm_config: llm_config.clone(),
             });
 
             // Emit immediate ready event so UI can start working
@@ -128,6 +135,13 @@ pub fn run() {
                 // Store database once it's ready
                 app_handle_clone.manage(database);
 
+                // Initialize default LLM providers
+                if let Err(e) = llm_config.initialize_default_providers().await {
+                    tracing::error!("Failed to initialize LLM providers: {}", e);
+                } else {
+                    tracing::info!("LLM providers initialized");
+                }
+
                 tracing::info!("MCP Studio background initialization complete");
 
                 // Emit ready event to frontend
@@ -174,6 +188,15 @@ pub fn run() {
             commands::create_sampling_request,
             commands::send_elicitation_response,
             commands::get_elicitation_requests,
+            // LLM Configuration management
+            commands::get_llm_config,
+            commands::get_llm_provider_statuses,
+            commands::set_llm_api_key,
+            commands::remove_llm_api_key,
+            commands::set_active_llm_provider,
+            commands::update_llm_provider_config,
+            commands::is_sampling_available,
+            commands::validate_llm_config,
             // TurboMCP 1.0.10 features
             commands::get_completions,
             commands::list_filesystem_roots,
