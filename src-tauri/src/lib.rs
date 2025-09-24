@@ -3,6 +3,7 @@ mod database;
 mod error;
 mod mcp_client;
 mod types;
+mod workflow_engine;
 use database::Database;
 use error::McpStudioError;
 use mcp_client::McpClientManager;
@@ -177,6 +178,22 @@ pub fn run() {
             commands::get_completions,
             commands::list_filesystem_roots,
             commands::get_handler_status,
+            // Collections & Workflow execution
+            commands::execute_workflow,
+            commands::get_workflow_execution,
+            commands::stop_workflow_execution,
+            commands::list_workflow_executions,
+            commands::save_collection,
+            commands::load_collection,
+            commands::list_collections,
+            commands::delete_collection,
+            // Collection import/export
+            commands::export_collection,
+            commands::import_collection,
+            commands::export_collection_to_file,
+            commands::import_collection_from_file,
+            commands::get_collection_templates,
+            commands::create_collection_from_template,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

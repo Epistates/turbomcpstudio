@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+// World-class Collections system (enhanced)
+pub mod collections;
+
 /// Server configuration for connecting to MCP servers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -174,80 +177,9 @@ pub struct PromptArgument {
     pub required: Option<bool>,
 }
 
-/// Collection of MCP operations and scenarios
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Collection {
-    pub id: Uuid,
-    pub name: String,
-    pub description: Option<String>,
-    pub version: String,
-    pub author: Option<String>,
-    pub tags: Vec<String>,
-    pub servers: Vec<ServerConfig>,
-    pub scenarios: Vec<Scenario>,
-    pub variables: HashMap<String, Variable>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-/// Scenario for chaining MCP operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Scenario {
-    pub id: Uuid,
-    pub name: String,
-    pub description: Option<String>,
-    pub steps: Vec<ScenarioStep>,
-    pub variables: HashMap<String, Variable>,
-}
-
-/// Individual step in a scenario
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioStep {
-    pub id: Uuid,
-    pub step_type: ScenarioStepType,
-    pub server_id: Uuid,
-    pub input_variables: HashMap<String, String>,
-    pub output_variable: Option<String>,
-    pub condition: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum ScenarioStepType {
-    ToolCall {
-        tool_name: String,
-        parameters: serde_json::Value,
-    },
-    ResourceRead {
-        uri: String,
-    },
-    PromptGet {
-        prompt_name: String,
-        arguments: HashMap<String, serde_json::Value>,
-    },
-    SamplingRequest {
-        messages: Vec<serde_json::Value>,
-        max_tokens: Option<u32>,
-        temperature: Option<f32>,
-    },
-}
-
-/// Variable definition for collections and scenarios
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Variable {
-    pub name: String,
-    pub value: String,
-    pub description: Option<String>,
-    pub variable_type: VariableType,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum VariableType {
-    String,
-    Number,
-    Boolean,
-    Json,
-}
+// NOTE: Collection types now imported from collections module above
+// Enhanced Collections system with cross-server workflows, variable passing,
+// advanced assertions, and execution tracking.
 
 /// Message history for protocol analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]

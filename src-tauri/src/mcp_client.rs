@@ -128,194 +128,16 @@ impl McpTransportClient {
         }
     }
 
-    /// Create an enhanced tool schema with common parameters as a fallback
-    fn create_enhanced_tool_schema(name: &str) -> ToolInputSchema {
-        let mut properties = HashMap::new();
 
-        // Add common parameters that many tools might have
-        match name {
-            "hello" => {
-                // For hello tool, add a name parameter based on the user's example
-                properties.insert(
-                    "name".to_string(),
-                    serde_json::json!({
-                        "type": "string",
-                        "description": "The name to greet"
-                    }),
-                );
-            }
-            _ => {
-                // For unknown tools, create a generic input parameter
-                properties.insert(
-                    "input".to_string(),
-                    serde_json::json!({
-                        "type": "string",
-                        "description": "Input for the tool"
-                    }),
-                );
-            }
-        }
 
-        ToolInputSchema {
-            schema_type: "object".to_string(),
-            properties: Some(properties),
-            required: Some(vec![]),
-            additional_properties: Some(true),
-        }
-    }
-
-    /// TODO: Make a direct JSON-RPC call to get full tool definitions with schemas
-    /// This would bypass TurboMCP client limitations but requires direct transport access
-    /// For now, this is not implemented due to TurboMCP's encapsulation
-    /// List tools with full schema information using enhanced schema fallback
+    /// Get tools with their schemas from the MCP server
+    /// This method is now an alias for list_tools() since TurboMCP 1.0.11
+    /// returns full Tool objects with schemas by default
     pub async fn list_tools_with_schemas(&self) -> Result<Vec<Tool>, Box<turbomcp_core::Error>> {
-        // TODO: Implement direct protocol call to get real schemas from MCP server
-        // For now, use enhanced schemas with known tool patterns as fallback
-        tracing::info!("Using enhanced schema fallback (real schema access not yet implemented)");
-
-        match self {
-            McpTransportClient::Stdio(client) => {
-                let tool_names = client.list_tools().await?;
-
-                let tools: Vec<Tool> = tool_names
-                    .into_iter()
-                    .map(|name| Tool {
-                        name: name.clone(),
-                        title: None,
-                        description: Some(format!("Tool: {}", name)),
-                        input_schema: Self::create_enhanced_tool_schema(&name),
-                        output_schema: None,
-                        annotations: None,
-                        meta: None,
-                    })
-                    .collect();
-
-                tracing::info!(
-                    "Created {} tools with enhanced fallback schemas",
-                    tools.len()
-                );
-                Ok(tools)
-            }
-            McpTransportClient::ChildProcess(client) => {
-                let tool_names = client.list_tools().await?;
-
-                let tools: Vec<Tool> = tool_names
-                    .into_iter()
-                    .map(|name| Tool {
-                        name: name.clone(),
-                        title: None,
-                        description: Some(format!("Tool: {}", name)),
-                        input_schema: Self::create_enhanced_tool_schema(&name),
-                        output_schema: None,
-                        annotations: None,
-                        meta: None,
-                    })
-                    .collect();
-
-                tracing::info!(
-                    "Created {} tools with enhanced fallback schemas",
-                    tools.len()
-                );
-                Ok(tools)
-            }
-
-            #[cfg(feature = "http")]
-            McpTransportClient::Http(client) => {
-                let tool_names = client.list_tools().await?;
-
-                let tools: Vec<Tool> = tool_names
-                    .into_iter()
-                    .map(|name| Tool {
-                        name: name.clone(),
-                        title: None,
-                        description: Some(format!("Tool: {}", name)),
-                        input_schema: Self::create_enhanced_tool_schema(&name),
-                        output_schema: None,
-                        annotations: None,
-                        meta: None,
-                    })
-                    .collect();
-
-                tracing::info!(
-                    "Created {} tools with enhanced fallback schemas",
-                    tools.len()
-                );
-                Ok(tools)
-            }
-
-            #[cfg(feature = "websocket")]
-            McpTransportClient::WebSocket(client) => {
-                let tool_names = client.list_tools().await?;
-
-                let tools: Vec<Tool> = tool_names
-                    .into_iter()
-                    .map(|name| Tool {
-                        name: name.clone(),
-                        title: None,
-                        description: Some(format!("Tool: {}", name)),
-                        input_schema: Self::create_enhanced_tool_schema(&name),
-                        output_schema: None,
-                        annotations: None,
-                        meta: None,
-                    })
-                    .collect();
-
-                tracing::info!(
-                    "Created {} tools with enhanced fallback schemas",
-                    tools.len()
-                );
-                Ok(tools)
-            }
-
-            #[cfg(feature = "tcp")]
-            McpTransportClient::Tcp(client) => {
-                let tool_names = client.list_tools().await?;
-
-                let tools: Vec<Tool> = tool_names
-                    .into_iter()
-                    .map(|name| Tool {
-                        name: name.clone(),
-                        title: None,
-                        description: Some(format!("Tool: {}", name)),
-                        input_schema: Self::create_enhanced_tool_schema(&name),
-                        output_schema: None,
-                        annotations: None,
-                        meta: None,
-                    })
-                    .collect();
-
-                tracing::info!(
-                    "Created {} tools with enhanced fallback schemas",
-                    tools.len()
-                );
-                Ok(tools)
-            }
-
-            #[cfg(feature = "unix")]
-            McpTransportClient::Unix(client) => {
-                let tool_names = client.list_tools().await?;
-
-                let tools: Vec<Tool> = tool_names
-                    .into_iter()
-                    .map(|name| Tool {
-                        name: name.clone(),
-                        title: None,
-                        description: Some(format!("Tool: {}", name)),
-                        input_schema: Self::create_enhanced_tool_schema(&name),
-                        output_schema: None,
-                        annotations: None,
-                        meta: None,
-                    })
-                    .collect();
-
-                tracing::info!(
-                    "Created {} tools with enhanced fallback schemas",
-                    tools.len()
-                );
-                Ok(tools)
-            }
-        }
+        tracing::info!("✅ Getting tool schemas using TurboMCP 1.0.11 API");
+        self.list_tools().await
     }
+
 
     /// Call a tool on the MCP server (transport-agnostic)
     pub async fn call_tool(
@@ -344,7 +166,7 @@ impl McpTransportClient {
     }
 
     /// List tools available on the MCP server (transport-agnostic)
-    pub async fn list_tools(&self) -> Result<Vec<String>, Box<turbomcp_core::Error>> {
+    pub async fn list_tools(&self) -> Result<Vec<Tool>, Box<turbomcp_core::Error>> {
         match self {
             McpTransportClient::Stdio(client) => client.list_tools().await,
             McpTransportClient::ChildProcess(client) => client.list_tools().await,
@@ -550,7 +372,7 @@ impl McpTransportClient {
         }
     }
 
-    /// List filesystem roots available to the server (TurboMCP 1.0.10)
+    /// List filesystem roots available to the server (TurboMCP 1.0.11)
     /// Returns filesystem boundaries that define server access scope
     pub async fn list_roots(&self) -> Result<Vec<String>, Box<turbomcp_core::Error>> {
         match self {
@@ -851,7 +673,7 @@ impl McpClientManager {
 
         tracing::info!("MCP Client Manager initialized - ready for enterprise connections");
         tracing::info!("Available transports: STDIO, HTTP, WebSocket, TCP, Unix");
-        tracing::info!("TurboMCP v1.0.9 integration ready with plugin and LLM registry support");
+        tracing::info!("TurboMCP v1.0.11 integration ready with plugin and LLM registry support");
         if manager.sampling_handler.is_some() {
             tracing::info!("Production LLM sampling handler initialized");
         } else {
@@ -2456,6 +2278,7 @@ impl McpClientManager {
                 model_preferences: None,
                 include_context: None,
                 metadata: None,
+                _meta: None,
             };
 
             // Process the sampling request through TurboMCP

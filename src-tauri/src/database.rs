@@ -1,6 +1,7 @@
 use crate::error::{McpResult, McpStudioError};
-use crate::types::{Collection, MessageHistory, ServerConfig};
+use crate::types::{collections::*, MessageHistory, ServerConfig};
 use sqlx::{Pool, Row, Sqlite, SqlitePool};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Database manager for MCP Studio
@@ -162,20 +163,71 @@ impl Database {
         .await?;
         tracing::info!("server_configs table created successfully");
 
-        // Collections table
-        tracing::info!("Creating collections table");
+        // Enhanced Collections table with workflow support
+        tracing::info!("Creating enhanced collections table");
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS collections (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 description TEXT,
-                version TEXT NOT NULL,
-                author TEXT,
                 tags TEXT NOT NULL,
-                servers TEXT NOT NULL,
-                scenarios TEXT NOT NULL,
+                workflow TEXT NOT NULL,
                 variables TEXT NOT NULL,
+                environment TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                created_by TEXT,
+                version TEXT NOT NULL,
+                last_run TEXT,
+                run_count INTEGER NOT NULL DEFAULT 0
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("Enhanced collections table created successfully");
+
+        // Workflow executions table for tracking execution history
+        tracing::info!("Creating workflow_executions table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS workflow_executions (
+                id TEXT PRIMARY KEY,
+                collection_id TEXT NOT NULL,
+                collection_version TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                status TEXT NOT NULL,
+                step_results TEXT NOT NULL,
+                final_variables TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                environment_name TEXT NOT NULL,
+                user_variables TEXT NOT NULL,
+                FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("workflow_executions table created successfully");
+
+        // Collection templates table for reusable templates
+        tracing::info!("Creating collection_templates table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS collection_templates (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                category TEXT NOT NULL,
+                tags TEXT NOT NULL,
+                author TEXT,
+                documentation_url TEXT,
+                required_server_types TEXT NOT NULL,
+                template_collection TEXT NOT NULL,
+                setup_instructions TEXT NOT NULL,
+                usage_examples TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
@@ -183,7 +235,7 @@ impl Database {
         )
         .execute(&self.pool)
         .await?;
-        tracing::info!("collections table created successfully");
+        tracing::info!("collection_templates table created successfully");
 
         // Message history table
         tracing::info!("Creating message_history table");
@@ -387,31 +439,34 @@ impl Database {
         Ok(())
     }
 
-    /// Save a collection
+    /// Save an enhanced collection with workflow support
     pub async fn save_collection(&self, collection: &Collection) -> McpResult<()> {
         let tags = serde_json::to_string(&collection.tags)?;
-        let servers = serde_json::to_string(&collection.servers)?;
-        let scenarios = serde_json::to_string(&collection.scenarios)?;
+        let workflow = serde_json::to_string(&collection.workflow)?;
         let variables = serde_json::to_string(&collection.variables)?;
+        let environment = serde_json::to_string(&collection.environment)?;
 
         sqlx::query(
             r#"
-            INSERT OR REPLACE INTO collections 
-            (id, name, description, version, author, tags, servers, scenarios, variables, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO collections
+            (id, name, description, tags, workflow, variables, environment,
+             created_at, updated_at, created_by, version, last_run, run_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(collection.id.to_string())
         .bind(&collection.name)
         .bind(collection.description.as_deref())
-        .bind(&collection.version)
-        .bind(collection.author.as_deref())
         .bind(tags)
-        .bind(servers)
-        .bind(scenarios)
+        .bind(workflow)
         .bind(variables)
+        .bind(environment)
         .bind(collection.created_at.to_rfc3339())
         .bind(collection.updated_at.to_rfc3339())
+        .bind(collection.created_by.as_deref())
+        .bind(&collection.version)
+        .bind(collection.last_run.map(|dt| dt.to_rfc3339()))
+        .bind(collection.run_count as i64)
         .execute(&self.pool)
         .await?;
 
@@ -421,7 +476,7 @@ impl Database {
     /// Load a collection by ID
     pub async fn load_collection(&self, id: Uuid) -> McpResult<Option<Collection>> {
         let row = sqlx::query(
-            "SELECT id, name, description, version, author, tags, servers, scenarios, variables, created_at, updated_at FROM collections WHERE id = ?"
+            "SELECT id, name, description, tags, workflow, variables, environment, created_at, updated_at, created_by, version, last_run, run_count FROM collections WHERE id = ?"
         )
         .bind(id.to_string())
         .fetch_optional(&self.pool)
@@ -429,24 +484,26 @@ impl Database {
 
         if let Some(row) = row {
             let tags: Vec<String> = serde_json::from_str(&row.get::<String, _>("tags"))?;
-            let servers: Vec<ServerConfig> =
-                serde_json::from_str(&row.get::<String, _>("servers"))?;
-            let scenarios: Vec<crate::types::Scenario> =
-                serde_json::from_str(&row.get::<String, _>("scenarios"))?;
-            let variables: std::collections::HashMap<String, crate::types::Variable> =
+            let workflow: Vec<crate::types::collections::WorkflowStep> =
+                serde_json::from_str(&row.get::<String, _>("workflow"))?;
+            let variables: std::collections::HashMap<String, crate::types::collections::CollectionVariable> =
                 serde_json::from_str(&row.get::<String, _>("variables"))?;
+            let environment: crate::types::collections::CollectionEnvironment =
+                serde_json::from_str(&row.get::<String, _>("environment"))?;
+            let last_run: Option<chrono::DateTime<chrono::Utc>> = row.get::<Option<String>, _>("last_run")
+                .map(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
+                .flatten()
+                .map(|dt| dt.with_timezone(&chrono::Utc));
 
             Ok(Some(Collection {
                 id: Uuid::parse_str(&row.get::<String, _>("id"))
                     .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?,
                 name: row.get("name"),
                 description: row.get("description"),
-                version: row.get("version"),
-                author: row.get("author"),
                 tags,
-                servers,
-                scenarios,
+                workflow,
                 variables,
+                environment,
                 created_at: chrono::DateTime::parse_from_rfc3339(
                     &row.get::<String, _>("created_at"),
                 )
@@ -457,6 +514,10 @@ impl Database {
                 )
                 .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?
                 .with_timezone(&chrono::Utc),
+                created_by: row.get("created_by"),
+                version: row.get("version"),
+                last_run,
+                run_count: row.get::<i64, _>("run_count") as u32,
             }))
         } else {
             Ok(None)
@@ -466,7 +527,7 @@ impl Database {
     /// List all collections
     pub async fn list_collections(&self) -> McpResult<Vec<Collection>> {
         let rows = sqlx::query(
-            "SELECT id, name, description, version, author, tags, servers, scenarios, variables, created_at, updated_at FROM collections ORDER BY name"
+            "SELECT id, name, description, tags, workflow, variables, environment, created_at, updated_at, created_by, version, last_run, run_count FROM collections ORDER BY name"
         )
         .fetch_all(&self.pool)
         .await?;
@@ -475,24 +536,26 @@ impl Database {
 
         for row in rows {
             let tags: Vec<String> = serde_json::from_str(&row.get::<String, _>("tags"))?;
-            let servers: Vec<ServerConfig> =
-                serde_json::from_str(&row.get::<String, _>("servers"))?;
-            let scenarios: Vec<crate::types::Scenario> =
-                serde_json::from_str(&row.get::<String, _>("scenarios"))?;
-            let variables: std::collections::HashMap<String, crate::types::Variable> =
+            let workflow: Vec<crate::types::collections::WorkflowStep> =
+                serde_json::from_str(&row.get::<String, _>("workflow"))?;
+            let variables: std::collections::HashMap<String, crate::types::collections::CollectionVariable> =
                 serde_json::from_str(&row.get::<String, _>("variables"))?;
+            let environment: crate::types::collections::CollectionEnvironment =
+                serde_json::from_str(&row.get::<String, _>("environment"))?;
+            let last_run: Option<chrono::DateTime<chrono::Utc>> = row.get::<Option<String>, _>("last_run")
+                .map(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
+                .flatten()
+                .map(|dt| dt.with_timezone(&chrono::Utc));
 
             collections.push(Collection {
                 id: Uuid::parse_str(&row.get::<String, _>("id"))
                     .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?,
                 name: row.get("name"),
                 description: row.get("description"),
-                version: row.get("version"),
-                author: row.get("author"),
                 tags,
-                servers,
-                scenarios,
+                workflow,
                 variables,
+                environment,
                 created_at: chrono::DateTime::parse_from_rfc3339(
                     &row.get::<String, _>("created_at"),
                 )
@@ -503,10 +566,105 @@ impl Database {
                 )
                 .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?
                 .with_timezone(&chrono::Utc),
+                created_by: row.get("created_by"),
+                version: row.get("version"),
+                last_run,
+                run_count: row.get::<i64, _>("run_count") as u32,
             });
         }
 
         Ok(collections)
+    }
+
+    /// Delete a collection by ID
+    pub async fn delete_collection(&self, id: Uuid) -> McpResult<()> {
+        sqlx::query("DELETE FROM collections WHERE id = ?")
+            .bind(id.to_string())
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Get a workflow execution by ID
+    pub async fn get_workflow_execution(&self, id: Uuid) -> McpResult<Option<crate::types::collections::WorkflowExecution>> {
+        let row = sqlx::query(
+            "SELECT id, collection_id, status, started_at, completed_at, summary, results FROM workflow_executions WHERE id = ?"
+        )
+        .bind(id.to_string())
+        .fetch_optional(&self.pool)
+        .await?;
+
+        if let Some(row) = row {
+            let summary: crate::types::collections::ExecutionSummary =
+                serde_json::from_str(&row.get::<String, _>("summary"))?;
+            let step_results: std::collections::HashMap<uuid::Uuid, crate::types::collections::StepResult> =
+                serde_json::from_str(&row.get::<String, _>("results"))?;
+
+            Ok(Some(crate::types::collections::WorkflowExecution {
+                id: Uuid::parse_str(&row.get::<String, _>("id"))
+                    .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?,
+                collection_id: Uuid::parse_str(&row.get::<String, _>("collection_id"))
+                    .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?,
+                status: serde_json::from_str(&format!("\"{}\"", row.get::<String, _>("status")))?,
+                started_at: chrono::DateTime::parse_from_rfc3339(&row.get::<String, _>("started_at"))
+                    .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?
+                    .with_timezone(&chrono::Utc),
+                completed_at: row.get::<Option<String>, _>("completed_at")
+                    .map(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
+                    .flatten()
+                    .map(|dt| dt.with_timezone(&chrono::Utc)),
+                summary,
+                step_results,
+                collection_version: "1.0.0".to_string(), // Default version since not stored in DB yet
+                final_variables: HashMap::new(),
+                environment_name: "default".to_string(),
+                user_variables: HashMap::new(),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// List workflow executions for a collection
+    pub async fn list_workflow_executions(&self, collection_id: Uuid) -> McpResult<Vec<crate::types::collections::WorkflowExecution>> {
+        let rows = sqlx::query(
+            "SELECT id, collection_id, status, started_at, completed_at, summary, results FROM workflow_executions WHERE collection_id = ? ORDER BY started_at DESC"
+        )
+        .bind(collection_id.to_string())
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut executions = Vec::new();
+
+        for row in rows {
+            let summary: crate::types::collections::ExecutionSummary =
+                serde_json::from_str(&row.get::<String, _>("summary"))?;
+            let step_results: std::collections::HashMap<uuid::Uuid, crate::types::collections::StepResult> =
+                serde_json::from_str(&row.get::<String, _>("results"))?;
+
+            executions.push(crate::types::collections::WorkflowExecution {
+                id: Uuid::parse_str(&row.get::<String, _>("id"))
+                    .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?,
+                collection_id: Uuid::parse_str(&row.get::<String, _>("collection_id"))
+                    .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?,
+                status: serde_json::from_str(&format!("\"{}\"", row.get::<String, _>("status")))?,
+                started_at: chrono::DateTime::parse_from_rfc3339(&row.get::<String, _>("started_at"))
+                    .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?
+                    .with_timezone(&chrono::Utc),
+                completed_at: row.get::<Option<String>, _>("completed_at")
+                    .map(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
+                    .flatten()
+                    .map(|dt| dt.with_timezone(&chrono::Utc)),
+                summary,
+                step_results,
+                collection_version: "1.0.0".to_string(), // Default version since not stored in DB yet
+                final_variables: HashMap::new(),
+                environment_name: "default".to_string(),
+                user_variables: HashMap::new(),
+            });
+        }
+
+        Ok(executions)
     }
 
     /// Save message to history

@@ -48,6 +48,9 @@ pub enum McpStudioError {
     #[error("Scenario execution error: {0}")]
     ScenarioError(String),
 
+    #[error("Workflow execution error: {0}")]
+    WorkflowError(String),
+
     #[error("Protocol validation error: {0}")]
     ProtocolError(String),
 
