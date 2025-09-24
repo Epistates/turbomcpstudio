@@ -3,6 +3,8 @@
   import { invoke } from '@tauri-apps/api/core';
   import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
+  import { createCapabilityStore } from '$lib/utils/serverStore';
+  import EmptyCapabilityState from '$lib/components/ui/EmptyCapabilityState.svelte';
 
   interface ResourceExecution {
     id: string;
@@ -38,7 +40,8 @@
     History
   } from 'lucide-svelte';
 
-  let servers: ServerInfo[] = $state([]);
+  // Optimized reactive store for servers with resources capability
+  const resourceServersStore = createCapabilityStore('resources');
   let selectedServerId: string | undefined = $state(undefined);
   let resources: any[] = $state([]);
   let loading = $state(false);
@@ -54,28 +57,51 @@
   let isHistoricalResult = $state(false);
   let filterType = $state('all');
 
-  // Subscribe to stores
-  $effect(() => {
-    const unsubscribeServers = serverStore.subscribe(state => {
-      const connectedServers = state.servers.filter(s => s.status?.toLowerCase() === 'connected');
-      servers = connectedServers;
+  // Reactive store access using Svelte 5 derived
+  let serverData = $state(null);
 
-      if (selectedServerId !== state.selectedServerId) {
-        selectedServerId = state.selectedServerId;
-        if (selectedServerId) {
+  $effect(() => {
+    const unsubscribe = resourceServersStore.subscribe(value => {
+      serverData = value;
+    });
+    return unsubscribe;
+  });
+
+  // Listen to global server selection changes
+  $effect(() => {
+    const unsubscribe = serverStore.subscribe(state => {
+      const globalSelectedId = state.selectedServerId;
+
+      // If global selection changed and points to a valid resources server, sync it
+      if (globalSelectedId && serverData?.servers?.some(s => s.id === globalSelectedId)) {
+        if (selectedServerId !== globalSelectedId) {
+          selectedServerId = globalSelectedId;
           loadResources();
         }
       }
-
-      // Auto-select first connected server if none selected
-      if (!state.selectedServerId && connectedServers.length > 0 && !selectedServerId) {
-        serverStore.selectServer(connectedServers[0].id);
-      }
     });
+    return unsubscribe;
+  });
 
-    return () => {
-      unsubscribeServers();
-    };
+  // Auto-manage server selection
+  $effect(() => {
+    const data = serverData;
+    if (!data) return;
+
+    // Only update selectedServerId if current selection is no longer valid
+    if (selectedServerId && !data.servers.find((s: ServerInfo) => s.id === selectedServerId)) {
+      // Current selection is invalid, pick first available
+      selectedServerId = data.servers.length > 0 ? data.servers[0].id : undefined;
+      if (selectedServerId) {
+        loadResources();
+      }
+    } else if (!selectedServerId && data.servers.length > 0) {
+      // No selection and servers available, auto-select first
+      selectedServerId = data.servers[0].id;
+      if (selectedServerId) {
+        loadResources();
+      }
+    }
   });
 
   const filteredResources = $derived.by(() => {
@@ -212,7 +238,7 @@
 
     const startTime = Date.now();
     const executionId = crypto.randomUUID();
-    const serverInfo = servers.find(s => s.id === selectedServerId);
+    const serverInfo = serverData?.servers?.find(s => s.id === selectedServerId);
 
     contentLoading = true;
     resourceContent = '';
@@ -285,7 +311,7 @@
 
     const startTime = Date.now();
     const executionId = crypto.randomUUID();
-    const serverInfo = servers.find(s => s.id === selectedServerId);
+    const serverInfo = serverData?.servers?.find(s => s.id === selectedServerId);
 
     contentLoading = true;
     resourceContent = '';
@@ -397,7 +423,10 @@
   }
 
   function selectServer(serverId: string) {
+    selectedServerId = serverId;
+    // Update global store so other components stay in sync
     serverStore.selectServer(serverId);
+    loadResources();
   }
 
   function extractNameFromUri(uri: string): string {
@@ -462,7 +491,7 @@
       </div>
 
       <!-- Server Selection -->
-      {#if servers.length > 1}
+      {#if (serverData?.servers || []).length > 1}
         <div class="mb-3">
           <label class="block text-xs font-medium text-gray-700 mb-1" for="resource-server-select">Server</label>
           <select
@@ -471,7 +500,7 @@
             class="form-select text-sm"
             id="resource-server-select"
           >
-            {#each servers as server}
+            {#each serverData?.servers || [] as server}
               <option value={server.id}>{server.config.name}</option>
             {/each}
           </select>
@@ -485,7 +514,7 @@
           type="text"
           bind:value={searchQuery}
           placeholder="Search resources..."
-          class="form-input pl-10 text-sm"
+          class="form-input has-icon-left text-sm"
         />
       </div>
 

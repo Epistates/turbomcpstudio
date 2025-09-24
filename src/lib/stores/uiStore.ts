@@ -17,6 +17,11 @@ interface UiStoreState {
     serverConfig: boolean;
     toolCall: boolean;
   };
+  // Tool Explorer state persistence
+  selectedTool?: {
+    name: string;
+    serverId: string;
+  };
 }
 
 const initialState: UiStoreState = {
@@ -30,6 +35,7 @@ const initialState: UiStoreState = {
     serverConfig: false,
     toolCall: false,
   },
+  selectedTool: undefined,
 };
 
 function createUiStore() {
@@ -127,6 +133,21 @@ function createUiStore() {
 
     showInfo(message: string) {
       this.showNotification('info', message);
+    },
+
+    // Tool Explorer state management
+    setSelectedTool(toolName: string, serverId: string) {
+      update(state => ({
+        ...state,
+        selectedTool: { name: toolName, serverId },
+      }));
+    },
+
+    clearSelectedTool() {
+      update(state => ({
+        ...state,
+        selectedTool: undefined,
+      }));
     },
   };
 }

@@ -11,12 +11,45 @@
     appStoreState
   } from '$lib/stores/appStore';
 
-  // Reactive state using Svelte 5 runes
-  const isReady = $derived($appStoreIsReady);
-  const loadingSteps = $derived($appStoreLoadingSteps);
-  const completedSteps = $derived($appStoreCompletedSteps);
-  const totalSteps = $derived($appStoreTotalSteps);
-  const appState = $derived($appStoreState);
+  // Reactive state using Svelte 5 runes - access store values directly
+  let isReady = $state(false);
+  let loadingSteps = $state([]);
+  let completedSteps = $state(0);
+  let totalSteps = $state(4);
+  let appState = $state({
+    isInitializing: true,
+    databaseReady: false,
+    mcpManagerReady: false,
+    initializationError: null,
+    startupTime: null
+  });
+
+  // Subscribe to store changes and update reactive state
+  $effect(() => {
+    const unsubscribeReady = appStoreIsReady.subscribe(value => {
+      isReady = value;
+    });
+    const unsubscribeSteps = appStoreLoadingSteps.subscribe(value => {
+      loadingSteps = value;
+    });
+    const unsubscribeCompleted = appStoreCompletedSteps.subscribe(value => {
+      completedSteps = value;
+    });
+    const unsubscribeTotal = appStoreTotalSteps.subscribe(value => {
+      totalSteps = value;
+    });
+    const unsubscribeState = appStoreState.subscribe(value => {
+      appState = value;
+    });
+
+    return () => {
+      unsubscribeReady();
+      unsubscribeSteps();
+      unsubscribeCompleted();
+      unsubscribeTotal();
+      unsubscribeState();
+    };
+  });
 
   // Progress calculation
   const progressPercentage = $derived(Math.round((completedSteps / totalSteps) * 100));
@@ -338,45 +371,45 @@
     font-style: italic;
   }
 
-  /* Dark mode adjustments */
-  [data-theme="dark"] .mcp-loading-step.completed {
+  /* Dark mode adjustments using :global() for proper scoping */
+  :global([data-theme="dark"]) .mcp-loading-step.completed {
     background: rgba(34, 197, 94, 0.1);
     border-color: rgba(34, 197, 94, 0.3);
   }
 
-  [data-theme="dark"] .mcp-loading-step.loading {
+  :global([data-theme="dark"]) .mcp-loading-step.loading {
     background: rgba(59, 130, 246, 0.1);
     border-color: rgba(59, 130, 246, 0.3);
   }
 
-  [data-theme="dark"] .mcp-loading-step.error {
+  :global([data-theme="dark"]) .mcp-loading-step.error {
     background: rgba(239, 68, 68, 0.1);
     border-color: rgba(239, 68, 68, 0.3);
   }
 
-  [data-theme="dark"] .mcp-loading-error {
+  :global([data-theme="dark"]) .mcp-loading-error {
     background: rgba(239, 68, 68, 0.1);
     border-color: rgba(239, 68, 68, 0.3);
   }
 
   /* Dark mode text improvements for better readability */
-  [data-theme="dark"] .mcp-step-label {
+  :global([data-theme="dark"]) .mcp-step-label {
     color: var(--mcp-text-primary-dark, rgba(255, 255, 255, 0.9));
   }
 
-  [data-theme="dark"] .mcp-step-error-text {
+  :global([data-theme="dark"]) .mcp-step-error-text {
     color: var(--mcp-error-400, rgba(248, 113, 113, 0.9));
   }
 
-  [data-theme="dark"] .mcp-progress-text {
+  :global([data-theme="dark"]) .mcp-progress-text {
     color: var(--mcp-text-secondary-dark, rgba(255, 255, 255, 0.7));
   }
 
-  [data-theme="dark"] .mcp-logo-text {
+  :global([data-theme="dark"]) .mcp-logo-text {
     color: var(--mcp-text-primary-dark, rgba(255, 255, 255, 0.95));
   }
 
-  [data-theme="dark"] .mcp-logo-subtitle {
+  :global([data-theme="dark"]) .mcp-logo-subtitle {
     color: var(--mcp-text-secondary-dark, rgba(255, 255, 255, 0.7));
   }
 

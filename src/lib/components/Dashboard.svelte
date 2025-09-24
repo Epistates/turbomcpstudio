@@ -4,8 +4,9 @@
   import ToolExplorer from './ToolExplorer.svelte';
   import ResourceBrowser from './ResourceBrowser.svelte';
   import PromptDesigner from './PromptDesigner.svelte';
-  import SamplingDebugger from './SamplingDebugger.svelte';
+  import SamplingTester from './SamplingTester.svelte';
   import ElicitationFlow from './ElicitationFlow.svelte';
+  import CollectionsManager from './CollectionsManager.svelte';
   import ServerOverview from './ServerOverview.svelte';
   import AddServerModal from './AddServerModal.svelte';
   import ServerConfigModal from './ServerConfigModal.svelte';
@@ -305,10 +306,13 @@
     <PromptDesigner />
 
   {:else if currentView === 'sampling'}
-    <SamplingDebugger />
+    <SamplingTester {selectedServerId} />
 
   {:else if currentView === 'elicitation'}
     <ElicitationFlow />
+
+  {:else if currentView === 'collections'}
+    <CollectionsManager />
 
   {:else}
     <!-- Other views placeholder -->

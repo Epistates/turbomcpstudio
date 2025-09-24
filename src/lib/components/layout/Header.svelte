@@ -29,9 +29,9 @@
   }>();
 
   // Store subscriptions
-  const theme = $derived($themeStore);
-  const ui = $derived($uiStore);
-  const servers = $derived($serverStore);
+  const theme = $themeStore;
+  const ui = $uiStore;
+  const servers = $serverStore;
 
   // Connection status
   const connectedServers = $derived(servers.servers.filter(s => getServerStatus(s) === 'connected').length);

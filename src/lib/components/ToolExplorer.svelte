@@ -3,7 +3,14 @@
   import { serverStore, type ServerInfo, type ToolDefinition, type ToolExecution } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
   import DynamicForm from '$lib/components/ui/DynamicForm.svelte';
-  import { validateToolParameters, generateDefaultParameters, type ValidationResult } from '$lib/utils/schemaValidation';
+  import { validateToolParameters, generateDefaultParameters } from '$lib/utils/schemaValidation';
+  import { filterServersByCapability } from '$lib/utils/serverCapabilities';
+
+  interface ValidationResult {
+    isValid: boolean;
+    errors: Record<string, string[]>;
+  }
+
   import {
     Zap,
     Play,
@@ -33,40 +40,71 @@
   let expandedTool: string | null = $state(null);
   let executing = $state(false);
   let isHistoricalResult = $state(false);
-  let validationResult: ValidationResult = $state({ isValid: true, errors: [] });
+  let validationResult: ValidationResult = $state({ isValid: true, errors: {} });
   let showValidationErrors = $state(false);
+  let persistedToolSelection: { name: string; serverId: string } | undefined = $state(undefined);
 
   // Subscribe to stores
   $effect(() => {
     const unsubscribeServers = serverStore.subscribe(state => {
-      const connectedServers = state.servers.filter(s => s.status?.toLowerCase() === 'connected');
+      // Filter to only show connected servers that support tools
+      const connectedServers = filterServersByCapability(state.servers, 'tools');
       servers = connectedServers;
 
-      // Only update selectedServerId if it's different to avoid loops
-      if (selectedServerId !== state.selectedServerId) {
-        selectedServerId = state.selectedServerId;
+      // Sync with global server selection if it's valid for tools
+      const globalSelectedId = state.selectedServerId;
+      if (globalSelectedId && connectedServers.some(s => s.id === globalSelectedId)) {
+        if (selectedServerId !== globalSelectedId) {
+          selectedServerId = globalSelectedId;
+          // Clear current tool selection when switching servers
+          selectedTool = null;
+          toolParameters = {};
+          toolResult = null;
+          loadTools();
+        }
+      }
+      // Only update selectedServerId if current selection is no longer valid
+      else if (selectedServerId && !connectedServers.find(s => s.id === selectedServerId)) {
+        // Current selection is invalid, pick first available
+        selectedServerId = connectedServers.length > 0 ? connectedServers[0].id : undefined;
+      } else if (!selectedServerId && connectedServers.length > 0) {
+        // No selection and servers available, auto-select first
+        selectedServerId = connectedServers[0].id;
       }
 
-      // Auto-select first connected server if none selected (only once)
-      if (!state.selectedServerId && connectedServers.length > 0 && !selectedServerId) {
-        serverStore.selectServer(connectedServers[0].id);
+      // Update execution history from store - FIXED: Show all history when no tool selected
+      if (selectedTool) {
+        // Filter by specific tool when one is selected
+        executionHistory = selectedServerId
+          ? state.toolExecutions.filter(e =>
+              e.serverId === selectedServerId &&
+              e.tool === selectedTool.name &&
+              !e.tool.startsWith('prompt:') // Exclude prompt executions
+            )
+          : state.toolExecutions.filter(e =>
+              e.tool === selectedTool.name &&
+              !e.tool.startsWith('prompt:') // Exclude prompt executions
+            );
+      } else {
+        // Show all history when no tool is selected (THIS IS THE KEY FIX)
+        executionHistory = selectedServerId
+          ? state.toolExecutions.filter(e =>
+              e.serverId === selectedServerId &&
+              !e.tool.startsWith('prompt:') // Exclude prompt executions
+            )
+          : state.toolExecutions.filter(e =>
+              !e.tool.startsWith('prompt:') // Exclude prompt executions
+            );
       }
+    });
 
-      // Update execution history from store - filter by both server and selected tool
-      executionHistory = selectedServerId
-        ? state.toolExecutions.filter(e =>
-            e.serverId === selectedServerId &&
-            (!selectedTool || e.tool === selectedTool.name) &&
-            !e.tool.startsWith('prompt:') // Exclude prompt executions
-          )
-        : state.toolExecutions.filter(e =>
-            (!selectedTool || e.tool === selectedTool.name) &&
-            !e.tool.startsWith('prompt:') // Exclude prompt executions
-          );
+    const unsubscribeUi = uiStore.subscribe(state => {
+      persistedToolSelection = state.selectedTool;
     });
 
     return () => {
       unsubscribeServers();
+      unsubscribeUi();
     };
   });
 
@@ -74,6 +112,17 @@
   $effect(() => {
     if (selectedServerId) {
       loadTools();
+    }
+  });
+
+  // Restore persisted tool selection when tools are loaded
+  $effect(() => {
+    if (tools.length > 0 && persistedToolSelection && selectedServerId === persistedToolSelection.serverId) {
+      const persistedTool = tools.find(t => t.name === persistedToolSelection.name);
+      if (persistedTool && (!selectedTool || selectedTool.name !== persistedTool.name)) {
+        selectedTool = persistedTool;
+        toolParameters = persistedTool.input_schema ? generateDefaultParameters(persistedTool.input_schema) : {};
+      }
     }
   });
 
@@ -106,10 +155,6 @@
     }
   }
 
-  function selectServer(serverId: string) {
-    serverStore.selectServer(serverId);
-    selectedServerId = serverId;
-  }
 
   function selectTool(tool: ToolDefinition) {
     selectedTool = tool;
@@ -117,10 +162,24 @@
     expandedTool = null;
     isHistoricalResult = false;
     showValidationErrors = false;
-    validationResult = { isValid: true, errors: [] };
+    validationResult = { isValid: true, errors: {} };
+
+    // Persist tool selection to UI store
+    if (selectedServerId) {
+      uiStore.setSelectedTool(tool.name, selectedServerId);
+    }
 
     // Initialize parameters with schema defaults
     toolParameters = tool.input_schema ? generateDefaultParameters(tool.input_schema) : {};
+  }
+
+  function clearSelectedTool() {
+    selectedTool = null;
+    toolResult = null;
+    expandedTool = null;
+    isHistoricalResult = false;
+    toolParameters = {};
+    uiStore.clearSelectedTool();
   }
 
   function handleParameterChange(newParams: Record<string, any>) {
@@ -141,12 +200,24 @@
       return;
     }
 
+    // Clean up parameters - remove empty strings for optional fields
+    const cleanedParameters: Record<string, any> = {};
+    const requiredFields = selectedTool.input_schema?.required || [];
+
+    Object.entries(toolParameters).forEach(([key, value]) => {
+      // Always include required fields (even if empty - let server validation handle it)
+      // For optional fields, only include non-empty values
+      if (requiredFields.includes(key) || (value !== '' && value !== null && value !== undefined)) {
+        cleanedParameters[key] = value;
+      }
+    });
+
     executing = true;
     try {
       const result = await serverStore.callTool(
         selectedServerId,
         selectedTool.name,
-        toolParameters
+        cleanedParameters
       );
 
       toolResult = result;
@@ -157,7 +228,7 @@
       console.error('Tool execution failed:', error);
       const errorResult = { error: String(error) };
       toolResult = errorResult;
-
+      isHistoricalResult = false;
       uiStore.showError(`Tool execution failed: ${error}`);
     } finally {
       executing = false;
@@ -175,6 +246,17 @@
 
   function formatJson(obj: any): string {
     return JSON.stringify(obj, null, 2);
+  }
+
+  function selectServer(serverId: string) {
+    selectedServerId = serverId;
+    // Update global store so other components stay in sync
+    serverStore.selectServer(serverId);
+    // Clear current tool selection when switching servers
+    selectedTool = null;
+    toolParameters = {};
+    toolResult = null;
+    loadTools();
   }
 
   function rerunFromHistory(historyItem: ToolExecution) {
@@ -210,7 +292,7 @@
         <div class="mb-4">
           <label class="form-label" for="server-select">Server</label>
           <select
-            bind:value={selectedServerId}
+            value={selectedServerId}
             onchange={(e) => selectServer((e.target as HTMLSelectElement).value)}
             class="form-input"
             id="server-select"
@@ -229,7 +311,7 @@
           type="text"
           bind:value={searchQuery}
           placeholder="Search tools..."
-          class="form-input pl-10"
+          class="form-input has-icon-left"
         />
       </div>
     </div>
@@ -433,8 +515,8 @@
 
             <div class="flex-1 overflow-y-auto p-4 min-h-0">
               {#if toolResult}
-                <div class="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
-                  <pre>{formatJson(toolResult)}</pre>
+                <div class="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm">
+                  <pre class="whitespace-pre-wrap break-words">{formatJson(toolResult)}</pre>
                 </div>
               {:else}
                 <div class="text-center py-8">

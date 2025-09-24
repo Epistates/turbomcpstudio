@@ -81,6 +81,27 @@
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
     return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
   }
+
+  function navigateToCapability(capability: string, e: Event) {
+    e.stopPropagation(); // Prevent triggering the parent server selection
+
+    // Set the server as selected first
+    serverStore.selectServer(server.id);
+
+    // Map capability to the corresponding view
+    const viewMap: { [key: string]: string } = {
+      'tools': 'tools',
+      'resources': 'resources',
+      'prompts': 'prompts',
+      'sampling': 'sampling',
+      'elicitation': 'elicitation'
+    };
+
+    const view = viewMap[capability.toLowerCase()];
+    if (view) {
+      uiStore.setView(view as any);
+    }
+  }
 </script>
 
 <div
@@ -252,19 +273,49 @@
         <span class="text-xs text-gray-600">Capabilities:</span>
         <div class="flex items-center space-x-1">
           {#if server.capabilities.tools}
-            <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">Tools</span>
+            <button
+              onclick={(e) => navigateToCapability('tools', e)}
+              class="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 hover:text-blue-800 transition-colors cursor-pointer"
+              title="Go to Tools"
+            >
+              Tools
+            </button>
           {/if}
           {#if server.capabilities.resources}
-            <span class="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">Resources</span>
+            <button
+              onclick={(e) => navigateToCapability('resources', e)}
+              class="px-2 py-1 bg-green-100 text-green-700 text-xs rounded hover:bg-green-200 hover:text-green-800 transition-colors cursor-pointer"
+              title="Go to Resources"
+            >
+              Resources
+            </button>
           {/if}
           {#if server.capabilities.prompts}
-            <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded">Prompts</span>
+            <button
+              onclick={(e) => navigateToCapability('prompts', e)}
+              class="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded hover:bg-purple-200 hover:text-purple-800 transition-colors cursor-pointer"
+              title="Go to Prompts"
+            >
+              Prompts
+            </button>
           {/if}
           {#if server.capabilities.sampling}
-            <span class="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded">Sampling</span>
+            <button
+              onclick={(e) => navigateToCapability('sampling', e)}
+              class="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded hover:bg-orange-200 hover:text-orange-800 transition-colors cursor-pointer"
+              title="Go to Sampling"
+            >
+              Sampling
+            </button>
           {/if}
           {#if server.capabilities.elicitation}
-            <span class="px-2 py-1 bg-pink-100 text-pink-700 text-xs rounded">Elicitation</span>
+            <button
+              onclick={(e) => navigateToCapability('elicitation', e)}
+              class="px-2 py-1 bg-pink-100 text-pink-700 text-xs rounded hover:bg-pink-200 hover:text-pink-800 transition-colors cursor-pointer"
+              title="Go to Elicitation"
+            >
+              Elicitation
+            </button>
           {/if}
         </div>
       </div>

@@ -3,6 +3,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
+  import { filterServersByCapability } from '$lib/utils/serverCapabilities';
   import {
     MessageCircle,
     ArrowRight,
@@ -27,7 +28,8 @@
     Plus,
     Edit,
     Copy,
-    Download
+    Download,
+    RefreshCw
   } from 'lucide-svelte';
 
   interface ElicitationRequest {
@@ -88,7 +90,8 @@
   // Subscribe to stores
   $effect(() => {
     const unsubscribeServers = serverStore.subscribe(state => {
-      const connectedServers = state.servers.filter(s => s.status?.toLowerCase() === 'connected');
+      // Filter to only show connected servers that support elicitation
+      const connectedServers = filterServersByCapability(state.servers, 'elicitation');
       servers = connectedServers;
 
       if (selectedServerId !== state.selectedServerId) {
@@ -118,84 +121,53 @@
     serverStore.selectServer(serverId);
   }
 
-  async function createMockElicitationFlow() {
+  async function loadRealElicitationRequests() {
     if (!selectedServerId) return;
 
-    const serverName = servers.find(s => s.id === selectedServerId)?.config.name || 'Unknown Server';
+    loading = true;
+    try {
+      // Get real elicitation requests from the MCP server
+      const requests = await invoke('get_elicitation_requests', {
+        server_id: selectedServerId
+      });
 
-    const mockFlow: ElicitationFlow = {
-      id: crypto.randomUUID(),
-      serverId: selectedServerId,
-      serverName,
-      title: 'Database Migration Approval',
-      description: 'Server requesting approval for a database schema migration',
-      currentRequestIndex: 0,
-      status: 'active',
-      startedAt: new Date().toISOString(),
-      requests: [
-        {
-          id: crypto.randomUUID(),
-          serverId: selectedServerId,
-          serverName,
-          type: 'confirmation',
-          title: 'Migration Safety Check',
-          message: 'This migration will modify the user table schema. All existing data will be preserved, but the operation may take 5-10 minutes. Do you want to proceed?',
-          timestamp: new Date().toISOString(),
-          status: 'pending',
-          priority: 'high',
-          timeout: 300,
-          context: 'database-migration',
-          confirmationOptions: { confirm: 'Proceed with Migration', cancel: 'Cancel Operation' }
-        },
-        {
-          id: crypto.randomUUID(),
-          serverId: selectedServerId,
-          serverName,
-          type: 'form',
-          title: 'Migration Parameters',
-          message: 'Please provide the migration parameters:',
-          timestamp: new Date(Date.now() + 1000).toISOString(),
-          status: 'pending',
-          priority: 'normal',
-          context: 'migration-config',
-          formFields: [
-            { name: 'batchSize', label: 'Batch Size', type: 'number', required: true, placeholder: '1000' },
-            { name: 'maxDuration', label: 'Max Duration (minutes)', type: 'number', required: true, placeholder: '30' },
-            { name: 'rollbackPlan', label: 'Rollback Plan', type: 'textarea', required: true, placeholder: 'Describe the rollback strategy...' },
-            { name: 'notifyUsers', label: 'Notify Users', type: 'checkbox', required: false }
-          ]
-        }
-      ]
-    };
+      // Convert the raw requests to our UI format
+      const convertedRequests = requests.map(req => ({
+        id: req.id || crypto.randomUUID(),
+        serverId: selectedServerId,
+        serverName: servers.find(s => s.id === selectedServerId)?.config.name || 'Unknown Server',
+        type: req.request_type || 'confirmation',
+        title: req.title || 'Server Request',
+        message: req.message || req.description || 'Server is requesting user input',
+        timestamp: req.timestamp || new Date().toISOString(),
+        status: 'pending',
+        priority: req.priority || 'normal',
+        timeout: req.timeout,
+        context: req.context,
+        // Handle different request types
+        confirmationOptions: req.confirmation_options,
+        inputPrompt: req.input_prompt,
+        choices: req.choices,
+        formFields: req.form_fields,
+      }));
 
-    // Also create standalone requests
-    const standaloneRequest: ElicitationRequest = {
-      id: crypto.randomUUID(),
-      serverId: selectedServerId,
-      serverName,
-      type: 'choice',
-      title: 'Resource Allocation',
-      message: 'The server is running low on memory. How would you like to proceed?',
-      timestamp: new Date(Date.now() + 2000).toISOString(),
-      status: 'pending',
-      priority: 'urgent',
-      timeout: 120,
-      context: 'resource-management',
-      choices: [
-        { id: 'scale-up', label: 'Scale Up Resources', description: 'Increase memory allocation' },
-        { id: 'restart', label: 'Restart Services', description: 'Restart to free memory' },
-        { id: 'maintain', label: 'Monitor and Wait', description: 'Continue monitoring' }
-      ]
-    };
+      // Update our state with real requests
+      pendingRequests = [...convertedRequests, ...pendingRequests];
 
-    elicitationFlows = [mockFlow, ...elicitationFlows];
-    pendingRequests = [standaloneRequest, ...pendingRequests];
+      if (convertedRequests.length > 0) {
+        uiStore.showInfo(`Loaded ${convertedRequests.length} real elicitation requests from server`);
 
-    uiStore.showInfo('New elicitation requests received from server');
-
-    // Auto-select the new flow
-    selectedFlow = mockFlow;
-    selectedRequest = mockFlow.requests[0];
+        // Auto-select the first request
+        selectedRequest = convertedRequests[0];
+      } else {
+        uiStore.showInfo('No pending elicitation requests from server');
+      }
+    } catch (error) {
+      console.error('Failed to load elicitation requests:', error);
+      uiStore.showError(`Failed to load elicitation requests: ${error}`);
+    } finally {
+      loading = false;
+    }
   }
 
   async function respondToRequest(request: ElicitationRequest, response: any) {
@@ -303,8 +275,10 @@
   }
 
   onMount(() => {
-    // Create some initial mock requests for demonstration
-    setTimeout(() => createMockElicitationFlow(), 1000);
+    // Load real elicitation requests on component mount
+    if (selectedServerId) {
+      setTimeout(() => loadRealElicitationRequests(), 500);
+    }
   });
 </script>
 
@@ -316,11 +290,16 @@
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Elicitation</h2>
         <button
-          onclick={createMockElicitationFlow}
-          class="btn-secondary text-sm"
-          title="Simulate new requests"
+          onclick={loadRealElicitationRequests}
+          class="btn-primary text-sm"
+          title="Load real elicitation requests"
+          disabled={loading}
         >
-          <Plus size={14} />
+          {#if loading}
+            <RefreshCw size={14} class="animate-spin" />
+          {:else}
+            <RefreshCw size={14} />
+          {/if}
         </button>
       </div>
 
@@ -754,11 +733,17 @@
 
           {#if elicitationFlows.length === 0 && pendingRequests.length === 0}
             <button
-              onclick={createMockElicitationFlow}
+              onclick={loadRealElicitationRequests}
               class="btn-primary mt-4"
+              disabled={loading}
             >
-              <Plus size={16} class="mr-2" />
-              Create Test Requests
+              {#if loading}
+                <RefreshCw size={16} class="mr-2 animate-spin" />
+                Loading...
+              {:else}
+                <RefreshCw size={16} class="mr-2" />
+                Load Real Requests
+              {/if}
             </button>
           {/if}
         </div>

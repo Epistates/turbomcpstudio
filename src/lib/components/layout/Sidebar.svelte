@@ -5,18 +5,22 @@
 <script lang="ts">
   import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
   import { uiStore, type View } from '$lib/stores/uiStore';
-  import { 
-    Monitor, 
-    Zap, 
-    Database, 
-    FileText, 
-    MessageSquare, 
-    Activity, 
+  import { getServerCapabilitySummary, serverSupportsCapability, type McpCapability } from '$lib/utils/serverCapabilities';
+  import {
+    Monitor,
+    Zap,
+    Database,
+    FileText,
+    MessageSquare,
+    Activity,
     FolderOpen,
+    Layers3,
     Settings,
     Plus,
     ChevronRight,
-    ChevronDown
+    ChevronDown,
+    Play,
+    Square
   } from 'lucide-svelte';
 
   // Props using Svelte 5 runes
@@ -24,12 +28,14 @@
 
   let servers: ServerInfo[] = $state([]);
   let currentView: View = $state('dashboard');
+  let selectedServerId: string | undefined = $state(undefined);
   let expandedSections = $state(new Set(['navigation', 'servers']));
 
   // Subscribe to stores
   $effect(() => {
     const unsubscribeServers = serverStore.subscribe(state => {
       servers = state.servers;
+      selectedServerId = state.selectedServerId;
     });
 
     const unsubscribeUi = uiStore.subscribe(state => {
@@ -49,20 +55,84 @@
     { id: 'prompts', label: 'Prompts', icon: FileText },
     { id: 'sampling', label: 'Sampling', icon: MessageSquare },
     { id: 'elicitation', label: 'Elicitation', icon: Activity },
-    { id: 'collections', label: 'Collections', icon: FolderOpen },
+    { id: 'collections', label: 'Collections', icon: Layers3 },
   ];
 
   function navigateTo(view: View) {
     uiStore.setView(view);
   }
 
+  // Map views to their required capabilities
+  const viewCapabilityMap: Record<View, McpCapability | null> = {
+    'dashboard': null,        // Dashboard supports all servers
+    'tools': 'tools',
+    'resources': 'resources',
+    'prompts': 'prompts',
+    'sampling': 'sampling',
+    'elicitation': 'elicitation'
+  };
+
   function selectServer(serverId: string) {
-    serverStore.selectServer(serverId);
-    uiStore.setView('tools');
+    const server = servers.find(s => s.id === serverId);
+    if (!server) return;
+
+    const requiredCapability = viewCapabilityMap[currentView];
+
+    // If current view doesn't require a specific capability (like dashboard), always allow selection
+    if (!requiredCapability) {
+      serverStore.selectServer(serverId);
+      return;
+    }
+
+    // Check if server supports the current view's capability
+    if (serverSupportsCapability(server, requiredCapability)) {
+      serverStore.selectServer(serverId);
+    } else {
+      // Server doesn't support current view - find a compatible view and switch
+      const compatibleViews: View[] = [];
+
+      if (serverSupportsCapability(server, 'tools')) compatibleViews.push('tools');
+      if (serverSupportsCapability(server, 'resources')) compatibleViews.push('resources');
+      if (serverSupportsCapability(server, 'prompts')) compatibleViews.push('prompts');
+      if (serverSupportsCapability(server, 'sampling')) compatibleViews.push('sampling');
+      if (serverSupportsCapability(server, 'elicitation')) compatibleViews.push('elicitation');
+
+      if (compatibleViews.length > 0) {
+        // Switch to first compatible view and select server
+        uiStore.setView(compatibleViews[0]);
+        serverStore.selectServer(serverId);
+      } else {
+        // No compatible views - just go to dashboard
+        uiStore.setView('dashboard');
+        serverStore.selectServer(serverId);
+      }
+    }
   }
 
   function addServer() {
     uiStore.openModal('addServer');
+  }
+
+  async function toggleConnection(server: ServerInfo, event: Event) {
+    event.stopPropagation();
+
+    try {
+      if (server.status?.toLowerCase() === 'connected') {
+        await serverStore.disconnectServer(server.id);
+        uiStore.showSuccess(`Disconnected from ${server.config.name}`);
+      } else {
+        await serverStore.connectServer(server.config);
+        uiStore.showSuccess(`Connected to ${server.config.name}`);
+      }
+    } catch (error) {
+      uiStore.showError(`Failed to ${server.status?.toLowerCase() === 'connected' ? 'disconnect from' : 'connect to'} ${server.config.name}: ${error}`);
+    }
+  }
+
+  function openServerConfig(server: ServerInfo, event: Event) {
+    event.stopPropagation();
+    serverStore.selectServer(server.id);
+    uiStore.openModal('serverConfig');
   }
 
   function getStatusColor(status: string) {
@@ -103,6 +173,12 @@
     }
     expandedSections = new Set(expandedSections);
   }
+
+
+  // Simple server list - no filtering, just show all servers
+  const filteredServers = $derived(servers || []);
+
+  // No auto-deselection - let users manage their own server selection
 </script>
 
 <div class="mcp-sidebar-content">
@@ -173,10 +249,10 @@
 
     {#if expandedSections.has('servers')}
       <div class="mcp-sidebar__servers">
-        {#if servers.length === 0}
+        {#if filteredServers.length === 0}
           <div class="mcp-sidebar__empty-state">
             <Database size={32} class="mcp-sidebar__empty-icon" />
-            <p class="mcp-sidebar__empty-text">No servers connected</p>
+            <p class="mcp-sidebar__empty-text">No servers configured</p>
             <button
               class="mcp-sidebar__empty-action"
               onclick={addServer}
@@ -186,43 +262,67 @@
           </div>
         {:else}
           <div class="mcp-sidebar__server-list">
-            {#each servers as server (server.id)}
-              <button
-                class="mcp-sidebar__server-item"
-                onclick={() => {
-                  console.log('Server object:', JSON.stringify(server, null, 2));
-                  selectServer(server.id);
-                }}
-                title={server.config.description || server.config.name}
-              >
-                <div class="mcp-sidebar__server-info">
-                  <div class="mcp-sidebar__server-header">
-                    <div class="mcp-sidebar__server-status">
-                      <div class="mcp-sidebar__status-dot {getStatusColor(server.status)}"></div>
-                      <h3 class="mcp-sidebar__server-name">
-                        {server.config.name || 'Unnamed Server'}
-                      </h3>
+            {#each filteredServers as server (server.id)}
+              <div class="mcp-sidebar__server-item {selectedServerId === server.id ? 'mcp-sidebar__server-item--selected border-mcp-primary-300 bg-mcp-primary-50 ring-2 ring-mcp-primary-200 dark:border-mcp-primary-600 dark:bg-mcp-primary-900/30 dark:ring-mcp-primary-700' : ''}">
+                <button
+                  class="mcp-sidebar__server-main"
+                  onclick={() => {
+                    console.log('Server object:', JSON.stringify(server, null, 2));
+                    selectServer(server.id);
+                  }}
+                  title={server.config.description || server.config.name}
+                >
+                  <div class="mcp-sidebar__server-info">
+                    <div class="mcp-sidebar__server-header">
+                      <div class="mcp-sidebar__server-status">
+                        <div class="mcp-sidebar__status-dot {getStatusColor(server.status)}"></div>
+                        <h3 class="mcp-sidebar__server-name">
+                          {server.config.name || 'Unnamed Server'}
+                        </h3>
+                      </div>
+                    </div>
+
+                    {#if server.config.description}
+                      <p class="mcp-sidebar__server-description">
+                        {server.config.description}
+                      </p>
+                    {/if}
+
+                    <div class="mcp-sidebar__server-meta">
+                      <span class="mcp-sidebar__server-transport">
+                        {getTransportType(server.config.transport)}
+                      </span>
+                      {#if server.metrics}
+                        <span class="mcp-sidebar__server-messages">
+                          {server.metrics.messages_sent + server.metrics.messages_received} msgs
+                        </span>
+                      {/if}
                     </div>
                   </div>
-                  
-                  {#if server.config.description}
-                    <p class="mcp-sidebar__server-description">
-                      {server.config.description}
-                    </p>
-                  {/if}
-                  
-                  <div class="mcp-sidebar__server-meta">
-                    <span class="mcp-sidebar__server-transport">
-                      {getTransportType(server.config.transport)}
-                    </span>
-                    {#if server.metrics}
-                      <span class="mcp-sidebar__server-messages">
-                        {server.metrics.messages_sent + server.metrics.messages_received} msgs
-                      </span>
+                </button>
+
+                <div class="mcp-sidebar__server-actions">
+                  <button
+                    class="mcp-sidebar__action-button {server.status?.toLowerCase() === 'connected' ? 'mcp-sidebar__action-button--disconnect' : 'mcp-sidebar__action-button--connect'}"
+                    onclick={(e) => toggleConnection(server, e)}
+                    title={server.status?.toLowerCase() === 'connected' ? 'Disconnect' : 'Connect'}
+                  >
+                    {#if server.status?.toLowerCase() === 'connected'}
+                      <Square size={14} />
+                    {:else}
+                      <Play size={14} />
                     {/if}
-                  </div>
+                  </button>
+
+                  <button
+                    class="mcp-sidebar__action-button mcp-sidebar__action-button--settings"
+                    onclick={(e) => openServerConfig(server, e)}
+                    title="Settings"
+                  >
+                    <Settings size={14} />
+                  </button>
                 </div>
-              </button>
+              </div>
             {/each}
           </div>
         {/if}
@@ -372,16 +472,14 @@
   }
 
   .mcp-sidebar__server-item {
-    display: block;
+    display: flex;
     width: 100%;
-    padding: var(--mcp-space-3);
     margin-bottom: var(--mcp-space-2);
     background: var(--mcp-surface-primary);
     border: 1px solid var(--mcp-border-primary);
     border-radius: var(--mcp-radius-lg);
-    cursor: pointer;
     transition: all var(--mcp-transition-fast);
-    text-align: left;
+    overflow: hidden;
   }
 
   .mcp-sidebar__server-item:hover {
@@ -394,8 +492,73 @@
     margin-bottom: 0;
   }
 
+
+  .mcp-sidebar__server-main {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: var(--mcp-space-3);
+    cursor: pointer;
+    text-align: left;
+    min-width: 0;
+  }
+
+  .mcp-sidebar__server-actions {
+    display: flex;
+    flex-direction: column;
+    background: var(--mcp-surface-secondary);
+    border-left: 1px solid var(--mcp-border-primary);
+    width: 32px;
+    flex-shrink: 0;
+  }
+
+  .mcp-sidebar__action-button {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    padding: var(--mcp-space-2);
+    cursor: pointer;
+    transition: all var(--mcp-transition-fast);
+  }
+
+  .mcp-sidebar__action-button:hover {
+    background: var(--mcp-surface-tertiary);
+  }
+
+  .mcp-sidebar__action-button--connect {
+    color: var(--mcp-success-600);
+  }
+
+  .mcp-sidebar__action-button--connect:hover {
+    background: var(--mcp-success-50);
+    color: var(--mcp-success-700);
+  }
+
+  .mcp-sidebar__action-button--disconnect {
+    color: var(--mcp-error-600);
+  }
+
+  .mcp-sidebar__action-button--disconnect:hover {
+    background: var(--mcp-error-50);
+    color: var(--mcp-error-700);
+  }
+
+  .mcp-sidebar__action-button--settings {
+    color: var(--mcp-text-tertiary);
+    border-top: 1px solid var(--mcp-border-primary);
+  }
+
+  .mcp-sidebar__action-button--settings:hover {
+    background: var(--mcp-surface-tertiary);
+    color: var(--mcp-text-secondary);
+  }
+
   .mcp-sidebar__server-info {
     width: 100%;
+    min-width: 0; /* Allow flex shrinking */
   }
 
   .mcp-sidebar__server-header {
@@ -533,16 +696,24 @@
 
   /* Dark theme adjustments */
   [data-theme="dark"] .mcp-sidebar__add-button {
-    background: var(--mcp-primary-900);
+    background: var(--mcp-surface-tertiary);
     color: var(--mcp-primary-300);
   }
 
   [data-theme="dark"] .mcp-sidebar__add-button:hover {
-    background: var(--mcp-primary-800);
+    background: var(--mcp-surface-elevated);
   }
 
   [data-theme="dark"] .nav-item-active {
-    background: var(--mcp-primary-900);
-    color: var(--mcp-primary-200);
+    background: var(--mcp-primary-800);
+    color: var(--mcp-primary-100);
+    font-weight: var(--mcp-font-semibold);
+    border-left: 3px solid var(--mcp-primary-400);
   }
+
+  [data-theme="dark"] .mcp-sidebar__server-item:hover {
+    background: rgba(12, 74, 110, 0.2); /* mcp-primary-900/20 */
+    border-color: var(--mcp-primary-600);
+  }
+
 </style>

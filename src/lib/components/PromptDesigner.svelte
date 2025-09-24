@@ -3,6 +3,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import { serverStore, type ServerInfo, type ToolExecution } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
+  import { filterServersByCapability } from '$lib/utils/serverCapabilities';
   import {
     FileText,
     Play,
@@ -62,34 +63,45 @@
   let expandedPrompt: string | null = $state(null);
   let savedPrompts: Array<{id: string; name: string; template: PromptTemplate; arguments: Record<string, any>}> = $state([]);
   // Get execution history from centralized store (filtered for prompts)
-  let serverStoreState = $state(null);
-  const allExecutionHistory = $derived(
-    serverStoreState?.toolExecutions?.filter(e => e.tool.startsWith('prompt:')) || []
+  let serverStoreState = $state<any>(null);
+  let isHistoricalResult = $state(false);
+
+  // All execution history, reactive to serverStoreState changes
+  let allExecutionHistory = $derived(
+    serverStoreState?.toolExecutions?.filter((e: any) => e.tool.startsWith('prompt:')) || []
   );
 
   // Filter execution history by selected prompt
-  const executionHistory = $derived(
+  let executionHistory = $derived(
     selectedPrompt
-      ? allExecutionHistory.filter(e => e.tool === `prompt:${selectedPrompt.name}`)
+      ? allExecutionHistory.filter((e: any) => e.tool === `prompt:${selectedPrompt.name}`)
       : allExecutionHistory
   );
-  let isHistoricalResult = $state(false);
 
-  const selectedServer = $derived(
+  // Selected server info
+  let selectedServer = $derived(
     servers.find(s => s.id === selectedServerId)
   );
 
   // Subscribe to stores
   $effect(() => {
     const unsubscribeServers = serverStore.subscribe(state => {
-      const connectedServers = state.servers.filter(s => s.status?.toLowerCase() === 'connected');
+      // Filter to only show connected servers that support prompts
+      const connectedServers = filterServersByCapability(state.servers, 'prompts');
       servers = connectedServers;
       serverStoreState = state; // Update reactive state for execution history
 
+      // Validate that the globally selected server exists in our filtered list and supports prompts
       if (selectedServerId !== state.selectedServerId) {
-        selectedServerId = state.selectedServerId;
-        if (selectedServerId) {
+        const globallySelectedId = state.selectedServerId;
+
+        // Only update if the globally selected server is in our filtered prompts servers list
+        if (globallySelectedId && connectedServers.some(s => s.id === globallySelectedId)) {
+          selectedServerId = globallySelectedId;
           loadPrompts();
+        } else if (globallySelectedId !== selectedServerId) {
+          // Global selection is invalid for prompts, clear our local selection
+          selectedServerId = undefined;
         }
       }
 
@@ -104,7 +116,7 @@
     };
   });
 
-  const filteredPrompts = $derived.by(() => {
+  let filteredPrompts = $derived.by(() => {
     console.log('🔍 PROMPT FILTER DEBUG: Starting with prompts:', prompts.length);
     if (!searchQuery.trim()) {
       console.log('🔍 PROMPT FILTER DEBUG: No search query, returning all prompts:', prompts.length);
@@ -344,6 +356,10 @@
     serverStore.selectServer(serverId);
   }
 
+  function clearHistory() {
+    serverStore.clearExecutionHistory();
+  }
+
   function getArgumentType(arg: any): string {
     switch (arg.type) {
       case 'string':
@@ -408,7 +424,7 @@
           type="text"
           bind:value={searchQuery}
           placeholder="Search prompts..."
-          class="form-input pl-10 text-sm"
+          class="form-input has-icon-left text-sm"
         />
       </div>
     </div>
@@ -709,7 +725,7 @@
               Execution History ({executionHistory.length})
             </h3>
             <button
-              onclick={() => serverStore.clearExecutionHistory()}
+              onclick={clearHistory}
               class="text-xs text-red-600 hover:text-red-800"
             >
               Clear History

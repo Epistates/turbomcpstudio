@@ -8,12 +8,12 @@
   import ToolExplorer from '../ToolExplorer.svelte';
   import ResourceBrowser from '../ResourceBrowser.svelte';
   import PromptDesigner from '../PromptDesigner.svelte';
-  import SamplingDebugger from '../SamplingDebugger.svelte';
+  import SamplingTester from '../SamplingTester.svelte';
   import ElicitationFlow from '../ElicitationFlow.svelte';
   import AddServerModal from '../AddServerModal.svelte';
 
   // Reactive view state using Svelte 5 runes
-  const ui = $derived($uiStore);
+  const ui = $uiStore;
   const currentView = $derived(ui.currentView);
   const modals = $derived(ui.modals);
 
@@ -29,7 +29,7 @@
       case 'prompts':
         return PromptDesigner;
       case 'sampling':
-        return SamplingDebugger;
+        return SamplingTester;
       case 'elicitation':
         return ElicitationFlow;
       case 'collections':
@@ -67,7 +67,7 @@
     {:else if currentView === 'prompts'}
       <PromptDesigner />
     {:else if currentView === 'sampling'}
-      <SamplingDebugger />
+      <SamplingTester />
     {:else if currentView === 'elicitation'}
       <ElicitationFlow />
     {:else}
@@ -166,6 +166,11 @@
   .mcp-content-viewport {
     flex: 1;
     overflow: auto;
+    height: 100%;
+  }
+
+  /* Ensure all child containers propagate height */
+  .mcp-content-viewport > :global(*) {
     height: 100%;
   }
 

@@ -603,15 +603,15 @@
             <div class="mt-8 pt-6 border-t border-gray-200">
               <button
                 onclick={toggleJsonImport}
-                class="w-full p-4 text-left border-2 border-dashed border-gray-300 hover:border-mcp-primary-400 hover:bg-mcp-primary-50 rounded-lg transition-colors group"
+                class="json-import-button w-full p-4 text-left border-2 border-dashed rounded-lg transition-colors group"
               >
                 <div class="flex items-center justify-center">
-                  <div class="p-2 bg-gray-100 group-hover:bg-mcp-primary-100 rounded-lg mr-3">
-                    <Code size={20} class="text-gray-600 group-hover:text-mcp-primary-600" />
+                  <div class="json-import-icon p-2 rounded-lg mr-3">
+                    <Code size={20} class="json-import-icon-svg" />
                   </div>
                   <div class="text-center">
-                    <h4 class="font-medium text-gray-900">Import JSON Configuration</h4>
-                    <p class="text-sm text-gray-600">Paste or edit a JSON configuration</p>
+                    <h4 class="json-import-title font-medium">Import JSON Configuration</h4>
+                    <p class="json-import-subtitle text-sm">Paste or edit a JSON configuration</p>
                   </div>
                 </div>
               </button>
@@ -1064,5 +1064,54 @@
     font-family: var(--mcp-font-mono);
   }
 
-  /* Dark mode styles are handled by CSS custom properties automatically */
+  /* JSON Import Button Styles - Same pattern as transport buttons */
+  .json-import-button {
+    padding: 1rem;
+    text-align: left;
+    border: 2px solid var(--mcp-border-primary);
+    border-style: dashed;
+    border-radius: var(--mcp-radius-lg);
+    transition: all var(--mcp-transition-fast);
+    background-color: var(--mcp-surface-primary);
+    color: var(--mcp-text-primary);
+    cursor: pointer;
+    width: 100%;
+  }
+
+  .json-import-button:hover {
+    border-color: var(--mcp-primary-500);
+    background-color: var(--mcp-surface-tertiary);
+  }
+
+  .json-import-icon {
+    padding: 0.5rem;
+    background-color: var(--mcp-surface-secondary);
+    border-radius: var(--mcp-radius-lg);
+    margin-right: 0.75rem;
+    transition: all var(--mcp-transition-fast);
+  }
+
+  .json-import-button:hover .json-import-icon {
+    background-color: var(--mcp-surface-elevated);
+  }
+
+  .json-import-icon-svg {
+    color: var(--mcp-text-secondary);
+    transition: color var(--mcp-transition-fast);
+  }
+
+  .json-import-button:hover .json-import-icon-svg {
+    color: var(--mcp-primary-600);
+  }
+
+  .json-import-title {
+    font-weight: var(--mcp-font-medium);
+    color: var(--mcp-text-primary);
+    margin-bottom: 0.25rem;
+  }
+
+  .json-import-subtitle {
+    font-size: var(--mcp-text-sm);
+    color: var(--mcp-text-secondary);
+  }
 </style>
