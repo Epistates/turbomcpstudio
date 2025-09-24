@@ -164,12 +164,60 @@ MCP Studio leverages a **native-first, MCP-protocol-aware** architecture that fu
 - **Team Collaboration** - Shared workspaces, version control, CI/CD integration
 - **Security** - Sandboxed execution, encrypted storage, audit logging
 
+## 🚨 CRITICAL: TurboMCP Dogfooding Policy
+
+**MCP Studio is a PRIMARY DOGFOODING APPLICATION for TurboMCP**
+
+### Quality Assurance Mandate
+When encountering ANY issues with TurboMCP dependencies:
+1. **STOP immediately** - Do not implement workarounds
+2. **Create detailed bug report** for TurboMCP developers
+3. **Focus on maximum Developer Experience (DX)** and MCP compliance
+4. **Expect TurboMCP to be robust** - issues should be fixed upstream
+
+### Bug Report Template
+When finding TurboMCP issues, provide:
+```
+## TurboMCP Issue Report
+
+**Component**: [turbomcp-client|turbomcp-protocol|turbomcp-transport]
+**Version**: [current version]
+**Impact**: [Developer Experience|MCP Compliance|Performance]
+
+### Problem Description
+[Clear description of the issue]
+
+### Expected Behavior (Maximum DX)
+[What developers should expect from the API]
+
+### Current Behavior
+[What actually happens]
+
+### MCP Compliance Impact
+[How this affects MCP protocol compliance]
+
+### Code Example
+[Minimal reproduction case]
+
+### Proposed Solution
+[Ideal API design for maximum DX]
+```
+
+### Developer Experience Standards
+TurboMCP must provide:
+- **Intuitive APIs** - Natural, obvious usage patterns
+- **Full Schema Access** - Complete tool/resource/prompt schemas
+- **Type Safety** - Comprehensive TypeScript/Rust types
+- **Error Clarity** - Clear, actionable error messages
+- **MCP Compliance** - 100% protocol specification adherence
+
 ## Integration Dependencies
 
 ### TurboMCP Framework
 - **Location**: `/Users/nickpaterno/work/turbomcp/`
 - **Purpose**: Production-ready MCP client with enterprise features
 - **Features**: Multi-transport, circuit breakers, connection pooling, health monitoring
+- **🎯 Dogfooding Role**: Primary quality assurance through real-world usage
 
 ### Reference Materials
 - **MCP Inspector**: `/Users/nickpaterno/work/reference/inspector/` - Official implementation
