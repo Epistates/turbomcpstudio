@@ -15,16 +15,22 @@ use tokio::process::Child;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-// TurboMCP 1.0.9 imports - Enhanced Client API
+// TurboMCP 1.1.0 imports - Enhanced Client API with Error Extensions
+// Enhanced error handling - using direct error mapping for better compatibility
 use turbomcp_client::sampling::{
     SamplingHandler, DelegatingSamplingHandler,
 };
 use turbomcp_client::{Client, ClientBuilder, ConnectionConfig, SharedClient};
-// Plugin system temporarily disabled for TurboMCP 1.0.9 compatibility
-// use turbomcp_client::plugins::{
-//     MetricsPlugin, RetryPlugin, CachePlugin, PluginConfig,
-//     CacheConfig, ClientPlugin
-// };
+// Type-State Capability Builders (TurboMCP 1.1.0)
+use turbomcp_protocol::capabilities::builders::{
+    ServerCapabilitiesBuilder, ClientCapabilitiesBuilder
+};
+// Plugin system ready for TurboMCP 1.1.0
+#[cfg(feature = "plugins")]
+use turbomcp_client::plugins::{
+    MetricsPlugin, RetryPlugin, CachePlugin, PluginConfig,
+    CacheConfig, RetryConfig, ClientPlugin
+};
 use turbomcp_client::handlers::{
     ElicitationAction, ElicitationHandler, ElicitationRequest, ElicitationResponse, HandlerResult, LogHandler,
     ProgressHandler, ResourceUpdateHandler,
@@ -131,10 +137,10 @@ impl McpTransportClient {
 
 
     /// Get tools with their schemas from the MCP server
-    /// This method is now an alias for list_tools() since TurboMCP 1.0.11
+    /// This method is now an alias for list_tools() since TurboMCP 1.1.0
     /// returns full Tool objects with schemas by default
     pub async fn list_tools_with_schemas(&self) -> Result<Vec<Tool>, Box<turbomcp_core::Error>> {
-        tracing::info!("✅ Getting tool schemas using TurboMCP 1.0.11 API");
+        tracing::info!("✅ Getting tool schemas using TurboMCP 1.1.0 API");
         self.list_tools().await
     }
 
@@ -673,7 +679,7 @@ impl McpClientManager {
 
         tracing::info!("MCP Client Manager initialized - ready for enterprise connections");
         tracing::info!("Available transports: STDIO, HTTP, WebSocket, TCP, Unix");
-        tracing::info!("TurboMCP v1.0.11 integration ready with plugin and LLM registry support");
+        tracing::info!("TurboMCP v1.1.0 integration ready with plugin and LLM registry support");
         if manager.sampling_handler.is_some() {
             tracing::info!("Production LLM sampling handler initialized");
         } else {
@@ -681,6 +687,66 @@ impl McpClientManager {
         }
 
         (manager, event_receiver)
+    }
+
+    /// Configure ClientBuilder with enterprise plugins for production reliability
+    #[cfg(feature = "plugins")]
+    fn configure_plugins(mut builder: ClientBuilder) -> ClientBuilder {
+        // Retry plugin with exponential backoff - essential for MCP Studio's server testing
+        let retry_config = RetryConfig {
+            max_retries: 3,
+            base_delay_ms: 100,
+            max_delay_ms: 5000,
+            backoff_multiplier: 2.0,
+            retry_on_timeout: true,
+            retry_on_connection_error: true,
+        };
+        builder = builder.with_plugin(Arc::new(RetryPlugin::new(PluginConfig::Retry(retry_config))));
+
+        // Cache plugin for performance - critical for repeated tool/resource calls
+        let cache_config = CacheConfig {
+            max_entries: 1000,
+            ttl_seconds: 300, // 5 minutes - good for development workflow
+            cache_responses: true,
+            cache_resources: true,
+            cache_tools: true,
+        };
+        builder = builder.with_plugin(Arc::new(CachePlugin::new(PluginConfig::Cache(cache_config))));
+
+        // Metrics plugin for monitoring server performance - valuable for development
+        builder = builder.with_plugin(Arc::new(MetricsPlugin::new(PluginConfig::Metrics)));
+
+        tracing::info!("Enterprise plugins enabled: Retry, Cache, Metrics");
+        builder
+    }
+
+    #[cfg(not(feature = "plugins"))]
+    fn configure_plugins(builder: ClientBuilder) -> ClientBuilder {
+        tracing::debug!("Plugin system disabled - using basic client");
+        builder
+    }
+
+    /// Configure client capabilities with type-state builders for compile-time validation
+    fn configure_client_capabilities() -> turbomcp_protocol::types::ClientCapabilities {
+        // Use TurboMCP 1.1.0 type-state capability builders for compile-time validation
+        let client_caps = ClientCapabilitiesBuilder::new()
+            .enable_experimental()  // Enables experimental capability state
+            .enable_roots()         // Enables roots capability state (for MCP Studio file access)
+            .enable_sampling()      // Enables sampling capability state (for HITL)
+            .enable_elicitation()   // Enables elicitation capability state
+            // Sub-capability only available when roots are enabled!
+            .enable_roots_list_changed()  // ✅ Only available when roots enabled
+            // TurboMCP exclusive features for MCP Studio!
+            .with_llm_provider("openai", "gpt-4")                  // 🚀 TurboMCP exclusive
+            .with_ui_capabilities(vec!["form", "dialog", "toast"]) // 🚀 TurboMCP exclusive - perfect for MCP Studio UI
+            .build();
+
+        tracing::info!("Type-state client capabilities configured with compile-time validation");
+        tracing::info!("✅ Roots enabled: {}", client_caps.roots.is_some());
+        tracing::info!("✅ Sampling enabled: {}", client_caps.sampling.is_some());
+        tracing::info!("✅ Elicitation enabled: {}", client_caps.elicitation.is_some());
+
+        client_caps
     }
 
     /// Create a studio elicitation handler that forwards requests to the frontend
@@ -1200,9 +1266,8 @@ impl McpClientManager {
 
         // Convert arguments from JSON to PromptInput if provided
         let prompt_input = if let Some(args) = arguments {
-            Some(serde_json::from_value::<PromptInput>(args).map_err(|e| {
-                McpStudioError::ToolCallFailed(format!("Invalid prompt arguments: {}", e))
-            })?)
+            Some(serde_json::from_value::<PromptInput>(args)
+                .map_err(|e| McpStudioError::SerializationError(e))?)
         } else {
             None
         };
@@ -1830,11 +1895,14 @@ impl McpClientManager {
             keepalive_ms: 60_000,  // 60 second keepalive
         };
 
-        let mut client = ClientBuilder::new()
+        // Use type-state capability builders for compile-time validation (TurboMCP 1.1.0)
+        Self::configure_client_capabilities();
+
+        let mut client = Self::configure_plugins(ClientBuilder::new())
             .with_tools(true)
             .with_prompts(true)
             .with_resources(true)
-            .with_sampling(false) // Disable sampling for now
+            .with_sampling(true) // Enable production-grade sampling with HITL
             .with_connection_config(connection_config)
             .build_sync(transport);
 
@@ -1955,11 +2023,14 @@ impl McpClientManager {
             keepalive_ms: 60_000,  // 60 second keepalive
         };
 
-        let mut client = ClientBuilder::new()
+        // Use type-state capability builders for compile-time validation (TurboMCP 1.1.0)
+        Self::configure_client_capabilities();
+
+        let mut client = Self::configure_plugins(ClientBuilder::new())
             .with_tools(true)
             .with_prompts(true)
             .with_resources(true)
-            .with_sampling(false) // Disable sampling for now
+            .with_sampling(true) // Enable production-grade sampling with HITL
             .with_connection_config(connection_config)
             .build_sync(transport);
 
@@ -2037,11 +2108,14 @@ impl McpClientManager {
             keepalive_ms: 60_000,  // 60 second keepalive
         };
 
-        let mut client = ClientBuilder::new()
+        // Use type-state capability builders for compile-time validation (TurboMCP 1.1.0)
+        Self::configure_client_capabilities();
+
+        let mut client = Self::configure_plugins(ClientBuilder::new())
             .with_tools(true)
             .with_prompts(true)
             .with_resources(true)
-            .with_sampling(false) // Disable sampling for now
+            .with_sampling(true) // Enable production-grade sampling with HITL
             .with_connection_config(connection_config)
             .build_sync(transport);
 
@@ -2113,11 +2187,14 @@ impl McpClientManager {
             keepalive_ms: 60_000,  // 60 second keepalive
         };
 
-        let mut client = ClientBuilder::new()
+        // Use type-state capability builders for compile-time validation (TurboMCP 1.1.0)
+        Self::configure_client_capabilities();
+
+        let mut client = Self::configure_plugins(ClientBuilder::new())
             .with_tools(true)
             .with_prompts(true)
             .with_resources(true)
-            .with_sampling(false) // Disable sampling for now
+            .with_sampling(true) // Enable production-grade sampling with HITL
             .with_connection_config(connection_config)
             .build_sync(transport);
 

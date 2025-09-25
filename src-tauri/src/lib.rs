@@ -1,12 +1,14 @@
 mod commands;
 mod database;
 mod error;
+mod hitl_sampling;
 mod llm_config;
 mod mcp_client;
 mod types;
 mod workflow_engine;
 use database::Database;
 use error::McpStudioError;
+use hitl_sampling::HITLSamplingManager;
 use llm_config::LLMConfigManager;
 use mcp_client::McpClientManager;
 use std::sync::Arc;
@@ -17,6 +19,7 @@ use tauri::{Emitter, Manager};
 pub struct AppState {
     pub mcp_manager: Arc<McpClientManager>,
     pub llm_config: Arc<LLMConfigManager>,
+    pub hitl_sampling: Arc<HITLSamplingManager>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -42,10 +45,15 @@ pub fn run() {
 
             let llm_config = Arc::new(LLMConfigManager::new());
 
+            // Initialize HITL sampling manager with LLM config
+            let (hitl_sampling, mut sampling_event_receiver) = HITLSamplingManager::new(llm_config.clone());
+            let hitl_sampling = Arc::new(hitl_sampling);
+
             // Store lightweight state immediately to unblock UI
             app.manage(AppState {
                 mcp_manager: mcp_manager.clone(),
                 llm_config: llm_config.clone(),
+                hitl_sampling: hitl_sampling.clone(),
             });
 
             // Emit immediate ready event so UI can start working
@@ -160,6 +168,15 @@ pub fn run() {
                 }
             });
 
+            // Handle HITL sampling events in background
+            let app_handle_clone = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                while let Ok(event) = sampling_event_receiver.recv().await {
+                    // Emit sampling events to frontend
+                    let _ = app_handle_clone.emit("hitl-sampling-event", &event);
+                }
+            });
+
             tracing::info!("MCP Studio setup complete, background initialization started");
             Ok(())
         })
@@ -217,6 +234,18 @@ pub fn run() {
             commands::import_collection_from_file,
             commands::get_collection_templates,
             commands::create_collection_from_template,
+            // HITL Sampling Commands
+            commands::get_hitl_sampling_mode,
+            commands::set_hitl_sampling_mode,
+            commands::get_pending_sampling_requests,
+            commands::get_completed_sampling_requests,
+            commands::approve_sampling_request,
+            commands::reject_sampling_request,
+            commands::process_hitl_sampling_request,
+            commands::test_sampling_request,
+            // LLM API commands (avoids CORS issues)
+            commands::fetch_llm_models,
+            commands::llm_completion_request,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

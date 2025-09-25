@@ -22,6 +22,9 @@ tauri-plugin-process = "2.0"
 tauri-plugin-dialog = "2.0"
 tauri-plugin-http = "2.0"
 
+# HTTP client for LLM API requests
+reqwest = { version = "0.12", features = ["json"] }
+
 # TurboMCP integration - using local development version
 turbomcp = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp" }
 turbomcp-client = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp-client" }
@@ -65,7 +68,7 @@ dashmap = "6.1"
 keyring = "2.3"
 
 [features]
-default = ["stdio", "http", "websocket", "tcp", "unix"]
+default = ["stdio", "http", "websocket", "tcp", "unix", "plugins"]
 stdio = []
 http = []
 websocket = []
