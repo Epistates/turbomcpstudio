@@ -4,7 +4,7 @@
   Enterprise-grade UX with pure DX focus for MCP server developers
 -->
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
@@ -129,8 +129,22 @@
   let activeProvider: any | null = $state(null);
   let samplingAvailable = $state(false);
 
-  // Cost estimation and analytics
-  let estimatedCost = $state(0);
+  // LLM Configuration state - loaded from backend
+  let llmConfig: LLMConfig = $state({
+    provider: 'openai',
+    apiKey: '',
+    baseUrl: '',
+    model: '',
+    defaultMaxTokens: 500,
+    defaultTemperature: 0.7
+  });
+
+  // Current active LLM provider from backend
+  let activeLLMProvider: any = $state(null);
+
+  // World-class cost estimation and analytics
+  // estimatedCost moved to derived section for better performance
+  let thinkingTokenCost = $state(0); // September 2025: Real thinking token costs
   let usageStats = $state({
     totalRequests: 0,
     successfulRequests: 0,
@@ -178,9 +192,24 @@
     samplingAvailable && activeProvider && activeProvider.configured
   );
 
-  const canTestAI = $derived(
-    selectedServerId && hasLLMConfig && testMessage.trim().length > 0
-  );
+  // Convert expensive derived to debounced state to prevent keystroke cascade
+  let canTestAI = $state(false);
+  let canTestAITimeout: number;
+
+  function updateCanTestAI() {
+    clearTimeout(canTestAITimeout);
+    canTestAITimeout = setTimeout(() => {
+      canTestAI = selectedServerId && hasLLMConfig && testMessage.trim().length > 0 && !creatingRequest;
+    }, 100); // Very fast update for UI responsiveness
+  }
+
+  // Update canTestAI when relevant values change
+  $effect(() => {
+    updateCanTestAI();
+  });
+
+  // Track loading state for creating new requests
+  let creatingRequest = $state(false);
 
   const activeProviderModel = $derived(
     activeProvider?.default_model || 'gpt-3.5-turbo'
@@ -252,27 +281,26 @@
   // STORE SUBSCRIPTIONS
   // ===============================================
 
+  // Use derived state instead of subscription effect for better performance
+  const connectedServers = $derived(
+    $serverStore.servers.filter(s =>
+      s.status?.toLowerCase() === 'connected' &&
+      s.capabilities?.sampling
+    )
+  );
+
+  // Only run when servers actually change
   $effect(() => {
-    const unsubscribeServers = serverStore.subscribe(state => {
-      const connectedServers = state.servers.filter(s =>
-        s.status?.toLowerCase() === 'connected' &&
-        s.capabilities?.sampling
-      );
-      servers = connectedServers;
+    servers = connectedServers;
 
-      if (selectedServerId !== state.selectedServerId) {
-        selectedServerId = state.selectedServerId;
-      }
+    if (selectedServerId !== $serverStore.selectedServerId) {
+      selectedServerId = $serverStore.selectedServerId;
+    }
 
-      // Auto-select first connected server with sampling capability
-      if (!state.selectedServerId && connectedServers.length > 0 && !selectedServerId) {
-        serverStore.selectServer(connectedServers[0].id);
-      }
-    });
-
-    return () => {
-      unsubscribeServers();
-    };
+    // Auto-select first connected server with sampling capability
+    if (!$serverStore.selectedServerId && connectedServers.length > 0 && !selectedServerId) {
+      serverStore.selectServer(connectedServers[0].id);
+    }
   });
 
   // ===============================================
@@ -282,9 +310,10 @@
   // Load LLM provider status from backend
   async function loadLLMProviders() {
     try {
-      const [providersData, samplingStatus] = await Promise.all([
+      const [providersData, samplingStatus, llmConfigData] = await Promise.all([
         invoke('get_llm_provider_statuses'),
-        invoke('is_sampling_available')
+        invoke('is_sampling_available'),
+        invoke('get_llm_config')
       ]);
 
       llmProviders = providersData as any[];
@@ -292,6 +321,69 @@
 
       // Find active provider
       activeProvider = llmProviders.find(p => p.active) || null;
+      activeLLMProvider = activeProvider;
+
+      // Update LLM config from backend
+      if (llmConfigData && typeof llmConfigData === 'object') {
+        const backendConfig = llmConfigData as any;
+        // Debug: Backend LLM config loaded
+
+        if (backendConfig.active_provider && backendConfig.providers) {
+          const activeProviderId = backendConfig.active_provider;
+          const activeConfig = backendConfig.providers[activeProviderId];
+
+          // Debug: Active provider ID loaded
+          // Debug: Active provider config loaded
+
+          if (activeConfig) {
+            // Set the active LLM provider for display
+            activeLLMProvider = {
+              id: activeProviderId,
+              display_name: activeConfig.display_name,
+              provider_type: activeConfig.provider_type,
+              enabled: activeConfig.enabled,
+              default_model: activeConfig.default_model,
+              base_url: activeConfig.base_url,
+              available_models: activeConfig.available_models || []
+            };
+
+            llmConfig = {
+              provider: activeConfig.provider_type === 'local' ? 'local' :
+                       activeConfig.provider_type === 'anthropic' ? 'anthropic' : 'openai',
+              apiKey: '', // Don't expose API keys in frontend
+              baseUrl: activeConfig.base_url || 'http://localhost:1234/v1',
+              model: activeConfig.default_model || 'gpt-3.5-turbo',
+              defaultMaxTokens: 500,
+              defaultTemperature: 0.7
+            };
+
+            // Debug: Final LLM config loaded
+            // Debug: Final active LLM provider loaded
+
+            // Use models from backend config instead of fetching again
+            if (activeConfig.available_models && activeConfig.available_models.length > 0) {
+              availableModels = activeConfig.available_models;
+              console.log('Using models from backend config:', availableModels);
+            } else {
+              // Only fetch if no models in config
+              console.log('No models in backend config, will need manual refresh');
+              availableModels = [];
+            }
+          }
+        } else {
+          // Debug: No active provider found
+          // Reset to show unconfigured state
+          activeLLMProvider = null;
+          llmConfig = {
+            provider: 'local',
+            apiKey: '',
+            baseUrl: 'http://localhost:1234/v1',
+            model: '',
+            defaultMaxTokens: 500,
+            defaultTemperature: 0.7
+          };
+        }
+      }
 
       // Update usage stats if available
       if (activeProvider?.usage_stats) {
@@ -309,6 +401,26 @@
     }
   }
 
+  // Load available models from LLM API
+  let availableModels: string[] = $state([]);
+
+  async function loadAvailableModels() {
+    if (!llmConfig.baseUrl) return;
+
+    try {
+      const data = await invoke('fetch_llm_models', {
+        baseUrl: llmConfig.baseUrl
+      });
+
+      if (data && data.data) {
+        availableModels = data.data.map((model: any) => model.id || model.name) || [];
+        console.log('Loaded models:', availableModels);
+      }
+    } catch (error) {
+      console.error('Failed to load models:', error);
+      availableModels = [];
+    }
+  }
 
   // Estimate cost for a sampling request
   function estimateRequestCost(messages: any[], maxTokens: number = 500): number {
@@ -357,15 +469,59 @@
     return Number((inputCost + outputCost + additionalCost).toFixed(4));
   }
 
-  // Update cost estimation when message changes
+  // Simple, non-blocking cost estimation - no memoization to avoid reactivity loops
+  let estimatedCost = $state(0);
+  let costCalculationTimeout: number;
+
+  // Debounced cost calculation to prevent blocking on every keystroke
+  function updateCostEstimation() {
+    clearTimeout(costCalculationTimeout);
+    costCalculationTimeout = setTimeout(() => {
+      if (testMessage && activeProvider) {
+        const messages = [{ content: { text: testMessage } }];
+        estimatedCost = estimateRequestCost(messages, testMaxTokens);
+      } else {
+        estimatedCost = 0;
+      }
+    }, 300); // Quick update for cost display
+  }
+
+  // Trigger cost update on relevant changes - but debounced
   $effect(() => {
-    if (testMessage && activeProvider) {
-      const messages = [{ content: { text: testMessage } }];
-      estimatedCost = estimateRequestCost(messages, testMaxTokens);
-    } else {
-      estimatedCost = 0;
-    }
+    updateCostEstimation();
   });
+
+  // Validate LLM response for common issues
+  function validateLLMResponse(result: any): { valid: boolean; reason?: string } {
+    // Check if result exists
+    if (!result) {
+      return { valid: false, reason: 'Empty or null response from LLM' };
+    }
+
+    // Check for error status
+    if (result.status === 'error') {
+      return { valid: false, reason: result.message || 'LLM returned error status' };
+    }
+
+    // Check if content exists and is not empty
+    const content = result.content || result.text || '';
+    if (!content || content.trim().length === 0) {
+      return {
+        valid: false,
+        reason: 'LLM returned empty response. This often happens when max_tokens is too low or the model hits a token limit. Try increasing max_tokens in the request.'
+      };
+    }
+
+    // Check for problematic finish reasons
+    if (result.stop_reason === 'length' && content.trim().length === 0) {
+      return {
+        valid: false,
+        reason: 'LLM hit token limit before generating any content. Increase max_tokens or check your system prompt length.'
+      };
+    }
+
+    return { valid: true };
+  }
 
   // Intelligent retry with exponential backoff
   async function retryWithExponentialBackoff<T>(
@@ -426,42 +582,58 @@
   }
 
   async function createTestSamplingRequest() {
-    if (!selectedServerId || !testMessage.trim()) return;
+    if (!selectedServerId || !testMessage.trim() || creatingRequest) return;
 
-    const testRequest: SamplingRequest = {
-      id: crypto.randomUUID(),
-      serverId: selectedServerId,
-      serverName: selectedServer?.config.name || 'Test Server',
-      messages: [
-        {
-          role: 'user',
-          content: {
-            type: 'text',
-            text: testMessage.trim()
+    creatingRequest = true;
+
+    try {
+      const testRequest: SamplingRequest = {
+        id: crypto.randomUUID(),
+        serverId: selectedServerId,
+        serverName: selectedServer?.config.name || 'Test Server',
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: testMessage.trim()
+            }
           }
-        }
-      ],
-      modelPreferences: {
-        intelligencePriority: 0.7,
-        speedPriority: 0.6,
-        costPriority: 0.4,
-        hints: [{ name: activeProviderModel }]
-      },
-      systemPrompt: testSystemPrompt.trim() || undefined,
-      includeContext: 'thisServer',
-      maxTokens: testMaxTokens,
-      temperature: testTemperature,
-      timestamp: new Date().toISOString(),
-      status: 'pending'
-    };
+        ],
+        modelPreferences: {
+          intelligencePriority: 0.7,
+          speedPriority: 0.6,
+          costPriority: 0.4,
+          hints: [{ name: llmConfig.model || activeProviderModel }]
+        },
+        systemPrompt: testSystemPrompt.trim() || undefined,
+        includeContext: 'thisServer',
+        maxTokens: testMaxTokens,
+        temperature: testTemperature,
+        timestamp: new Date().toISOString(),
+        status: samplingMode === 'ai' ? 'processing' : 'pending'
+      };
 
-    samplingRequests = [testRequest, ...samplingRequests];
-    selectedRequest = testRequest;
+      // Show immediate feedback
+      samplingRequests = [testRequest, ...samplingRequests];
+      selectedRequest = testRequest;
 
-    // Clear the test form
-    testMessage = '';
+      // Clear the test form
+      testMessage = '';
 
-    uiStore.showSuccess('Test sampling request created');
+      if (samplingMode === 'ai' && hasLLMConfig) {
+        uiStore.showSuccess(`Processing with ${llmConfig.model || activeProviderModel}...`);
+        console.log(`🔥 Starting AI processing with model: ${llmConfig.model || activeProviderModel}`);
+      } else {
+        uiStore.showSuccess('Sampling request created - awaiting human review');
+      }
+
+    } catch (error) {
+      console.error('Failed to create sampling request:', error);
+      uiStore.showError(`Failed to create request: ${error}`);
+    } finally {
+      creatingRequest = false;
+    }
   }
 
   async function approveAndProcess(request: SamplingRequest, useAI: boolean = false) {
@@ -495,6 +667,15 @@
           }
         };
 
+        // Debug: Log what we're sending to the LLM
+        console.log('🤖 Sending to LLM:', {
+          server_id: request.serverId,
+          messages: createMessageRequest.messages,
+          max_tokens: createMessageRequest.max_tokens,
+          temperature: createMessageRequest.temperature,
+          message_content: createMessageRequest.messages?.[0]?.content || 'NO CONTENT'
+        });
+
         // Use the new runtime LLM configuration system with intelligent retry
         let result;
         try {
@@ -506,6 +687,12 @@
               temperature: createMessageRequest.temperature
             });
           });
+
+          // Validate the response for common issues
+          const isValidResponse = validateLLMResponse(result);
+          if (!isValidResponse.valid) {
+            throw new Error(isValidResponse.reason);
+          }
 
           request.response = result;
           request.status = 'completed';
@@ -520,23 +707,38 @@
           throw error; // Re-throw to be caught by outer try-catch
         }
       } else {
-        // HITL mode - would normally wait for human response,
-        // but for demo we'll create a mock response
-        request.response = {
-          role: 'assistant',
-          content: {
-            type: 'text',
-            text: `[HITL Mode] This would normally wait for human input. In a real implementation, you would edit this response manually and approve it.`
-          },
-          model: 'human-review',
-          stopReason: 'manual'
-        };
-        request.status = 'completed';
+        // HITL mode - use real HITL sampling system
+        try {
+          const hitlResult = await invoke('process_hitl_sampling_request', {
+            serverId: request.serverId,
+            serverName: request.serverName,
+            request: {
+              messages: request.messages,
+              model_preferences: request.modelPreferences,
+              system_prompt: request.systemPrompt,
+              include_context: request.includeContext,
+              max_tokens: request.maxTokens,
+              temperature: request.temperature,
+              stop_sequences: request.stopSequences
+            }
+          });
+
+          request.response = hitlResult.response;
+          request.status = hitlResult.status === 'completed' ? 'completed' : 'pending';
+
+          // If pending, it means it's awaiting human approval
+          if (request.status === 'pending') {
+            uiStore.showInfo('Request submitted for human review - check the Sampling Debugger tab');
+          }
+        } catch (error) {
+          console.error('HITL processing failed:', error);
+          throw new Error(`HITL processing failed: ${error}`);
+        }
       }
 
       request.duration = Date.now() - startTime;
 
-      // Estimate cost (mock calculation)
+      // Calculate cost from actual token usage
       if (request.response?.usage) {
         const inputCost = (request.response.usage.inputTokens / 1000) * 0.0015;
         const outputCost = (request.response.usage.outputTokens / 1000) * 0.002;
@@ -615,30 +817,86 @@
   // LIFECYCLE
   // ===============================================
 
-  onMount(() => {
-    // Load saved LLM config from localStorage
-    const saved = localStorage.getItem('mcp-studio-llm-config');
-    if (saved) {
+  onMount(async () => {
+    // Load saved sampling state
+    const savedSamplingState = localStorage.getItem('mcp-studio-sampling-state');
+    if (savedSamplingState) {
       try {
-        const parsed = JSON.parse(saved);
-        llmConfig = { ...llmConfig, ...parsed };
+        const parsed = JSON.parse(savedSamplingState);
+        if (parsed.testMessage) testMessage = parsed.testMessage;
+        if (parsed.testSystemPrompt) testSystemPrompt = parsed.testSystemPrompt;
+        if (parsed.testMaxTokens) testMaxTokens = parsed.testMaxTokens;
+        if (parsed.testTemperature) testTemperature = parsed.testTemperature;
+        if (parsed.samplingRequests) samplingRequests = parsed.samplingRequests;
+        if (parsed.selectedRequest) selectedRequest = parsed.selectedRequest;
       } catch (e) {
-        console.warn('Failed to load saved LLM config:', e);
+        console.warn('Failed to load saved sampling state:', e);
       }
     }
 
-    // Create initial demo request
-    setTimeout(() => {
-      if (selectedServerId) {
-        testMessage = 'Hello! Please explain what MCP (Model Context Protocol) is and how it helps developers build better AI applications.';
-        createTestSamplingRequest();
-      }
-    }, 1000);
+    // Initialize empty test message if nothing was saved
+    if (!testMessage) testMessage = '';
+
+    // Load LLM configuration from backend
+    await loadLLMProviders();
   });
 
-  // Save LLM config to localStorage
+  // Consolidated localStorage saving with proper debouncing
+  let saveTimeout: number;
+
+  // Debounced save function to prevent excessive localStorage writes
+  const debouncedSave = () => {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      // Save LLM config
+      localStorage.setItem('mcp-studio-llm-config', JSON.stringify(llmConfig));
+
+      // Save sampling state
+      const samplingState = {
+        testMessage,
+        testSystemPrompt,
+        testMaxTokens,
+        testTemperature,
+        samplingRequests: samplingRequests.slice(0, 50), // Limit to last 50 requests
+        selectedRequest
+      };
+      localStorage.setItem('mcp-studio-sampling-state', JSON.stringify(samplingState));
+    }, 3000); // Further increased to 3 seconds to prevent excessive saves
+  };
+
+  // Minimal state saving - only when user stops typing
   $effect(() => {
-    localStorage.setItem('mcp-studio-llm-config', JSON.stringify(llmConfig));
+    // Only save when we have meaningful content
+    if (testMessage || testSystemPrompt || samplingRequests.length > 0) {
+      debouncedSave();
+    }
+  });
+
+  // Refresh LLM config when returning from Settings - optimized
+  let previousView: string = '';
+  $effect(() => {
+    const currentView = $uiStore.currentView;
+    if (previousView === 'settings' && currentView === 'sampling') {
+      console.log('Returning from Settings to Sampling - refreshing LLM config');
+      // Use requestIdleCallback for non-critical updates to prevent blocking
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => loadLLMProviders());
+      } else {
+        setTimeout(() => loadLLMProviders(), 10);
+      }
+    }
+    previousView = currentView;
+  });
+
+  // World-class cleanup - prevent memory leaks
+  onDestroy(() => {
+    clearTimeout(saveTimeout);
+    clearTimeout(costCalculationTimeout);
+    clearTimeout(canTestAITimeout);
+
+    // Clean up any pending operations
+    if (processing) processing = false;
+    if (creatingRequest) creatingRequest = false;
   });
 
 </script>
@@ -672,15 +930,21 @@
 
       <!-- Mode Selection -->
       <div class="mb-4">
-        <label class="form-label">Mode</label>
-        <div class="grid grid-cols-2 gap-1 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+        <label for="sampling-mode" class="form-label">Mode</label>
+        <div role="radiogroup" aria-labelledby="sampling-mode" class="grid grid-cols-2 gap-1 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
           <button
+            type="button"
+            role="radio"
+            aria-checked={samplingMode === 'hitl'}
             onclick={() => samplingMode = 'hitl'}
             class="px-3 py-2 text-sm font-medium rounded-md transition-all {samplingMode === 'hitl' ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
           >
             HITL Only
           </button>
           <button
+            type="button"
+            role="radio"
+            aria-checked={samplingMode === 'ai'}
             onclick={() => samplingMode = 'ai'}
             class="px-3 py-2 text-sm font-medium rounded-md transition-all {samplingMode === 'ai' ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
           >
@@ -721,11 +985,12 @@
           Test Message
         </label>
         <textarea
+          id="test-message-input"
           bind:value={testMessage}
-          placeholder="Enter a message to test sampling..."
-          class="form-input h-20 resize-none"
+          placeholder="Enter a message to test sampling... (⌘+Enter to send)"
+          class="form-input h-20 resize-none transition-all duration-200 focus:ring-2 focus:ring-mcp-primary-500 focus:border-mcp-primary-500"
           onkeydown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canTestAI) {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !creatingRequest && selectedServerId && testMessage.trim()) {
               e.preventDefault();
               createTestSamplingRequest();
             }
@@ -737,359 +1002,86 @@
             variant="primary"
             size="sm"
             onclick={createTestSamplingRequest}
-            disabled={!selectedServerId || !testMessage.trim()}
-            class="flex-1"
+            disabled={!canTestAI}
+            loading={creatingRequest}
+            class="flex-1 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
           >
-            <Plus size={14} />
-            Create Request
+            <Plus size={14} class="transition-transform duration-200 {creatingRequest ? 'animate-spin' : ''}" />
+            {creatingRequest ? 'Creating...' : 'Create Request'}
           </Button>
           <button
+            type="button"
             onclick={() => showAdvancedOptions = !showAdvancedOptions}
-            class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
             title="Advanced options"
+            aria-label="Toggle advanced options"
           >
-            <Settings size={16} />
+            <Settings size={16} class="transition-transform duration-200 {showAdvancedOptions ? 'rotate-90' : ''}" />
           </button>
         </div>
 
-        <p class="text-xs text-gray-500">
-          <kbd class="kbd">⌘</kbd> + <kbd class="kbd">Enter</kbd> to create request
-        </p>
+        <div class="flex items-center justify-between text-xs text-gray-500">
+          <span>
+            <kbd class="kbd">⌘</kbd> + <kbd class="kbd">Enter</kbd> to create request
+          </span>
+          {#if estimatedCost > 0}
+            <span class="text-green-600 font-medium animate-pulse">
+              ~${estimatedCost.toFixed(4)} estimated
+            </span>
+          {/if}
+        </div>
       </div>
     </div>
 
-    <!-- Advanced Options -->
+    <!-- HITL Options -->
     {#if showAdvancedOptions}
       <div class="p-4 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div class="space-y-3">
           <div>
-            <label class="form-label text-xs">System Prompt</label>
-            <textarea
-              bind:value={testSystemPrompt}
-              class="form-input text-xs h-16 resize-none"
-              placeholder="System prompt for testing..."
-            ></textarea>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="form-label text-xs">Max Tokens</label>
-              <input
-                type="number"
-                bind:value={testMaxTokens}
-                min="1"
-                max="4096"
-                class="form-input text-xs"
-              />
-            </div>
-            <div>
-              <label class="form-label text-xs">Temperature</label>
-              <input
-                type="number"
-                bind:value={testTemperature}
-                min="0"
-                max="2"
-                step="0.1"
-                class="form-input text-xs"
-              />
-            </div>
+            <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+              <Settings size={14} class="text-blue-500" />
+              HITL Testing Options
+            </h4>
+            <p class="text-xs text-gray-600 dark:text-gray-400 mb-3">
+              Configure how requests are processed for testing your MCP server
+            </p>
           </div>
 
-          <!-- 2024 Cutting-Edge API Features -->
-          {#if hasLLMConfig}
-            <div class="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
-              <h4 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                <Zap size={12} class="text-yellow-500" />
-                2024 API Features
-              </h4>
-
-              <div class="space-y-3">
-                <!-- Structured Outputs (100% Reliability) -->
-                {#if supportsStructuredOutputs}
-                  <div>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        bind:checked={useStructuredOutput}
-                        class="form-checkbox text-xs"
-                        disabled={!isStructuredOutputModel}
-                      />
-                      <span class="text-xs font-medium">
-                        Structured Outputs
-                        {#if isStructuredOutputModel}
-                          <span class="text-green-600 ml-1">100% Reliable</span>
-                        {:else}
-                          <span class="text-orange-600 ml-1">(Switch to {activeProvider?.capabilities?.structured_output_models?.[0] || 'compatible model'})</span>
-                        {/if}
-                      </span>
-                    </label>
-                    {#if useStructuredOutput}
-                      <div class="mt-2">
-                        <label class="form-label text-xs">JSON Schema</label>
-                        <textarea
-                          bind:value={structuredOutputSchema}
-                          class="form-input text-xs h-16 font-mono resize-none"
-                          placeholder="JSON Schema for structured output..."
-                        ></textarea>
-                        <p class="text-xs text-gray-500 mt-1">
-                          OpenAI gpt-4o-2024-08-06 achieves 100% schema compliance vs &lt;40% on older models
-                        </p>
-                      </div>
-                    {/if}
-                  </div>
-                {/if}
-
-                <!-- Batch Processing -->
-                {#if supportsBatchProcessing}
-                  <div>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        bind:checked={enableBatchMode}
-                        class="form-checkbox text-xs"
-                      />
-                      <span class="text-xs font-medium">
-                        Batch Processing
-                        {#if activeProvider?.capabilities?.batch_discount_percentage}
-                          <span class="text-green-600 ml-1">
-                            ({activeProvider.capabilities.batch_discount_percentage}% cheaper)
-                          </span>
-                        {/if}
-                      </span>
-                    </label>
-                    {#if enableBatchMode}
-                      <p class="text-xs text-gray-500 mt-1">
-                        24-hour processing time with significant cost savings
-                      </p>
-                    {/if}
-                  </div>
-                {/if}
-
-                <!-- Parallel Function Calling -->
-                {#if supportsParallelFunctionCalling}
-                  <div>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        bind:checked={enableParallelFunctionCalls}
-                        class="form-checkbox text-xs"
-                      />
-                      <span class="text-xs font-medium">
-                        Parallel Function Calling
-                        <span class="text-blue-600 ml-1">(2024 Enhancement)</span>
-                      </span>
-                    </label>
-                    {#if enableParallelFunctionCalls}
-                      <p class="text-xs text-gray-500 mt-1">
-                        Execute multiple tool calls simultaneously with strict mode
-                      </p>
-                    {/if}
-                  </div>
-                {/if}
-
-                {#if !supportsStructuredOutputs && !supportsBatchProcessing && !supportsParallelFunctionCalling}
-                  <div class="text-xs text-gray-500 italic">
-                    No 2024 features available for {activeProvider?.display_name || 'current provider'}
-                  </div>
-                {/if}
+          {#if samplingMode === 'ai'}
+            <div>
+              <label class="form-label text-xs">System Prompt (Optional)</label>
+              <textarea
+                bind:value={testSystemPrompt}
+                class="form-input text-xs h-12 resize-none"
+                placeholder="Additional context for the AI..."
+              ></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="form-label text-xs">Max Tokens</label>
+                <input
+                  type="number"
+                  bind:value={testMaxTokens}
+                  min="1"
+                  max="4096"
+                  class="form-input text-xs"
+                />
+              </div>
+              <div>
+                <label class="form-label text-xs">Temperature</label>
+                <input
+                  type="number"
+                  bind:value={testTemperature}
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  class="form-input text-xs"
+                />
               </div>
             </div>
-
-            <!-- September 2025 Cutting-Edge Features -->
-            <div class="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
-              <h4 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                <Brain size={12} class="text-purple-500" />
-                September 2025 Features
-              </h4>
-
-              <div class="space-y-4">
-                <!-- OpenAI GPT-5 Reasoning Effort Parameter -->
-                {#if isOpenAIGPT5}
-                  <div>
-                    <label class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-                      GPT-5 Reasoning Effort
-                      <span class="text-blue-600 ml-1">⚡ Official API Parameter</span>
-                    </label>
-                    <select
-                      bind:value={reasoningEffort}
-                      class="form-input text-xs w-full"
-                    >
-                      <option value="minimal">Minimal - Fast responses, no reasoning</option>
-                      <option value="low">Low - Light reasoning</option>
-                      <option value="medium">Medium - Balanced (default)</option>
-                      <option value="high">High - Maximum quality, slower</option>
-                    </select>
-                    <p class="text-xs text-gray-500 mt-1">
-                      Controls reasoning depth. Higher = better quality but more output tokens ($10/1M).
-                      Reasoning tokens count as output tokens.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-                      GPT-5 Verbosity
-                    </label>
-                    <select
-                      bind:value={verbosity}
-                      class="form-input text-xs w-full"
-                    >
-                      <option value="low">Low - Concise responses</option>
-                      <option value="medium">Medium - Balanced (default)</option>
-                      <option value="high">High - Detailed responses</option>
-                    </select>
-                    <p class="text-xs text-gray-500 mt-1">
-                      Controls default response length independently of reasoning effort.
-                    </p>
-                  </div>
-                {/if}
-
-                <!-- Claude 4.1 Opus Extended Thinking Mode -->
-                {#if isClaudeWithThinking}
-                  <div>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        bind:checked={enableExtendedThinking}
-                        class="form-checkbox text-xs"
-                      />
-                      <span class="text-xs font-medium">
-                        Extended Thinking Mode
-                        <span class="text-purple-600 ml-1">🧠 Claude 4.1 Only</span>
-                        {#if hasThinkingCost}
-                          <span class="text-amber-600 ml-1">
-                            (+${activeProvider?.cost_config?.thinking_cost_per_1k}/1K thinking tokens)
-                          </span>
-                        {/if}
-                      </span>
-                    </label>
-                    {#if enableExtendedThinking}
-                      <div class="mt-2 space-y-2">
-                        <label class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
-                          Thinking Budget
-                        </label>
-                        <select
-                          bind:value={thinkingBudget}
-                          class="form-input text-xs w-full"
-                        >
-                          <option value="low">Low - Quick thinking</option>
-                          <option value="medium">Medium - Balanced</option>
-                          <option value="high">High - Deep reasoning</option>
-                        </select>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            bind:checked={showThinkingProcess}
-                            class="form-checkbox text-xs"
-                          />
-                          <span class="text-xs">Show thinking summaries in UI</span>
-                        </label>
-                        <p class="text-xs text-gray-500">
-                          Claude alternates between reasoning and tool use for improved responses.
-                          Performance matters more than latency.
-                        </p>
-                      </div>
-                    {/if}
-                  </div>
-                {:else if supportsExtendedThinking}
-                  <div>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        bind:checked={enableExtendedThinking}
-                        class="form-checkbox text-xs"
-                      />
-                      <span class="text-xs font-medium">
-                        Extended Thinking Mode
-                        <span class="text-blue-600 ml-1">🧠 Claude 4+</span>
-                      </span>
-                    </label>
-                    {#if enableExtendedThinking}
-                      <div class="mt-2 space-y-2">
-                        <label class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
-                          Thinking Budget
-                        </label>
-                        <select
-                          bind:value={thinkingBudget}
-                          class="form-input text-xs w-full"
-                        >
-                          <option value="low">Low - Quick thinking</option>
-                          <option value="medium">Medium - Balanced</option>
-                          <option value="high">High - Deep reasoning</option>
-                        </select>
-                        <p class="text-xs text-gray-500">
-                          Standard extended thinking without thinking token costs.
-                        </p>
-                      </div>
-                    {/if}
-                  </div>
-                {/if}
-
-                <!-- Computer Use (Claude 4+ Models) -->
-                {#if supportsComputerUse}
-                  <div>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        bind:checked={enableComputerUse}
-                        class="form-checkbox text-xs"
-                      />
-                      <span class="text-xs font-medium">
-                        Computer Use
-                        <span class="text-blue-600 ml-1">🖥️ Beta</span>
-                      </span>
-                    </label>
-                    {#if enableComputerUse}
-                      <p class="text-xs text-gray-500 mt-1">
-                        <strong>⚠️ Beta:</strong> AI can take screenshots, move cursor, type text, and click buttons. Use with caution in secure environments.
-                      </p>
-                    {/if}
-                  </div>
-                {/if}
-
-                <!-- Context Window Display -->
-                <div class="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 p-3 rounded-lg border border-purple-200 dark:border-purple-800">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs font-medium text-gray-700 dark:text-gray-300">
-                      Context Window
-                    </span>
-                    <span class="text-xs font-semibold {contextTokenLimit() >= 1000000 ? 'text-green-600' : contextTokenLimit() >= 200000 ? 'text-blue-600' : 'text-gray-600'}">
-                      {#if contextTokenLimit() >= 1000000}
-                        🚀 {Math.round(contextTokenLimit() / 1000000)}M tokens
-                      {:else if contextTokenLimit() >= 1000}
-                        {Math.round(contextTokenLimit() / 1000)}K tokens
-                      {:else}
-                        {contextTokenLimit()} tokens
-                      {/if}
-                    </span>
-                  </div>
-                  <div class="mt-1">
-                    <input
-                      type="range"
-                      min="1000"
-                      max={contextTokenLimit()}
-                      bind:value={maxContextTokens}
-                      class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div class="flex justify-between text-xs text-gray-500 mt-1">
-                      <span>1K</span>
-                      <span class="font-medium">{Math.round(maxContextTokens / 1000)}K selected</span>
-                      <span>
-                        {#if contextTokenLimit() >= 1000000}
-                          1M max
-                        {:else}
-                          {Math.round(contextTokenLimit() / 1000)}K max
-                        {/if}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {#if !isOpenAIGPT5 && !supportsExtendedThinking && !supportsComputerUse}
-                  <div class="text-xs text-gray-500 italic">
-                    No September 2025 features available for {activeProvider?.display_name || 'current provider'}.
-                    Try GPT-5 (reasoning_effort) or Claude 4+ (extended thinking).
-                  </div>
-                {/if}
-              </div>
+          {:else}
+            <div class="text-xs text-gray-600 dark:text-gray-400 italic">
+              HITL Only mode - requests go directly to human review without AI processing
             </div>
           {/if}
         </div>
@@ -1128,32 +1120,64 @@
           {/if}
         </div>
 
-        <!-- Provider Status (Read-only) -->
+        <!-- LLM Configuration -->
         <div class="space-y-2 mb-4">
-          {#if activeProvider}
-            <div class="p-3 rounded-lg border border-green-200 bg-green-50">
-              <div class="flex items-center justify-between mb-2">
+          {#if activeLLMProvider}
+            <div class="p-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800">
+              <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium">{activeProvider.display_name}</span>
-                  <CheckCircle size={12} class="text-green-600" />
-                  <span class="text-xs text-green-600">Active</span>
+                  <span class="text-sm font-medium">{activeLLMProvider.display_name || 'LLM Provider'}</span>
+                  {#if availableModels.length > 0}
+                    <CheckCircle size={12} class="text-green-600" />
+                    <span class="text-xs text-green-600">Connected</span>
+                  {:else if llmConfig.baseUrl}
+                    <AlertCircle size={12} class="text-orange-500" />
+                    <span class="text-xs text-orange-600">Loading...</span>
+                  {:else}
+                    <AlertCircle size={12} class="text-red-500" />
+                    <span class="text-xs text-red-600">Not Configured</span>
+                  {/if}
                 </div>
-                {#if activeProvider.usage_stats}
-                  <div class="flex items-center gap-2 text-xs text-gray-500">
-                    <span>{activeProvider.usage_stats.total_requests || 0} reqs</span>
-                    <span>${(activeProvider.usage_stats.total_cost || 0).toFixed(3)}</span>
-                  </div>
-                {/if}
-              </div>
-              <div class="flex items-center justify-between text-xs">
-                <span class="text-gray-600">Model: {activeProvider.default_model}</span>
                 <button
                   onclick={() => uiStore.setView('settings')}
-                  class="text-mcp-primary-600 hover:text-mcp-primary-700 font-medium"
+                  class="text-mcp-primary-600 hover:text-mcp-primary-700 font-medium text-xs"
                 >
                   Configure in Settings →
                 </button>
               </div>
+
+              {#if llmConfig.baseUrl}
+                <!-- Model Selection -->
+                <div class="space-y-2">
+                  <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Model Selection
+                  </label>
+                  {#if availableModels.length > 0}
+                    <select
+                      bind:value={llmConfig.model}
+                      class="w-full px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      {#each availableModels as model}
+                        <option value={model}>{model}</option>
+                      {/each}
+                    </select>
+                  {:else}
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs text-gray-600 dark:text-gray-400">{llmConfig.model || 'No model selected'}</span>
+                      <button
+                        onclick={loadAvailableModels}
+                        class="text-xs text-mcp-primary-600 hover:text-mcp-primary-700"
+                      >
+                        Refresh Models
+                      </button>
+                    </div>
+                  {/if}
+                </div>
+              {:else}
+                <div class="text-xs text-gray-600 dark:text-gray-400">
+                  Base URL not configured
+                </div>
+              {/if}
             </div>
           {:else}
             <div class="p-3 rounded-lg border border-orange-200 bg-orange-50">
@@ -1196,8 +1220,8 @@
       </div>
     {/if}
 
-    <!-- Request Queue -->
-    <div class="flex-1 overflow-y-auto">
+    <!-- World-Class Request Queue with Smooth Interactions -->
+    <div class="flex-1 overflow-y-auto scroll-smooth">
 
       <!-- Pending Requests -->
       {#if pendingRequests.length > 0}
@@ -1540,13 +1564,21 @@
             {#if processing && selectedRequest.status === 'approved'}
               <div class="flex items-center justify-center h-48">
                 <div class="text-center">
-                  <RefreshCw size={32} class="mx-auto text-mcp-primary-500 animate-spin mb-3" />
-                  <p class="text-sm font-medium text-gray-900 dark:text-white">
-                    Processing with AI...
+                  <div class="relative">
+                    <RefreshCw size={32} class="mx-auto text-mcp-primary-500 animate-spin mb-3" />
+                    <div class="absolute inset-0 w-8 h-8 mx-auto border-2 border-mcp-primary-200 rounded-full animate-pulse"></div>
+                  </div>
+                  <p class="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                    🤖 Processing with AI...
                   </p>
                   <p class="text-xs text-gray-600 dark:text-gray-400">
                     Waiting for {llmConfig.provider} response
                   </p>
+                  <div class="mt-3 flex items-center justify-center gap-1">
+                    <div class="w-2 h-2 bg-mcp-primary-400 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+                    <div class="w-2 h-2 bg-mcp-primary-400 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+                    <div class="w-2 h-2 bg-mcp-primary-400 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+                  </div>
                 </div>
               </div>
             {:else if selectedRequest.response}
