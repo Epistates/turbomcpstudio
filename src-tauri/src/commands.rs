@@ -1395,3 +1395,251 @@ pub async fn create_collection_from_template(
 
     Ok(collection_id.to_string())
 }
+
+// =============================================================================
+// HITL Sampling Commands
+// =============================================================================
+
+use crate::hitl_sampling::{SamplingMode, PendingSamplingRequest, SamplingResult};
+use turbomcp_protocol::types::CreateMessageRequest;
+
+/// Get the current HITL sampling mode
+#[tauri::command]
+pub async fn get_hitl_sampling_mode(
+    app_state: State<'_, AppState>,
+) -> Result<SamplingMode, String> {
+    let mode = app_state.hitl_sampling.get_mode().await;
+    Ok(mode)
+}
+
+/// Set the HITL sampling mode
+#[tauri::command]
+pub async fn set_hitl_sampling_mode(
+    mode: SamplingMode,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    app_state
+        .hitl_sampling
+        .set_mode(mode)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Get pending sampling requests awaiting human approval
+#[tauri::command]
+pub async fn get_pending_sampling_requests(
+    app_state: State<'_, AppState>,
+) -> Result<Vec<PendingSamplingRequest>, String> {
+    let pending = app_state.hitl_sampling.get_pending_requests();
+    Ok(pending)
+}
+
+/// Get completed sampling results for analysis
+#[tauri::command]
+pub async fn get_completed_sampling_requests(
+    app_state: State<'_, AppState>,
+) -> Result<Vec<SamplingResult>, String> {
+    let completed = app_state.hitl_sampling.get_completed_requests();
+    Ok(completed)
+}
+
+/// Approve a pending sampling request
+#[tauri::command]
+pub async fn approve_sampling_request(
+    request_id: String,
+    approved_by: String,
+    modified_request: Option<CreateMessageRequest>,
+    app_state: State<'_, AppState>,
+) -> Result<SamplingResult, String> {
+    app_state
+        .hitl_sampling
+        .approve_request(&request_id, approved_by, modified_request)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Reject a pending sampling request
+#[tauri::command]
+pub async fn reject_sampling_request(
+    request_id: String,
+    reason: String,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    app_state
+        .hitl_sampling
+        .reject_request(&request_id, reason)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Process a sampling request through the HITL system
+#[tauri::command]
+pub async fn process_hitl_sampling_request(
+    server_id: String,
+    server_name: String,
+    request: CreateMessageRequest,
+    app_state: State<'_, AppState>,
+) -> Result<SamplingResult, String> {
+    app_state
+        .hitl_sampling
+        .process_sampling_request(server_id, server_name, request)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Test sampling request for debugging (doesn't actually send to LLM)
+#[tauri::command]
+pub async fn test_sampling_request(
+    server_id: String,
+    server_name: String,
+    messages: Vec<serde_json::Value>,
+    app_state: State<'_, AppState>,
+) -> Result<Value, String> {
+    // Convert JSON messages to MCP protocol format
+    use turbomcp_protocol::types::{Content, Role, SamplingMessage, TextContent, IncludeContext};
+
+    let sampling_messages: Result<Vec<SamplingMessage>, String> = messages
+        .into_iter()
+        .map(|msg| {
+            let role = match msg.get("role").and_then(|r| r.as_str()) {
+                Some("user") => Role::User,
+                Some("assistant") => Role::Assistant,
+                _ => return Err("Invalid role in message".to_string()),
+            };
+
+            let content = match msg.get("content").and_then(|c| c.as_str()) {
+                Some(text) => Content::Text(TextContent {
+                    text: text.to_string(),
+                    annotations: None,
+                    meta: None,
+                }),
+                None => return Err("Missing content in message".to_string()),
+            };
+
+            Ok(SamplingMessage { role, content })
+        })
+        .collect();
+
+    let sampling_messages = sampling_messages?;
+
+    let request = CreateMessageRequest {
+        messages: sampling_messages,
+        model_preferences: None,
+        system_prompt: None,
+        include_context: Some(IncludeContext::ThisServer),
+        max_tokens: 1000,
+        temperature: Some(0.7),
+        stop_sequences: None,
+        _meta: None,
+        metadata: None,
+    };
+
+    // Get conversation analysis without actually processing
+    let analysis = serde_json::json!({
+        "request_id": uuid::Uuid::new_v4().to_string(),
+        "server_id": server_id,
+        "server_name": server_name,
+        "message_count": request.messages.len(),
+        "estimated_tokens": request.messages.len() * 50, // Rough estimate
+        "estimated_cost": 0.001, // Rough estimate
+        "conversation_context": {
+            "thread_length": request.messages.len(),
+            "has_system_prompt": request.system_prompt.is_some(),
+            "model_preferences": request.model_preferences,
+            "parameters": {
+                "max_tokens": request.max_tokens,
+                "temperature": request.temperature,
+                "temperature": request.temperature,
+                "include_context": request.include_context
+            }
+        },
+        "status": "test_mode"
+    });
+
+    Ok(analysis)
+}
+
+/// Fetch available models from LLM API (avoids CORS issues)
+#[tauri::command]
+pub async fn fetch_llm_models(base_url: String) -> Result<Value, String> {
+    let client = reqwest::Client::new();
+    // Handle base URL properly - if it already ends with /v1, just add /models
+    let base = base_url.trim_end_matches('/');
+    let models_url = if base.ends_with("/v1") {
+        format!("{}/models", base)
+    } else {
+        format!("{}/v1/models", base)
+    };
+
+    match client.get(&models_url).send().await {
+        Ok(response) => {
+            if response.status().is_success() {
+                match response.json::<Value>().await {
+                    Ok(json) => Ok(json),
+                    Err(e) => Err(format!("Failed to parse models response: {}", e)),
+                }
+            } else {
+                Err(format!("Models API returned status: {}", response.status()))
+            }
+        }
+        Err(e) => Err(format!("Failed to fetch models: {}", e)),
+    }
+}
+
+/// Make LLM completion request through Tauri (avoids CORS issues)
+#[tauri::command]
+pub async fn llm_completion_request(
+    base_url: String,
+    api_key: String,
+    model: String,
+    messages: Vec<Value>,
+    max_tokens: Option<i32>,
+    temperature: Option<f32>,
+) -> Result<Value, String> {
+    let client = reqwest::Client::new();
+    // Handle baseUrl that may or may not already include /v1
+    let base = base_url.trim_end_matches('/');
+    let chat_url = if base.ends_with("/v1") {
+        format!("{}/chat/completions", base)
+    } else {
+        format!("{}/v1/chat/completions", base)
+    };
+
+    let mut request_body = serde_json::json!({
+        "model": model,
+        "messages": messages
+    });
+
+    if let Some(max_tokens) = max_tokens {
+        request_body["max_tokens"] = Value::Number(max_tokens.into());
+    }
+
+    if let Some(temperature) = temperature {
+        request_body["temperature"] = Value::Number(serde_json::Number::from_f64(temperature as f64).unwrap_or(serde_json::Number::from(0)));
+    }
+
+    let mut request_builder = client.post(&chat_url).json(&request_body);
+
+    // Add API key if provided
+    if !api_key.is_empty() {
+        request_builder = request_builder.header("Authorization", format!("Bearer {}", api_key));
+    }
+
+    match request_builder.send().await {
+        Ok(response) => {
+            if response.status().is_success() {
+                match response.json::<Value>().await {
+                    Ok(json) => Ok(json),
+                    Err(e) => Err(format!("Failed to parse completion response: {}", e)),
+                }
+            } else {
+                let status = response.status();
+                match response.text().await {
+                    Ok(error_text) => Err(format!("LLM API error ({}): {}", status, error_text)),
+                    Err(_) => Err(format!("LLM API returned status: {}", status)),
+                }
+            }
+        }
+        Err(e) => Err(format!("Failed to complete LLM request: {}", e)),
+    }
+}
