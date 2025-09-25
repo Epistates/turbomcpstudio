@@ -119,45 +119,6 @@
     serverStore.selectServer(serverId);
   }
 
-  async function createMockSamplingRequest() {
-    if (!selectedServerId) return;
-
-    const serverName = servers.find(s => s.id === selectedServerId)?.config.name || 'Unknown Server';
-
-    const mockRequest: SamplingRequest = {
-      id: crypto.randomUUID(),
-      serverId: selectedServerId,
-      serverName,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a helpful assistant that provides clear, accurate information.'
-        },
-        {
-          role: 'user',
-          content: 'Please explain the concept of Model Context Protocol (MCP) and its benefits for AI applications.'
-        }
-      ],
-      modelPreferences: {
-        intelligencePriority: 0.8,
-        speedPriority: 0.6,
-        costPriority: 0.3,
-        hints: ['reasoning', 'technical-explanation']
-      },
-      systemPrompt: 'You are an expert in AI protocols and distributed systems.',
-      includeContext: 'mcp-documentation',
-      maxTokens: 1000,
-      temperature: 0.7,
-      timestamp: new Date().toISOString(),
-      status: 'pending'
-    };
-
-    samplingRequests = [mockRequest, ...samplingRequests];
-    uiStore.showInfo('New sampling request received from server');
-
-    // Auto-select the new request
-    selectedRequest = mockRequest;
-  }
 
   async function approveSamplingRequest(request: SamplingRequest) {
     if (!request) return;
@@ -244,8 +205,7 @@
   }
 
   onMount(() => {
-    // Create some initial mock requests for demonstration
-    setTimeout(() => createMockSamplingRequest(), 1000);
+    // Component initialized - real sampling requests will come from MCP servers
   });
 </script>
 
@@ -256,13 +216,6 @@
     <div class="p-4 border-b border-gray-200">
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-lg font-semibold text-gray-900">Sampling Requests</h2>
-        <button
-          onclick={createMockSamplingRequest}
-          class="btn-secondary text-sm"
-          title="Simulate new request"
-        >
-          <Plus size={14} />
-        </button>
       </div>
 
       <!-- Server Selection -->
@@ -624,13 +577,9 @@
           <p class="text-gray-600">Choose a request from the queue to view details and manage approval</p>
 
           {#if samplingRequests.length === 0}
-            <button
-              onclick={createMockSamplingRequest}
-              class="btn-primary mt-4"
-            >
-              <Plus size={16} class="mr-2" />
-              Create Test Request
-            </button>
+            <p class="text-sm text-gray-500 mt-4">
+              Sampling requests will appear here when MCP servers request LLM assistance.
+            </p>
           {/if}
         </div>
       </div>

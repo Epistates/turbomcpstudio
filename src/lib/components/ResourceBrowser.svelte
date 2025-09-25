@@ -221,10 +221,10 @@
     if (paramMatch) {
       parameterName = paramMatch[1];
 
-      // Known values for TurboMCP example 04 server
+      // Generate intelligent parameter suggestions based on parameter name and context
+      const parameterSuggestions = generateParameterSuggestions(parameterName, resource);
       const knownValues: { [key: string]: string[] } = {
-        'name': ['readme', 'guide', 'api'],
-        'template': ['code_review', 'documentation']
+        [parameterName]: parameterSuggestions
       };
 
       parameterOptions = knownValues[parameterName] || [];
@@ -463,8 +463,90 @@
   }
 
   function formatResourceSize(resource: any) {
-    // Placeholder - in real implementation would show actual size
-    return 'Unknown size';
+    // Try to get size from resource metadata or make an intelligent estimate
+    if (resource.size !== undefined && resource.size !== null) {
+      return formatBytes(resource.size);
+    }
+
+    // For different resource types, provide intelligent defaults
+    const uri = resource.uri || '';
+
+    if (uri.startsWith('file://')) {
+      return 'File'; // File resources will be read to determine size
+    } else if (uri.startsWith('http://') || uri.startsWith('https://')) {
+      return 'Remote'; // Remote resources size unknown until fetched
+    } else if (uri.includes('database') || uri.includes('sql')) {
+      return 'Query result'; // Database resources are dynamic
+    } else if (uri.includes('template') || resource.mimeType?.includes('template')) {
+      return 'Template'; // Template resources are dynamic
+    }
+
+    return 'Dynamic'; // Default for other dynamic resources
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  function generateParameterSuggestions(paramName: string, resource: any): string[] {
+    const uri = resource.uri || '';
+    const description = (resource.description || '').toLowerCase();
+    const name = (resource.name || '').toLowerCase();
+
+    // Generate suggestions based on parameter name patterns
+    const suggestions: string[] = [];
+
+    switch (paramName.toLowerCase()) {
+      case 'name':
+        suggestions.push('readme', 'guide', 'api', 'config', 'documentation', 'example', 'tutorial');
+        break;
+      case 'template':
+      case 'type':
+        suggestions.push('code_review', 'documentation', 'bug_report', 'feature_request', 'meeting_notes');
+        break;
+      case 'id':
+      case 'identifier':
+        suggestions.push('user_001', 'item_123', 'project_abc', 'session_xyz');
+        break;
+      case 'path':
+      case 'file':
+      case 'filename':
+        suggestions.push('/README.md', '/src/main.js', '/docs/api.md', '/config/settings.json');
+        break;
+      case 'query':
+      case 'search':
+        suggestions.push('SELECT * FROM users', 'search term', 'filter criteria');
+        break;
+      case 'format':
+        suggestions.push('json', 'xml', 'csv', 'yaml', 'markdown');
+        break;
+      case 'language':
+      case 'lang':
+        suggestions.push('javascript', 'python', 'rust', 'typescript', 'go');
+        break;
+      case 'version':
+        suggestions.push('1.0.0', 'latest', 'beta', 'dev');
+        break;
+      default:
+        // Generate contextual suggestions based on URI and description
+        if (uri.includes('file') || description.includes('file')) {
+          suggestions.push('config.json', 'data.csv', 'readme.md', 'example.txt');
+        } else if (uri.includes('database') || uri.includes('sql') || description.includes('database')) {
+          suggestions.push('users', 'orders', 'products', 'sessions');
+        } else if (uri.includes('api') || description.includes('api')) {
+          suggestions.push('v1', 'v2', 'latest', 'beta');
+        } else {
+          // Generic suggestions
+          suggestions.push('example', 'test', 'sample', 'default');
+        }
+        break;
+    }
+
+    return suggestions;
   }
 
   onMount(() => {

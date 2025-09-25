@@ -59,6 +59,8 @@
     testing: boolean;
     test_result: 'none' | 'success' | 'error';
     test_message: string;
+    available_models: string[];
+    selected_model: string;
   }
 
   // ===============================================
@@ -80,7 +82,9 @@
     base_url: '',
     testing: false,
     test_result: 'none',
-    test_message: ''
+    test_message: '',
+    available_models: [],
+    selected_model: ''
   });
 
   // Show API keys toggle
@@ -175,20 +179,47 @@
   async function loadProviders() {
     loading = true;
     try {
-      const providerData = await invoke('get_llm_provider_statuses') as any[];
+      // Use the same backend call as SamplingWorkbench for consistency
+      const [providerStatusData, llmConfigData] = await Promise.all([
+        invoke('get_llm_provider_statuses'),
+        invoke('get_llm_config')
+      ]);
+
+      console.log('🔧 Settings: Provider status data from backend:', providerStatusData);
+      console.log('🔧 Settings: LLM config data from backend:', llmConfigData);
+
+      const backendConfig = llmConfigData as any;
+      const activeProviderId = backendConfig?.active_provider;
 
       // Merge with available provider definitions
       providers = AVAILABLE_PROVIDERS.map(available => {
-        const existing = providerData.find(p => p.provider_id === available.id);
+        const existing = (providerStatusData as any[]).find(p => p.provider_id === available.id);
+        const isActiveProvider = activeProviderId === available.id;
+        const providerConfig = backendConfig?.providers?.[available.id];
+
+        console.log(`🔧 Settings: Provider ${available.id}:`);
+        console.log(`  - existing status data:`, existing);
+        console.log(`  - is active provider: ${isActiveProvider}`);
+        console.log(`  - provider config:`, providerConfig);
+
+        let status = 'unconfigured';
+        if (providerConfig?.enabled) {
+          status = isActiveProvider ? 'active' : 'configured';
+        }
+
+        console.log(`🔧 Settings: Provider ${available.id} - final status: ${status}`);
+
         return {
           ...available,
-          status: existing?.configured ? (existing?.active ? 'active' : 'configured') : 'unconfigured',
+          status,
           api_key: existing?.api_key,
-          base_url: existing?.base_url || available.default_base_url,
-          models: existing?.available_models || [],
+          base_url: providerConfig?.base_url || existing?.base_url || available.default_base_url,
+          models: providerConfig?.available_models || existing?.available_models || [],
           usage_stats: existing?.usage_stats
         } as LLMProvider;
       });
+
+      console.log('🔧 Settings: Final providers array:', providers);
     } catch (error) {
       console.error('Failed to load providers:', error);
     } finally {
@@ -214,7 +245,9 @@
       base_url: provider.base_url || provider.default_base_url,
       testing: false,
       test_result: 'none',
-      test_message: ''
+      test_message: '',
+      available_models: [],
+      selected_model: ''
     };
   }
 
@@ -234,29 +267,29 @@
     quickSetup.test_result = 'none';
 
     try {
-      // Use Tauri's HTTP client to bypass CORS restrictions
-      const response = await tauriFetch(`${quickSetup.base_url}/models`, {
-        method: 'GET',
-        headers: quickSetup.api_key ? {
-          'Authorization': `Bearer ${quickSetup.api_key}`,
-          'Content-Type': 'application/json'
-        } : {
-          'Content-Type': 'application/json'
-        }
+      // Use Tauri backend command to bypass CORS restrictions
+      const data = await invoke('fetch_llm_models', {
+        baseUrl: quickSetup.base_url
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const modelCount = data?.data?.length || 0;
+      if (data && data.data) {
+        const models = data.data.map((model: any) => model.id || model.name || model);
+        quickSetup.available_models = models;
         quickSetup.test_result = 'success';
-        quickSetup.test_message = `Connection successful! Found ${modelCount} models available.`;
+        quickSetup.test_message = `Connection successful! Found ${models.length} models available.`;
+
+        // Auto-select first model if none selected
+        if (models.length > 0 && !quickSetup.selected_model) {
+          quickSetup.selected_model = models[0];
+        }
       } else {
         quickSetup.test_result = 'error';
-        quickSetup.test_message = `Connection failed: ${response.status} ${response.statusText}`;
+        quickSetup.test_message = 'Connection successful but no models found.';
       }
     } catch (error) {
       quickSetup.test_result = 'error';
-      quickSetup.test_message = `Connection failed: ${error.message || error}`;
+      quickSetup.test_message = `Connection failed: ${error}`;
+      quickSetup.available_models = [];
     } finally {
       quickSetup.testing = false;
     }
@@ -280,23 +313,30 @@
       let defaultModel;
 
       if (quickSetup.provider.type === 'local') {
-        try {
-          // Fetch models from local LM Studio API using Tauri HTTP
-          const response = await fetch(`${quickSetup.base_url}/v1/models`);
+        // Use models from test connection if available, otherwise fetch them
+        if (quickSetup.available_models.length > 0) {
+          availableModels = quickSetup.available_models;
+          defaultModel = quickSetup.selected_model || availableModels[0];
+        } else {
+          try {
+            // Fetch models from local LM Studio API using Tauri backend (avoids CORS)
+            const data = await invoke('fetch_llm_models', {
+              baseUrl: quickSetup.base_url
+            });
 
-          if (response.ok) {
-            const data = await response.json();
-            availableModels = data.data?.map((model: any) => model.id) || ['local-model'];
-            defaultModel = availableModels[0] || 'local-model';
-          } else {
-            // Fallback if models fetch fails
+            if (data && data.data) {
+              availableModels = data.data.map((model: any) => model.id || model.name || model) || ['local-model'];
+              defaultModel = availableModels[0] || 'local-model';
+            } else {
+              // Fallback if models fetch fails
+              availableModels = ['local-model'];
+              defaultModel = 'local-model';
+            }
+          } catch (error) {
+            console.warn('Failed to fetch models from local provider:', error);
             availableModels = ['local-model'];
             defaultModel = 'local-model';
           }
-        } catch (error) {
-          console.warn('Failed to fetch models from local provider:', error);
-          availableModels = ['local-model'];
-          defaultModel = 'local-model';
         }
       } else {
         // Cloud providers use predefined models
@@ -367,6 +407,27 @@
       });
 
       await loadProviders();
+
+      // Preload/warm up the selected model for better UX
+      if (quickSetup.provider.type === 'local' && defaultModel && quickSetup.base_url) {
+        try {
+          console.log(`🔥 Warming up model: ${defaultModel}`);
+          // Send a small completion request to warm up the model
+          await invoke('llm_completion_request', {
+            baseUrl: quickSetup.base_url,
+            apiKey: '',
+            model: defaultModel,
+            messages: [{ role: 'user', content: 'Hello' }],
+            maxTokens: 1,
+            temperature: 0.1
+          });
+          console.log(`✅ Model ${defaultModel} warmed up successfully`);
+        } catch (error) {
+          console.log(`⚠️ Model warmup failed (this is normal): ${error}`);
+          // Warmup failure is not critical - the model will load on first real request
+        }
+      }
+
       closeQuickSetup();
     } catch (error) {
       quickSetup.test_result = 'error';
@@ -816,6 +877,24 @@
               <AlertCircle size={16} class="text-red-600" />
             {/if}
             <span>{quickSetup.test_message}</span>
+          </div>
+        {/if}
+
+        <!-- Model Selection (shown after successful test) -->
+        {#if quickSetup.test_result === 'success' && quickSetup.available_models.length > 0}
+          <div class="form-group">
+            <label class="form-label">Default Model</label>
+            <select
+              bind:value={quickSetup.selected_model}
+              class="form-input"
+            >
+              {#each quickSetup.available_models as model}
+                <option value={model}>{model}</option>
+              {/each}
+            </select>
+            <p class="text-xs text-gray-500 mt-1">
+              This will be the default model for sampling requests
+            </p>
           </div>
         {/if}
       </div>
