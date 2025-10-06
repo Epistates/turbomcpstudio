@@ -122,7 +122,6 @@ function createServerStore() {
     async loadSavedConfigurations() {
       try {
         const savedConfigs: ServerConfig[] = await invoke('load_server_configs');
-        console.log('Loaded saved server configurations:', savedConfigs);
 
         // Convert saved configs to ServerInfo format with disconnected status
         const savedServers: ServerInfo[] = savedConfigs.map(config => ({
@@ -155,7 +154,6 @@ function createServerStore() {
         // If database isn't ready yet, just log and continue
         // The app-ready event will trigger another attempt
         if (typeof error === 'string' && error.includes('Database not yet initialized')) {
-          console.log('Database not ready yet, will retry after initialization');
         } else {
           console.error('Failed to load saved configurations:', error);
         }
@@ -501,9 +499,6 @@ function createServerStore() {
 
     // Handle MCP events from backend
     handleMcpEvent(event: any) {
-      console.log('Handling MCP event:', event);
-      console.log('Event JSON:', JSON.stringify(event, null, 2));
-      console.log('Event keys:', Object.keys(event));
 
       // Handle Rust enum serialization - the variant name becomes the key
       if (event.StatusChanged) {
@@ -553,7 +548,6 @@ function createServerStore() {
           error: `MCP Error: ${event.Error.error}`
         }));
       } else {
-        console.log('Unknown MCP event type:', event);
       }
     },
 
@@ -595,28 +589,23 @@ function createServerStore() {
 
     // Initialize the store by loading servers and templates
     async initialize() {
-      console.log('🚀 ServerStore.initialize() called');
 
       // Check if already initializing to prevent race conditions
       let currentState: ServerStoreState;
       subscribe(state => currentState = state)(); // Get current state without subscribing
 
       if (currentState!.initializing) {
-        console.log('⏳ Already initializing, skip');
         return; // Already initializing, skip
       }
 
-      console.log('🔄 Starting server store initialization');
       update(state => ({ ...state, initializing: true }));
 
       try {
         // Load all data in parallel for better performance
-        console.log('📡 Loading servers and templates...');
         await Promise.allSettled([
           this.loadServers(), // Now returns ALL servers (connected and disconnected)
           this.loadTemplates()
         ]);
-        console.log('✅ Server store initialization completed');
       } catch (error) {
         console.error('❌ Server store initialization failed:', error);
         throw error;

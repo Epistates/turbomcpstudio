@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 
-export type View = 'dashboard' | 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | 'protocol' | 'collections' | 'settings';
+export type View = 'dashboard' | 'servers' | 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | 'protocol' | 'collections' | 'settings';
 
 interface UiStoreState {
   currentView: View;
@@ -46,7 +46,11 @@ function createUiStore() {
 
     // Navigate to a different view
     setView(view: View) {
-      update(state => ({ ...state, currentView: view }));
+      console.log('🟢 uiStore.setView called with:', view);
+      update(state => {
+        console.log('🟢 uiStore updating state from:', state.currentView, 'to:', view);
+        return { ...state, currentView: view };
+      });
     },
 
     // Toggle sidebar

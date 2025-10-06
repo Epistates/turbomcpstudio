@@ -176,9 +176,6 @@ export async function retryWithExponentialBackoff<T>(
       const delay = initialDelayMs * Math.pow(2, attempt);
       const jitter = Math.random() * RETRY.JITTER_PERCENT * delay;
 
-      console.log(
-        `Request failed, retrying in ${Math.round(delay + jitter)}ms... (attempt ${attempt + 1}/${maxRetries + 1})`
-      );
       await new Promise((resolve) => setTimeout(resolve, delay + jitter));
     }
   }
