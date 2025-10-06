@@ -194,7 +194,7 @@
           <input
             type="text"
             placeholder="Search servers, tools, resources... (⌘K)"
-            bind:value={searchState.globalQuery}
+            value={searchState.globalQuery}
             oninput={(e) => handleSearchInput(e.currentTarget.value)}
             onkeydown={handleSearchKeydown}
             onfocus={() => searchStore.openGlobalSearch()}

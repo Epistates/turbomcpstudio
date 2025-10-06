@@ -8,6 +8,7 @@
   import { getServerCapabilitySummary, serverSupportsCapability, type McpCapability } from '$lib/utils/serverCapabilities';
   import {
     Monitor,
+    Server,
     Zap,
     Database,
     FileText,
@@ -27,30 +28,24 @@
   // Props using Svelte 5 runes
   const { isMobile = false, isSidebarCollapsed = false } = $props();
 
-  let servers: ServerInfo[] = $state([]);
-  let currentView: View = $state('dashboard');
-  let selectedServerId: string | undefined = $state(undefined);
+  // Reactive store access using Svelte 5 patterns
+  const serverState = $derived($serverStore);
+  const uiState = $derived($uiStore);
+
+  const servers = $derived(serverState.servers);
+  const selectedServerId = $derived(serverState.selectedServerId);
+  const currentView = $derived(uiState.currentView);
+
   let expandedSections = $state(new Set(['navigation', 'servers']));
 
-  // Subscribe to stores
+  // Debug logging
   $effect(() => {
-    const unsubscribeServers = serverStore.subscribe((state: any) => {
-      servers = state.servers;
-      selectedServerId = state.selectedServerId;
-    });
-
-    const unsubscribeUi = uiStore.subscribe((state: any) => {
-      currentView = state.currentView;
-    });
-
-    return () => {
-      unsubscribeServers();
-      unsubscribeUi();
-    };
+    console.log('🔵 Sidebar: currentView changed to:', currentView);
   });
 
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Monitor },
+    { id: 'servers', label: 'Server Manager', icon: Server },
     { id: 'tools', label: 'Tools', icon: Zap },
     { id: 'resources', label: 'Resources', icon: Database },
     { id: 'prompts', label: 'Prompts', icon: FileText },
@@ -61,12 +56,16 @@
   ];
 
   function navigateTo(view: View) {
+    console.log('🔵 Sidebar: navigateTo called with view:', view);
+    console.log('🔵 Sidebar: currentView before:', currentView);
     uiStore.setView(view);
+    console.log('🔵 Sidebar: setView called');
   }
 
   // Map views to their required capabilities
   const viewCapabilityMap: Record<View, McpCapability | null> = {
     'dashboard': null,        // Dashboard supports all servers
+    'servers': null,          // Server Manager supports all servers (manages profiles)
     'tools': 'tools',
     'resources': 'resources',
     'prompts': 'prompts',
@@ -151,9 +150,6 @@
 
   function getTransportType(transport: any): string {
     if (!transport) return 'UNKNOWN';
-
-    // Debug log the transport object structure
-    console.log('Transport object:', JSON.stringify(transport, null, 2));
 
     // Rust enum with serde(tag = "type", rename_all = "camelCase") serializes as:
     // { "type": "stdio", "command": "...", ... }
@@ -273,7 +269,6 @@
                 <button
                   class="mcp-sidebar__server-main"
                   onclick={() => {
-                    console.log('Server object:', JSON.stringify(server, null, 2));
                     selectServer(server.id);
                   }}
                   title={server.config.description || server.config.name}

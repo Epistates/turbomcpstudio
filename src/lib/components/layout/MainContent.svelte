@@ -5,17 +5,26 @@
 <script lang="ts">
   import { uiStore } from '$lib/stores/uiStore';
   import Dashboard from '../Dashboard.svelte';
+  import ServerManagement from '../ServerManagement.svelte';
   import ToolExplorer from '../ToolExplorer.svelte';
   import ResourceBrowser from '../ResourceBrowser.svelte';
   import PromptDesigner from '../PromptDesigner.svelte';
   import SamplingTester from '../SamplingTester.svelte';
   import ElicitationFlow from '../ElicitationFlow.svelte';
+  import ProtocolInspector from '../ProtocolInspector.svelte';
+  import CollectionsManager from '../CollectionsManager.svelte';
+  import Settings from '../Settings.svelte';
   import AddServerModal from '../AddServerModal.svelte';
 
   // Reactive view state using Svelte 5 runes
-  const ui = $uiStore;
-  const currentView = $derived(ui.currentView);
-  const modals = $derived(ui.modals);
+  // Access store properties directly with $derived to maintain reactivity
+  const currentView = $derived($uiStore.currentView);
+  const modals = $derived($uiStore.modals);
+
+  // Debug logging
+  $effect(() => {
+    console.log('🟣 MainContent: currentView changed to:', currentView);
+  });
 
   // Content component mapping
   function getContentComponent(view: string) {
@@ -60,53 +69,24 @@
   <div class="mcp-content-viewport">
     {#if currentView === 'dashboard'}
       <Dashboard />
+    {:else if currentView === 'servers'}
+      <ServerManagement />
     {:else if currentView === 'tools'}
       <ToolExplorer />
-    {:else}
-      <!-- Placeholder for unimplemented views -->
-      <div class="mcp-placeholder">
-        <div class="mcp-placeholder__content">
-          <div class="mcp-placeholder__icon">
-            {#if currentView === 'collections'}
-              📁
-            {:else if currentView === 'settings'}
-              ⚙️
-            {:else}
-              🚧
-            {/if}
-          </div>
-          <h2 class="mcp-placeholder__title">
-            {currentView.charAt(0).toUpperCase() + currentView.slice(1)} View
-          </h2>
-          <p class="mcp-placeholder__description">
-            This view is currently under development as part of the enterprise MCP Studio roadmap.
-          </p>
-          <div class="mcp-placeholder__features">
-            <h3>Planned Features:</h3>
-            <ul>
-              {#if currentView === 'collections'}
-                <li>Multi-server operation chains</li>
-                <li>Variable interpolation system</li>
-                <li>Test scenario management</li>
-                <li>Advanced assertions</li>
-              {:else if currentView === 'settings'}
-                <li>Server configuration</li>
-                <li>API key management</li>
-                <li>Theme customization</li>
-                <li>Performance tuning</li>
-              {/if}
-            </ul>
-          </div>
-          <div class="mcp-placeholder__actions">
-            <button 
-              class="btn btn-primary btn-sm"
-              onclick={() => uiStore.setView('dashboard')}
-            >
-              Return to Dashboard
-            </button>
-          </div>
-        </div>
-      </div>
+    {:else if currentView === 'resources'}
+      <ResourceBrowser />
+    {:else if currentView === 'prompts'}
+      <PromptDesigner />
+    {:else if currentView === 'sampling'}
+      <SamplingTester />
+    {:else if currentView === 'elicitation'}
+      <ElicitationFlow />
+    {:else if currentView === 'protocol'}
+      <ProtocolInspector />
+    {:else if currentView === 'collections'}
+      <CollectionsManager />
+    {:else if currentView === 'settings'}
+      <Settings />
     {/if}
   </div>
 </div>
