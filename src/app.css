@@ -227,6 +227,36 @@
 
 /* Custom utilities */
 @layer utilities {
+  /* Text Color Utilities - Theme-aware */
+  .text-primary {
+    color: var(--mcp-text-primary);
+  }
+
+  .text-secondary {
+    color: var(--mcp-text-secondary);
+  }
+
+  .text-tertiary {
+    color: var(--mcp-text-tertiary);
+  }
+
+  /* Background Color Utilities - Theme-aware */
+  .bg-surface-primary {
+    background-color: var(--mcp-surface-primary);
+  }
+
+  .bg-surface-secondary {
+    background-color: var(--mcp-surface-secondary);
+  }
+
+  .bg-surface-tertiary {
+    background-color: var(--mcp-surface-tertiary);
+  }
+
+  .bg-surface-elevated {
+    background-color: var(--mcp-surface-elevated);
+  }
+
   /* Scrollbar styles */
   .scrollbar-thin {
     scrollbar-width: thin;

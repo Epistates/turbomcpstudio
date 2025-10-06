@@ -62,28 +62,12 @@
       <Dashboard />
     {:else if currentView === 'tools'}
       <ToolExplorer />
-    {:else if currentView === 'resources'}
-      <ResourceBrowser />
-    {:else if currentView === 'prompts'}
-      <PromptDesigner />
-    {:else if currentView === 'sampling'}
-      <SamplingTester />
-    {:else if currentView === 'elicitation'}
-      <ElicitationFlow />
     {:else}
       <!-- Placeholder for unimplemented views -->
       <div class="mcp-placeholder">
         <div class="mcp-placeholder__content">
           <div class="mcp-placeholder__icon">
-            {#if currentView === 'resources'}
-              🗄️
-            {:else if currentView === 'prompts'}
-              📝
-            {:else if currentView === 'sampling'}
-              🎯
-            {:else if currentView === 'elicitation'}
-              💬
-            {:else if currentView === 'collections'}
+            {#if currentView === 'collections'}
               📁
             {:else if currentView === 'settings'}
               ⚙️
@@ -100,36 +84,16 @@
           <div class="mcp-placeholder__features">
             <h3>Planned Features:</h3>
             <ul>
-              {#if currentView === 'resources'}
-                <li>Resource browser with tree navigation</li>
-                <li>URI template management</li>
-                <li>Real-time resource subscriptions</li>
-                <li>Resource versioning and caching</li>
-              {:else if currentView === 'prompts'}
-                <li>Visual prompt designer</li>
-                <li>Template management system</li>
-                <li>A/B testing framework</li>
-                <li>Prompt performance analytics</li>
-              {:else if currentView === 'sampling'}
-                <li>Step-through debugging interface</li>
-                <li>Token tracking and analysis</li>
-                <li>Conversation history management</li>
-                <li>Model performance metrics</li>
-              {:else if currentView === 'elicitation'}
-                <li>Visual workflow designer</li>
-                <li>Conditional logic builder</li>
-                <li>Form validation system</li>
-                <li>Response routing engine</li>
-              {:else if currentView === 'collections'}
+              {#if currentView === 'collections'}
                 <li>Multi-server operation chains</li>
-                <li>Variable interpolation</li>
-                <li>Scenario management</li>
-                <li>Team collaboration features</li>
+                <li>Variable interpolation system</li>
+                <li>Test scenario management</li>
+                <li>Advanced assertions</li>
               {:else if currentView === 'settings'}
-                <li>Theme and appearance settings</li>
-                <li>Connection preferences</li>
-                <li>Security configurations</li>
-                <li>Export/import functionality</li>
+                <li>Server configuration</li>
+                <li>API key management</li>
+                <li>Theme customization</li>
+                <li>Performance tuning</li>
               {/if}
             </ul>
           </div>

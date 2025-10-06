@@ -20,7 +20,8 @@
     ChevronRight,
     ChevronDown,
     Play,
-    Square
+    Square,
+    Network
   } from 'lucide-svelte';
 
   // Props using Svelte 5 runes
@@ -33,12 +34,12 @@
 
   // Subscribe to stores
   $effect(() => {
-    const unsubscribeServers = serverStore.subscribe(state => {
+    const unsubscribeServers = serverStore.subscribe((state: any) => {
       servers = state.servers;
       selectedServerId = state.selectedServerId;
     });
 
-    const unsubscribeUi = uiStore.subscribe(state => {
+    const unsubscribeUi = uiStore.subscribe((state: any) => {
       currentView = state.currentView;
     });
 
@@ -55,6 +56,7 @@
     { id: 'prompts', label: 'Prompts', icon: FileText },
     { id: 'sampling', label: 'Sampling', icon: MessageSquare },
     { id: 'elicitation', label: 'Elicitation', icon: Activity },
+    { id: 'protocol', label: 'Protocol', icon: Network },
     { id: 'collections', label: 'Collections', icon: Layers3 },
   ];
 
@@ -69,7 +71,10 @@
     'resources': 'resources',
     'prompts': 'prompts',
     'sampling': 'sampling',
-    'elicitation': 'elicitation'
+    'elicitation': 'elicitation',
+    'protocol': null,         // Protocol inspector supports all servers
+    'collections': null,      // Collections supports all servers
+    'settings': null          // Settings doesn't require MCP capability
   };
 
   function selectServer(serverId: string) {

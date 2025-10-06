@@ -60,27 +60,21 @@
   }
 
   // Determine the appropriate message based on server state
-  const message = $derived(() => {
-    if (totalServers === 0) {
-      return {
-        title: 'No Servers Configured',
-        description: 'Get started by adding your first MCP server.',
-        showAddButton: true
-      };
-    } else if (connectedServers === 0) {
-      return {
-        title: 'No Servers Connected',
-        description: `You have ${totalServers} server${totalServers === 1 ? '' : 's'} configured but none are currently connected.`,
-        showAddButton: false
-      };
-    } else {
-      return {
-        title: config.title,
-        description: config.description,
-        showAddButton: true
-      };
+  const message = $derived(
+    totalServers === 0 ? {
+      title: 'No Servers Configured',
+      description: 'Get started by adding your first MCP server.',
+      showAddButton: true
+    } : connectedServers === 0 ? {
+      title: 'No Servers Connected',
+      description: `You have ${totalServers} server${totalServers === 1 ? '' : 's'} configured but none are currently connected.`,
+      showAddButton: false
+    } : {
+      title: config.title,
+      description: config.description,
+      showAddButton: true
     }
-  });
+  );
 </script>
 
 <div class="empty-capability-state">

@@ -4,7 +4,7 @@
 -->
 <script lang="ts">
 
-  type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
+  type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success' | 'outline';
   type ButtonSize = 'sm' | 'md' | 'lg';
 
   interface Props {

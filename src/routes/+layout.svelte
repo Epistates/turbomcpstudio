@@ -4,12 +4,15 @@
   import { listen, once } from '@tauri-apps/api/event';
   import { themeStore } from '$lib/stores/themeStore';
   import { serverStore } from '$lib/stores/serverStore';
-  import { appStore, appStoreIsReady, appStoreState } from '$lib/stores/appStore';
+  import { appStore, appStoreIsReady, appStoreState, type AppState } from '$lib/stores/appStore';
   import AppLoadingScreen from '$lib/components/AppLoadingScreen.svelte';
+
+  // Svelte 5 snippet props
+  const { children } = $props();
 
   // Reactive state using Svelte 5 runes - access store values directly
   let isAppReady = $state(false);
-  let currentAppState = $state({
+  let currentAppState = $state<AppState>({
     isInitializing: true,
     databaseReady: false,
     mcpManagerReady: false,
@@ -133,7 +136,7 @@
 <!-- Enterprise App Shell -->
 {#if isAppReady}
   <div class="mcp-app">
-    <slot />
+    {@render children()}
   </div>
 {/if}
 
