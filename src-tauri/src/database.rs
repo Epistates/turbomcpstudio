@@ -10,6 +10,11 @@ pub struct Database {
 }
 
 impl Database {
+    /// Get a reference to the database connection pool
+    pub fn pool(&self) -> &Pool<Sqlite> {
+        &self.pool
+    }
+
     /// Create a new database connection with lightweight initialization
     pub async fn new(database_path: &str) -> McpResult<Self> {
         let database_url = if database_path == ":memory:" {
@@ -60,8 +65,15 @@ impl Database {
                         tracing::info!("Created parent directory: {:?}", parent_dir);
                     }
                     Err(e) => {
-                        tracing::error!("Failed to create parent directory {:?}: {}", parent_dir, e);
-                        return Err(McpStudioError::ConfigError(format!("Cannot create database directory: {}", e)));
+                        tracing::error!(
+                            "Failed to create parent directory {:?}: {}",
+                            parent_dir,
+                            e
+                        );
+                        return Err(McpStudioError::ConfigError(format!(
+                            "Cannot create database directory: {}",
+                            e
+                        )));
                     }
                 }
             }
@@ -76,7 +88,10 @@ impl Database {
                 }
                 Err(e) => {
                     tracing::error!("Directory not writable {:?}: {}", parent_dir, e);
-                    return Err(McpStudioError::ConfigError(format!("Database directory not writable: {}", e)));
+                    return Err(McpStudioError::ConfigError(format!(
+                        "Database directory not writable: {}",
+                        e
+                    )));
                 }
             }
         }
@@ -111,7 +126,10 @@ impl Database {
             }
             Err(e) => {
                 tracing::error!("Failed to connect to database at {}: {}", database_url, e);
-                Err(McpStudioError::ConfigError(format!("Cannot connect to database file: {}", e)))
+                Err(McpStudioError::ConfigError(format!(
+                    "Cannot connect to database file: {}",
+                    e
+                )))
             }
         }
     }
@@ -486,13 +504,15 @@ impl Database {
             let tags: Vec<String> = serde_json::from_str(&row.get::<String, _>("tags"))?;
             let workflow: Vec<crate::types::collections::WorkflowStep> =
                 serde_json::from_str(&row.get::<String, _>("workflow"))?;
-            let variables: std::collections::HashMap<String, crate::types::collections::CollectionVariable> =
-                serde_json::from_str(&row.get::<String, _>("variables"))?;
+            let variables: std::collections::HashMap<
+                String,
+                crate::types::collections::CollectionVariable,
+            > = serde_json::from_str(&row.get::<String, _>("variables"))?;
             let environment: crate::types::collections::CollectionEnvironment =
                 serde_json::from_str(&row.get::<String, _>("environment"))?;
-            let last_run: Option<chrono::DateTime<chrono::Utc>> = row.get::<Option<String>, _>("last_run")
-                .map(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
-                .flatten()
+            let last_run: Option<chrono::DateTime<chrono::Utc>> = row
+                .get::<Option<String>, _>("last_run")
+                .and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
                 .map(|dt| dt.with_timezone(&chrono::Utc));
 
             Ok(Some(Collection {
@@ -538,13 +558,15 @@ impl Database {
             let tags: Vec<String> = serde_json::from_str(&row.get::<String, _>("tags"))?;
             let workflow: Vec<crate::types::collections::WorkflowStep> =
                 serde_json::from_str(&row.get::<String, _>("workflow"))?;
-            let variables: std::collections::HashMap<String, crate::types::collections::CollectionVariable> =
-                serde_json::from_str(&row.get::<String, _>("variables"))?;
+            let variables: std::collections::HashMap<
+                String,
+                crate::types::collections::CollectionVariable,
+            > = serde_json::from_str(&row.get::<String, _>("variables"))?;
             let environment: crate::types::collections::CollectionEnvironment =
                 serde_json::from_str(&row.get::<String, _>("environment"))?;
-            let last_run: Option<chrono::DateTime<chrono::Utc>> = row.get::<Option<String>, _>("last_run")
-                .map(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
-                .flatten()
+            let last_run: Option<chrono::DateTime<chrono::Utc>> = row
+                .get::<Option<String>, _>("last_run")
+                .and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
                 .map(|dt| dt.with_timezone(&chrono::Utc));
 
             collections.push(Collection {
@@ -586,7 +608,10 @@ impl Database {
     }
 
     /// Get a workflow execution by ID
-    pub async fn get_workflow_execution(&self, id: Uuid) -> McpResult<Option<crate::types::collections::WorkflowExecution>> {
+    pub async fn get_workflow_execution(
+        &self,
+        id: Uuid,
+    ) -> McpResult<Option<crate::types::collections::WorkflowExecution>> {
         let row = sqlx::query(
             "SELECT id, collection_id, status, started_at, completed_at, summary, results FROM workflow_executions WHERE id = ?"
         )
@@ -597,8 +622,10 @@ impl Database {
         if let Some(row) = row {
             let summary: crate::types::collections::ExecutionSummary =
                 serde_json::from_str(&row.get::<String, _>("summary"))?;
-            let step_results: std::collections::HashMap<uuid::Uuid, crate::types::collections::StepResult> =
-                serde_json::from_str(&row.get::<String, _>("results"))?;
+            let step_results: std::collections::HashMap<
+                uuid::Uuid,
+                crate::types::collections::StepResult,
+            > = serde_json::from_str(&row.get::<String, _>("results"))?;
 
             Ok(Some(crate::types::collections::WorkflowExecution {
                 id: Uuid::parse_str(&row.get::<String, _>("id"))
@@ -606,12 +633,14 @@ impl Database {
                 collection_id: Uuid::parse_str(&row.get::<String, _>("collection_id"))
                     .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?,
                 status: serde_json::from_str(&format!("\"{}\"", row.get::<String, _>("status")))?,
-                started_at: chrono::DateTime::parse_from_rfc3339(&row.get::<String, _>("started_at"))
-                    .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?
-                    .with_timezone(&chrono::Utc),
-                completed_at: row.get::<Option<String>, _>("completed_at")
-                    .map(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
-                    .flatten()
+                started_at: chrono::DateTime::parse_from_rfc3339(
+                    &row.get::<String, _>("started_at"),
+                )
+                .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?
+                .with_timezone(&chrono::Utc),
+                completed_at: row
+                    .get::<Option<String>, _>("completed_at")
+                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
                     .map(|dt| dt.with_timezone(&chrono::Utc)),
                 summary,
                 step_results,
@@ -626,7 +655,10 @@ impl Database {
     }
 
     /// List workflow executions for a collection
-    pub async fn list_workflow_executions(&self, collection_id: Uuid) -> McpResult<Vec<crate::types::collections::WorkflowExecution>> {
+    pub async fn list_workflow_executions(
+        &self,
+        collection_id: Uuid,
+    ) -> McpResult<Vec<crate::types::collections::WorkflowExecution>> {
         let rows = sqlx::query(
             "SELECT id, collection_id, status, started_at, completed_at, summary, results FROM workflow_executions WHERE collection_id = ? ORDER BY started_at DESC"
         )
@@ -639,8 +671,10 @@ impl Database {
         for row in rows {
             let summary: crate::types::collections::ExecutionSummary =
                 serde_json::from_str(&row.get::<String, _>("summary"))?;
-            let step_results: std::collections::HashMap<uuid::Uuid, crate::types::collections::StepResult> =
-                serde_json::from_str(&row.get::<String, _>("results"))?;
+            let step_results: std::collections::HashMap<
+                uuid::Uuid,
+                crate::types::collections::StepResult,
+            > = serde_json::from_str(&row.get::<String, _>("results"))?;
 
             executions.push(crate::types::collections::WorkflowExecution {
                 id: Uuid::parse_str(&row.get::<String, _>("id"))
@@ -648,12 +682,14 @@ impl Database {
                 collection_id: Uuid::parse_str(&row.get::<String, _>("collection_id"))
                     .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?,
                 status: serde_json::from_str(&format!("\"{}\"", row.get::<String, _>("status")))?,
-                started_at: chrono::DateTime::parse_from_rfc3339(&row.get::<String, _>("started_at"))
-                    .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?
-                    .with_timezone(&chrono::Utc),
-                completed_at: row.get::<Option<String>, _>("completed_at")
-                    .map(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
-                    .flatten()
+                started_at: chrono::DateTime::parse_from_rfc3339(
+                    &row.get::<String, _>("started_at"),
+                )
+                .map_err(|e| McpStudioError::DatabaseError(sqlx::Error::Decode(Box::new(e))))?
+                .with_timezone(&chrono::Utc),
+                completed_at: row
+                    .get::<Option<String>, _>("completed_at")
+                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
                     .map(|dt| dt.with_timezone(&chrono::Utc)),
                 summary,
                 step_results,
@@ -687,8 +723,8 @@ impl Database {
         .bind(message.timestamp.to_rfc3339())
         .bind(direction)
         .bind(content)
-        .bind(message.size_bytes as i64)
-        .bind(message.processing_time_ms.map(|t| t as i64))
+        .bind(message.size_bytes)
+        .bind(message.processing_time_ms)
         .execute(&self.pool)
         .await?;
 
@@ -748,9 +784,7 @@ impl Database {
                 direction,
                 content: content.to_string(),
                 size_bytes: row.get::<i64, _>("size_bytes"),
-                processing_time_ms: row
-                    .get::<Option<i64>, _>("processing_time_ms")
-                    .map(|t| t),
+                processing_time_ms: row.get::<Option<i64>, _>("processing_time_ms"),
             });
         }
 

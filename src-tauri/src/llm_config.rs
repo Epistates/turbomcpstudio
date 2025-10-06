@@ -1,7 +1,7 @@
 use crate::error::McpStudioError;
 use crate::types::{
-    LLMConfiguration, LLMProviderStatus, LLMProviderType,
-    ProviderUsageStats, SetAPIKeyRequest, UpdateLLMConfigRequest,
+    LLMConfiguration, LLMProviderStatus, ProviderUsageStats, SetAPIKeyRequest,
+    UpdateLLMConfigRequest,
 };
 use anyhow::Result;
 use keyring::Entry;
@@ -22,6 +22,12 @@ pub struct LLMConfigManager {
     usage_stats: Arc<RwLock<HashMap<String, ProviderUsageStats>>>,
     /// Service name for keyring storage
     keyring_service: String,
+}
+
+impl Default for LLMConfigManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LLMConfigManager {
@@ -46,7 +52,9 @@ impl LLMConfigManager {
         request: UpdateLLMConfigRequest,
     ) -> Result<(), McpStudioError> {
         let mut config = self.config.write().await;
-        config.providers.insert(request.provider_id.clone(), request.config);
+        config
+            .providers
+            .insert(request.provider_id.clone(), request.config);
 
         // If this provider is now enabled and was the only one, make it active
         if config.active_provider.is_none() {
@@ -60,7 +68,10 @@ impl LLMConfigManager {
         // Clear cached handler since config changed
         self.handlers.write().await.remove(&request.provider_id);
 
-        info!("Updated LLM provider configuration: {}", request.provider_id);
+        info!(
+            "Updated LLM provider configuration: {}",
+            request.provider_id
+        );
         Ok(())
     }
 
@@ -72,9 +83,9 @@ impl LLMConfigManager {
         let entry = Entry::new(&self.keyring_service, &key_id)
             .map_err(|e| McpStudioError::Configuration(format!("Keyring error: {}", e)))?;
 
-        entry
-            .set_password(&request.api_key)
-            .map_err(|e| McpStudioError::Configuration(format!("Failed to store API key: {}", e)))?;
+        entry.set_password(&request.api_key).map_err(|e| {
+            McpStudioError::Configuration(format!("Failed to store API key: {}", e))
+        })?;
 
         // Enable the provider now that it has an API key
         let mut config = self.config.write().await;
@@ -105,11 +116,17 @@ impl LLMConfigManager {
 
         let provider_config = match config.providers.get(provider_id) {
             Some(config) => {
-                debug!("🔑 Provider {} found, enabled: {}", provider_id, config.enabled);
+                debug!(
+                    "🔑 Provider {} found, enabled: {}",
+                    provider_id, config.enabled
+                );
                 config
             }
             None => {
-                debug!("🔑 Provider {} not found in config, returning None", provider_id);
+                debug!(
+                    "🔑 Provider {} not found in config, returning None",
+                    provider_id
+                );
                 return None;
             }
         };
@@ -122,16 +139,25 @@ impl LLMConfigManager {
         // Skip keyring access for local providers - they don't need API keys
         match provider_config.provider_type {
             crate::types::LLMProviderType::Local => {
-                debug!("🔑 Provider {} is local type, returning None (no API key needed)", provider_id);
+                debug!(
+                    "🔑 Provider {} is local type, returning None (no API key needed)",
+                    provider_id
+                );
                 return None;
-            },
+            }
             _ => {
-                debug!("🔑 Provider {} is cloud type, proceeding with keyring access", provider_id);
+                debug!(
+                    "🔑 Provider {} is cloud type, proceeding with keyring access",
+                    provider_id
+                );
             }
         }
         drop(config);
 
-        debug!("🔑 Provider {} is enabled, attempting keyring access", provider_id);
+        debug!(
+            "🔑 Provider {} is enabled, attempting keyring access",
+            provider_id
+        );
         let key_id = format!("{}-api-key", provider_id);
 
         // Only access keyring if we actually need to read a key
@@ -153,11 +179,17 @@ impl LLMConfigManager {
         debug!("🔑 Attempting to get password from keyring for {}", key_id);
         match entry.get_password() {
             Ok(password) => {
-                debug!("🔑 Successfully retrieved password from keyring for {}", key_id);
+                debug!(
+                    "🔑 Successfully retrieved password from keyring for {}",
+                    key_id
+                );
                 Some(password)
             }
             Err(e) => {
-                debug!("🔑 Failed to get password from keyring for {}: {}", key_id, e);
+                debug!(
+                    "🔑 Failed to get password from keyring for {}: {}",
+                    key_id, e
+                );
                 None
             }
         }
@@ -210,26 +242,29 @@ impl LLMConfigManager {
                 match provider_config.provider_type {
                     crate::types::LLMProviderType::Local => {
                         // Local providers don't need API keys, so they're always considered "configured"
-                    },
+                    }
                     _ => {
                         // Cloud providers need API keys
                         if self.get_api_key(&provider_id).await.is_none() {
-                            return Err(McpStudioError::Configuration(
-                                format!("Provider {} is not configured with API key", provider_id)
-                            ));
+                            return Err(McpStudioError::Configuration(format!(
+                                "Provider {} is not configured with API key",
+                                provider_id
+                            )));
                         }
                     }
                 }
             }
             Some(_) => {
-                return Err(McpStudioError::Configuration(
-                    format!("Provider {} is not enabled", provider_id)
-                ));
+                return Err(McpStudioError::Configuration(format!(
+                    "Provider {} is not enabled",
+                    provider_id
+                )));
             }
             None => {
-                return Err(McpStudioError::Configuration(
-                    format!("Unknown provider: {}", provider_id)
-                ));
+                return Err(McpStudioError::Configuration(format!(
+                    "Unknown provider: {}",
+                    provider_id
+                )));
             }
         }
 
@@ -285,19 +320,28 @@ impl LLMConfigManager {
             return None;
         }
 
-        info!("🚀 Creating production-grade sampling handler for provider: {}", provider_id);
+        info!(
+            "🚀 Creating production-grade sampling handler for provider: {}",
+            provider_id
+        );
 
         // Create DelegatingSamplingHandler based on provider type
         let handler = match provider_config.provider_type {
             crate::types::LLMProviderType::Local => {
                 // Local providers (like Ollama) don't need API keys
-                match self.create_local_provider_handler(provider_id, provider_config).await {
+                match self
+                    .create_local_provider_handler(provider_id, provider_config)
+                    .await
+                {
                     Ok(handler) => {
                         info!("✅ Local sampling handler created for {}", provider_id);
                         handler
                     }
                     Err(e) => {
-                        error!("❌ Failed to create local sampling handler for {}: {}", provider_id, e);
+                        error!(
+                            "❌ Failed to create local sampling handler for {}: {}",
+                            provider_id, e
+                        );
                         return None;
                     }
                 }
@@ -312,13 +356,19 @@ impl LLMConfigManager {
                     }
                 };
 
-                match self.create_cloud_provider_handler(provider_id, provider_config, &api_key).await {
+                match self
+                    .create_cloud_provider_handler(provider_id, provider_config, &api_key)
+                    .await
+                {
                     Ok(handler) => {
                         info!("✅ Cloud sampling handler created for {}", provider_id);
                         handler
                     }
                     Err(e) => {
-                        error!("❌ Failed to create cloud sampling handler for {}: {}", provider_id, e);
+                        error!(
+                            "❌ Failed to create cloud sampling handler for {}: {}",
+                            provider_id, e
+                        );
                         return None;
                     }
                 }
@@ -331,11 +381,11 @@ impl LLMConfigManager {
     /// Create sampling handler for local providers (Ollama, etc.)
     async fn create_local_provider_handler(
         &self,
-        provider_id: &str,
-        provider_config: &crate::types::LLMProviderConfig,
+        _provider_id: &str,
+        _provider_config: &crate::types::LLMProviderConfig,
     ) -> Result<DelegatingSamplingHandler, McpStudioError> {
-        use turbomcp_client::sampling::{AutoApprovingUserHandler, DelegatingSamplingHandler};
         use std::sync::Arc;
+        use turbomcp_client::sampling::{AutoApprovingUserHandler, DelegatingSamplingHandler};
 
         // For now, create a simple auto-approving handler
         // TODO: Implement proper local LLM integration
@@ -349,17 +399,21 @@ impl LLMConfigManager {
     async fn create_cloud_provider_handler(
         &self,
         provider_id: &str,
-        provider_config: &crate::types::LLMProviderConfig,
+        _provider_config: &crate::types::LLMProviderConfig, // TODO: Use config for provider setup
         api_key: &str,
     ) -> Result<DelegatingSamplingHandler, McpStudioError> {
-        use turbomcp_client::sampling::{AutoApprovingUserHandler, DelegatingSamplingHandler};
         use std::sync::Arc;
+        use turbomcp_client::sampling::{AutoApprovingUserHandler, DelegatingSamplingHandler};
 
         // For now, create a simple auto-approving handler
         // TODO: Implement proper cloud LLM integration with provider_id: {} and api_key: {}
         let user_handler = Arc::new(AutoApprovingUserHandler);
         let llm_clients = vec![]; // Empty for now - would connect to cloud LLM servers
-        info!("Creating cloud handler for {} (key length: {})", provider_id, api_key.len());
+        info!(
+            "Creating cloud handler for {} (key length: {})",
+            provider_id,
+            api_key.len()
+        );
 
         Ok(DelegatingSamplingHandler::new(llm_clients, user_handler))
     }
@@ -380,15 +434,21 @@ impl LLMConfigManager {
                 crate::types::LLMProviderType::Local => {
                     debug!("🔍 Provider {} is local, checking if enabled", provider_id);
                     provider_config.enabled
-                },
+                }
                 _ => {
-                    debug!("🔍 Provider {} is cloud, checking API key in keyring", provider_id);
+                    debug!(
+                        "🔍 Provider {} is cloud, checking API key in keyring",
+                        provider_id
+                    );
                     self.get_api_key(provider_id).await.is_some()
                 }
             };
 
             let active = config.active_provider.as_ref() == Some(provider_id);
-            debug!("🔍 Provider {} - configured: {}, active: {}", provider_id, configured, active);
+            debug!(
+                "🔍 Provider {} - configured: {}, active: {}",
+                provider_id, configured, active
+            );
 
             statuses.push(LLMProviderStatus {
                 provider_id: provider_id.clone(),
@@ -437,14 +497,20 @@ impl LLMConfigManager {
         let mut has_configured_provider = false;
 
         for (provider_id, provider_config) in &config.providers {
-            debug!("✅ Validating provider: {} (enabled: {})", provider_id, provider_config.enabled);
+            debug!(
+                "✅ Validating provider: {} (enabled: {})",
+                provider_id, provider_config.enabled
+            );
             if provider_config.enabled {
                 if self.get_api_key(provider_id).await.is_some() {
                     debug!("✅ Provider {} has API key configured", provider_id);
                     has_configured_provider = true;
                 } else {
                     debug!("✅ Provider {} is enabled but has no API key", provider_id);
-                    issues.push(format!("Provider {} is enabled but has no API key", provider_id));
+                    issues.push(format!(
+                        "Provider {} is enabled but has no API key",
+                        provider_id
+                    ));
                 }
             }
         }

@@ -6,22 +6,22 @@
 /// - Real LLM mode for realistic testing
 /// - Request/response interception for debugging
 /// - Rich conversation context analysis
-
 use crate::error::{McpResult, McpStudioError};
 use crate::llm_config::LLMConfigManager;
+use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 use tracing::{debug, info, warn};
-use turbomcp_client::sampling::{UserInteractionHandler, SamplingHandler};
+use turbomcp_client::sampling::SamplingHandler;
 use turbomcp_protocol::types::{
-    CreateMessageRequest, CreateMessageResult, Role, Content, TextContent
+    Content, CreateMessageRequest, CreateMessageResult, Role, TextContent,
 };
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 /// Sampling mode configuration
+#[allow(clippy::upper_case_acronyms)] // LLM is a well-known acronym
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "mode")]
 pub enum SamplingMode {
@@ -55,9 +55,9 @@ pub struct AutoApprovalRule {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RuleCondition {
     TrustedServer(String),
-    LowCostRequest(f64), // Max cost threshold
+    LowCostRequest(f64),        // Max cost threshold
     SafeContentPattern(String), // Regex pattern
-    ModelPreference(String), // Preferred model
+    ModelPreference(String),    // Preferred model
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,7 +87,7 @@ pub struct ConversationContext {
     pub thread_length: usize,
     pub total_tokens: Option<u32>,
     pub context_window_usage: Option<f32>, // 0.0 - 1.0
-    pub relevant_messages: Vec<usize>, // Indices of most relevant messages
+    pub relevant_messages: Vec<usize>,     // Indices of most relevant messages
     pub conversation_flow: Vec<ConversationTurn>,
 }
 
@@ -139,12 +139,28 @@ pub enum ProcessingMode {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum HITLSamplingEvent {
-    RequestPending { request: PendingSamplingRequest },
-    RequestApproved { request_id: String, approved_by: String },
-    RequestRejected { request_id: String, reason: String },
-    RequestCompleted { result: SamplingResult },
-    ModeChanged { old_mode: SamplingMode, new_mode: SamplingMode },
-    Error { request_id: Option<String>, error: String },
+    RequestPending {
+        request: PendingSamplingRequest,
+    },
+    RequestApproved {
+        request_id: String,
+        approved_by: String,
+    },
+    RequestRejected {
+        request_id: String,
+        reason: String,
+    },
+    RequestCompleted {
+        result: SamplingResult,
+    },
+    ModeChanged {
+        old_mode: SamplingMode,
+        new_mode: SamplingMode,
+    },
+    Error {
+        request_id: Option<String>,
+        error: String,
+    },
 }
 
 /// Human-in-the-Loop Sampling Manager
@@ -170,7 +186,9 @@ pub struct HITLSamplingManager {
 
 impl HITLSamplingManager {
     /// Create a new HITL sampling manager
-    pub fn new(llm_config: Arc<LLMConfigManager>) -> (Self, broadcast::Receiver<HITLSamplingEvent>) {
+    pub fn new(
+        llm_config: Arc<LLMConfigManager>,
+    ) -> (Self, broadcast::Receiver<HITLSamplingEvent>) {
         let (event_sender, event_receiver) = broadcast::channel(1000);
 
         let manager = Self {
@@ -201,7 +219,9 @@ impl HITLSamplingManager {
 
         info!("🔄 Sampling mode changed: {:?} -> {:?}", old_mode, new_mode);
 
-        let _ = self.event_sender.send(HITLSamplingEvent::ModeChanged { old_mode, new_mode });
+        let _ = self
+            .event_sender
+            .send(HITLSamplingEvent::ModeChanged { old_mode, new_mode });
 
         Ok(())
     }
@@ -220,7 +240,10 @@ impl HITLSamplingManager {
     ) -> McpResult<SamplingResult> {
         let request_id = Uuid::new_v4().to_string();
 
-        debug!("🎯 Processing sampling request {} from server {}", request_id, server_name);
+        debug!(
+            "🎯 Processing sampling request {} from server {}",
+            request_id, server_name
+        );
 
         // Analyze conversation context
         let conversation_context = self.analyze_conversation_context(&request).await?;
@@ -242,19 +265,22 @@ impl HITLSamplingManager {
         };
 
         // Store in history
-        self.request_history.write().await.push(pending_request.clone());
+        self.request_history
+            .write()
+            .await
+            .push(pending_request.clone());
 
         // Process based on current mode
         let mode = self.get_mode().await;
         match mode {
-            SamplingMode::Manual { .. } => {
-                self.handle_manual_mode(pending_request).await
-            }
-            SamplingMode::LLM { .. } => {
-                self.handle_llm_mode(pending_request).await
-            }
-            SamplingMode::Hybrid { auto_approval_rules, fallback_to_human } => {
-                self.handle_hybrid_mode(pending_request, auto_approval_rules, fallback_to_human).await
+            SamplingMode::Manual { .. } => self.handle_manual_mode(pending_request).await,
+            SamplingMode::LLM { .. } => self.handle_llm_mode(pending_request).await,
+            SamplingMode::Hybrid {
+                auto_approval_rules,
+                fallback_to_human,
+            } => {
+                self.handle_hybrid_mode(pending_request, auto_approval_rules, fallback_to_human)
+                    .await
             }
         }
     }
@@ -264,10 +290,14 @@ impl HITLSamplingManager {
         &self,
         pending_request: PendingSamplingRequest,
     ) -> McpResult<SamplingResult> {
-        info!("👤 Manual mode: Queuing request {} for human approval", pending_request.id);
+        info!(
+            "👤 Manual mode: Queuing request {} for human approval",
+            pending_request.id
+        );
 
         // Store pending request
-        self.pending_requests.insert(pending_request.id.clone(), pending_request.clone());
+        self.pending_requests
+            .insert(pending_request.id.clone(), pending_request.clone());
 
         // Notify UI
         let _ = self.event_sender.send(HITLSamplingEvent::RequestPending {
@@ -280,11 +310,12 @@ impl HITLSamplingManager {
             response: CreateMessageResult {
                 role: Role::Assistant,
                 content: Content::Text(TextContent {
-                    text: "Request queued for human approval. Please check the HITL interface.".to_string(),
+                    text: "Request queued for human approval. Please check the HITL interface."
+                        .to_string(),
                     annotations: None,
                     meta: None,
                 }),
-                model: None,
+                model: "hitl-pending".to_string(),
                 stop_reason: None,
                 _meta: None,
             },
@@ -313,16 +344,26 @@ impl HITLSamplingManager {
         &self,
         pending_request: PendingSamplingRequest,
     ) -> McpResult<SamplingResult> {
-        info!("🤖 LLM mode: Processing request {} with real AI", pending_request.id);
+        info!(
+            "🤖 LLM mode: Processing request {} with real AI",
+            pending_request.id
+        );
 
         let start_time = std::time::Instant::now();
 
         // Get active sampling handler
-        let handler = self.llm_config.get_active_sampling_handler().await
-            .ok_or_else(|| McpStudioError::Configuration("No active LLM provider configured".to_string()))?;
+        let handler = self
+            .llm_config
+            .get_active_sampling_handler()
+            .await
+            .ok_or_else(|| {
+                McpStudioError::Configuration("No active LLM provider configured".to_string())
+            })?;
 
         // Process with real LLM
-        let response = handler.handle_create_message(pending_request.request.clone()).await
+        let response = handler
+            .handle_create_message(pending_request.request.clone())
+            .await
             .map_err(|e| McpStudioError::TurboMcpError(format!("LLM sampling failed: {}", e)))?;
 
         let response_time = start_time.elapsed().as_millis() as u64;
@@ -331,7 +372,9 @@ impl HITLSamplingManager {
         let result = SamplingResult {
             request_id: pending_request.id.clone(),
             response: response.clone(),
-            model_used: pending_request.selected_model.unwrap_or("unknown".to_string()),
+            model_used: pending_request
+                .selected_model
+                .unwrap_or("unknown".to_string()),
             token_usage: TokenUsage {
                 input_tokens: pending_request.estimated_tokens.unwrap_or(0),
                 output_tokens: self.estimate_output_tokens(&response).await,
@@ -349,7 +392,8 @@ impl HITLSamplingManager {
         };
 
         // Store completed result
-        self.completed_requests.insert(pending_request.id.clone(), result.clone());
+        self.completed_requests
+            .insert(pending_request.id.clone(), result.clone());
 
         // Notify UI
         let _ = self.event_sender.send(HITLSamplingEvent::RequestCompleted {
@@ -366,27 +410,42 @@ impl HITLSamplingManager {
         auto_approval_rules: Vec<AutoApprovalRule>,
         fallback_to_human: bool,
     ) -> McpResult<SamplingResult> {
-        info!("🧠 Hybrid mode: Evaluating auto-approval rules for request {}", pending_request.id);
+        info!(
+            "🧠 Hybrid mode: Evaluating auto-approval rules for request {}",
+            pending_request.id
+        );
 
         // Evaluate auto-approval rules
         for rule in auto_approval_rules {
             if self.evaluate_rule(&rule, &pending_request).await? {
                 match rule.action {
                     RuleAction::AutoApprove => {
-                        info!("✅ Auto-approving request {} via rule: {}", pending_request.id, rule.name);
+                        info!(
+                            "✅ Auto-approving request {} via rule: {}",
+                            pending_request.id, rule.name
+                        );
                         return self.handle_llm_mode(pending_request).await;
                     }
                     RuleAction::RequireReview => {
-                        info!("👁️ Rule {} requires human review for request {}", rule.name, pending_request.id);
+                        info!(
+                            "👁️ Rule {} requires human review for request {}",
+                            rule.name, pending_request.id
+                        );
                         return self.handle_manual_mode(pending_request).await;
                     }
                     RuleAction::Reject(reason) => {
-                        warn!("❌ Rejecting request {} via rule {}: {}", pending_request.id, rule.name, reason);
+                        warn!(
+                            "❌ Rejecting request {} via rule {}: {}",
+                            pending_request.id, rule.name, reason
+                        );
                         let _ = self.event_sender.send(HITLSamplingEvent::RequestRejected {
                             request_id: pending_request.id.clone(),
                             reason: reason.clone(),
                         });
-                        return Err(McpStudioError::ProtocolError(format!("Request rejected by rule {}: {}", rule.name, reason)));
+                        return Err(McpStudioError::ProtocolError(format!(
+                            "Request rejected by rule {}: {}",
+                            rule.name, reason
+                        )));
                     }
                 }
             }
@@ -394,10 +453,16 @@ impl HITLSamplingManager {
 
         // No rules matched - use fallback
         if fallback_to_human {
-            info!("👤 No rules matched, falling back to human review for request {}", pending_request.id);
+            info!(
+                "👤 No rules matched, falling back to human review for request {}",
+                pending_request.id
+            );
             self.handle_manual_mode(pending_request).await
         } else {
-            info!("🤖 No rules matched, falling back to automatic LLM for request {}", pending_request.id);
+            info!(
+                "🤖 No rules matched, falling back to automatic LLM for request {}",
+                pending_request.id
+            );
             self.handle_llm_mode(pending_request).await
         }
     }
@@ -409,13 +474,11 @@ impl HITLSamplingManager {
         request: &PendingSamplingRequest,
     ) -> McpResult<bool> {
         match &rule.condition {
-            RuleCondition::TrustedServer(server_name) => {
-                Ok(request.server_name == *server_name)
-            }
+            RuleCondition::TrustedServer(server_name) => Ok(request.server_name == *server_name),
             RuleCondition::LowCostRequest(max_cost) => {
                 Ok(request.estimated_cost.unwrap_or(0.0) <= *max_cost)
             }
-            RuleCondition::SafeContentPattern(pattern) => {
+            RuleCondition::SafeContentPattern(_pattern) => {
                 // TODO: Implement content pattern matching
                 Ok(false)
             }
@@ -433,7 +496,8 @@ impl HITLSamplingManager {
         let thread_length = request.messages.len();
 
         // Convert messages for analysis
-        let conversation_flow: Vec<ConversationTurn> = request.messages
+        let conversation_flow: Vec<ConversationTurn> = request
+            .messages
             .iter()
             .map(|msg| {
                 let content_preview = match &msg.content {
@@ -461,8 +525,8 @@ impl HITLSamplingManager {
 
         Ok(ConversationContext {
             thread_length,
-            total_tokens: None, // TODO: Implement total token counting
-            context_window_usage: None, // TODO: Calculate context window usage
+            total_tokens: None,            // TODO: Implement total token counting
+            context_window_usage: None,    // TODO: Calculate context window usage
             relevant_messages: Vec::new(), // TODO: Identify most relevant messages
             conversation_flow,
         })
@@ -471,7 +535,7 @@ impl HITLSamplingManager {
     /// Estimate request cost and tokens
     async fn estimate_request_cost(
         &self,
-        request: &CreateMessageRequest,
+        _request: &CreateMessageRequest, // TODO: Use request for actual cost estimation
     ) -> McpResult<(Option<f64>, Option<u32>, Option<String>)> {
         // TODO: Implement real cost estimation based on model and message length
         let estimated_tokens = 1000; // Placeholder
@@ -492,12 +556,18 @@ impl HITLSamplingManager {
 
     /// Get pending requests for UI
     pub fn get_pending_requests(&self) -> Vec<PendingSamplingRequest> {
-        self.pending_requests.iter().map(|entry| entry.value().clone()).collect()
+        self.pending_requests
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect()
     }
 
     /// Get completed results for analysis
     pub fn get_completed_requests(&self) -> Vec<SamplingResult> {
-        self.completed_requests.iter().map(|entry| entry.value().clone()).collect()
+        self.completed_requests
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect()
     }
 
     /// Approve a pending request (called from UI)
@@ -507,7 +577,9 @@ impl HITLSamplingManager {
         approved_by: String,
         modified_request: Option<CreateMessageRequest>,
     ) -> McpResult<SamplingResult> {
-        let pending_request = self.pending_requests.get(request_id)
+        let pending_request = self
+            .pending_requests
+            .get(request_id)
             .ok_or_else(|| McpStudioError::Unknown(format!("Request not found: {}", request_id)))?
             .clone();
 
@@ -532,7 +604,8 @@ impl HITLSamplingManager {
 
     /// Reject a pending request (called from UI)
     pub async fn reject_request(&self, request_id: &str, reason: String) -> McpResult<()> {
-        self.pending_requests.remove(request_id)
+        self.pending_requests
+            .remove(request_id)
             .ok_or_else(|| McpStudioError::Unknown(format!("Request not found: {}", request_id)))?;
 
         info!("❌ Request {} rejected: {}", request_id, reason);

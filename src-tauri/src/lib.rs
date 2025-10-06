@@ -20,6 +20,7 @@ pub struct AppState {
     pub mcp_manager: Arc<McpClientManager>,
     pub llm_config: Arc<LLMConfigManager>,
     pub hitl_sampling: Arc<HITLSamplingManager>,
+    pub database: Arc<tokio::sync::RwLock<Option<Arc<Database>>>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -40,7 +41,7 @@ pub fn run() {
             let app_handle = app.handle().clone();
 
             // Initialize managers immediately (lightweight)
-            let (mcp_manager, mut event_receiver) = McpClientManager::new();
+            let (mcp_manager, mut event_receiver) = McpClientManager::new(app_handle.clone());
             let mcp_manager = Arc::new(mcp_manager);
 
             let llm_config = Arc::new(LLMConfigManager::new());
@@ -49,11 +50,15 @@ pub fn run() {
             let (hitl_sampling, mut sampling_event_receiver) = HITLSamplingManager::new(llm_config.clone());
             let hitl_sampling = Arc::new(hitl_sampling);
 
+            // Database will be initialized asynchronously and set later
+            let database = Arc::new(tokio::sync::RwLock::new(None));
+
             // Store lightweight state immediately to unblock UI
             app.manage(AppState {
                 mcp_manager: mcp_manager.clone(),
                 llm_config: llm_config.clone(),
                 hitl_sampling: hitl_sampling.clone(),
+                database: database.clone(),
             });
 
             // Emit immediate ready event so UI can start working
@@ -61,6 +66,7 @@ pub fn run() {
 
             // Defer heavy initialization to background task
             let app_handle_clone = app_handle.clone();
+            let database_clone = database.clone();
             tauri::async_runtime::spawn(async move {
                 tracing::info!("Starting background initialization");
 
@@ -140,8 +146,8 @@ pub fn run() {
 
                 tracing::info!("Database initialized successfully");
 
-                // Store database once it's ready
-                app_handle_clone.manage(database);
+                // Store database once it's ready in AppState (wrapped in Arc)
+                *database_clone.write().await = Some(Arc::new(database));
 
                 // Initialize default LLM providers
                 if let Err(e) = llm_config.initialize_default_providers().await {
@@ -205,6 +211,12 @@ pub fn run() {
             commands::create_sampling_request,
             commands::send_elicitation_response,
             commands::get_elicitation_requests,
+            // Protocol Inspector commands (used by ProtocolInspector.svelte)
+            commands::get_message_history,
+            commands::clear_message_history,
+            commands::get_connection_metrics,
+            commands::get_all_connection_metrics,
+            commands::get_all_server_info,
             // LLM Configuration management
             commands::get_llm_config,
             commands::get_llm_provider_statuses,
