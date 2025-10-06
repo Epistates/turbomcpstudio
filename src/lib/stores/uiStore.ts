@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 
-export type View = 'dashboard' | 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | 'collections' | 'settings';
+export type View = 'dashboard' | 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | 'protocol' | 'collections' | 'settings';
 
 interface UiStoreState {
   currentView: View;

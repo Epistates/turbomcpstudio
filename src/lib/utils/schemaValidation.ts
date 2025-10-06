@@ -3,6 +3,7 @@ export interface JsonSchema {
   properties?: Record<string, JsonSchema>;
   required?: string[];
   enum?: any[];
+  enumNames?: string[];  // Human-readable names for enum values
   format?: string;
   minimum?: number;
   maximum?: number;
@@ -391,9 +392,10 @@ export class SchemaValidator {
     if (schema.items) {
       if (Array.isArray(schema.items)) {
         // Tuple validation
+        const itemsArray = schema.items as JsonSchema[];
         value.forEach((item, index) => {
-          if (index < schema.items!.length) {
-            this.validateValue(item, (schema.items as JsonSchema[])[index], `${path}[${index}]`, errors);
+          if (index < itemsArray.length) {
+            this.validateValue(item, itemsArray[index], `${path}[${index}]`, errors);
           }
         });
       } else {

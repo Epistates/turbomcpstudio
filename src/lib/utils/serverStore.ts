@@ -112,7 +112,7 @@ export class ServerSelectionManager {
 
     // Check if server exists and supports capability
     let isValid = false;
-    const unsubscribe = this.capabilityStore.subscribe(state => {
+    const unsubscribe = this.capabilityStore.subscribe((state: any) => {
       isValid = state.servers.some((s: ServerInfo) => s.id === serverId);
     });
     unsubscribe(); // Immediately cleanup
@@ -131,7 +131,7 @@ export class ServerSelectionManager {
   autoSelectServer(): string | undefined {
     let selectedId: string | undefined;
 
-    const unsubscribe = this.capabilityStore.subscribe(state => {
+    const unsubscribe = this.capabilityStore.subscribe((state: any) => {
       if (state.servers.length > 0) {
         selectedId = state.servers[0].id;
         serverStore.selectServer(selectedId);
@@ -147,7 +147,7 @@ export class ServerSelectionManager {
    */
   getSelectionState() {
     let state: any;
-    const unsubscribe = this.capabilityStore.subscribe(s => state = s);
+    const unsubscribe = this.capabilityStore.subscribe((s: any) => state = s);
     unsubscribe(); // Immediately cleanup
 
     const currentlySelected = state.servers.find((s: ServerInfo) => s.id === state.selectedServerId);
