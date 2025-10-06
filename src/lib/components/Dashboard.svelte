@@ -1,29 +1,20 @@
 <script lang="ts">
   import { serverStore, getServerStatus, type ServerInfo } from '$lib/stores/serverStore';
-  import { uiStore, type View } from '$lib/stores/uiStore';
-  import ToolExplorer from './ToolExplorer.svelte';
-  import ResourceBrowser from './ResourceBrowser.svelte';
-  import PromptDesigner from './PromptDesigner.svelte';
-  import SamplingWorkbench from './SamplingWorkbench.svelte';
-  import ElicitationFlow from './ElicitationFlow.svelte';
-  import ProtocolInspector from './ProtocolInspector.svelte';
-  import CollectionsManager from './CollectionsManager.svelte';
+  import { uiStore } from '$lib/stores/uiStore';
   import ServerOverview from './ServerOverview.svelte';
   import AddServerModal from './AddServerModal.svelte';
   import ServerConfigModal from './ServerConfigModal.svelte';
-  import Settings from './Settings.svelte';
-  import { 
-    Plus, 
-    Activity, 
-    Zap, 
-    Database, 
+  import {
+    Plus,
+    Activity,
+    Zap,
+    Database,
     FileText,
     AlertCircle,
     CheckCircle,
     Clock
   } from 'lucide-svelte';
 
-  let currentView: View = $state('dashboard');
   let servers: ServerInfo[] = $state([]);
   let selectedServerId: string | undefined = $state(undefined);
   let modals = $state({ addServer: false, serverConfig: false, toolCall: false });
@@ -32,7 +23,6 @@
   // Subscribe to stores
   $effect(() => {
     const unsubscribeUi = uiStore.subscribe((state: any) => {
-      currentView = state.currentView;
       modals = state.modals;
       error = state.error;
     });
@@ -96,9 +86,8 @@
 {/if}
 
 <div class="flex-1 overflow-hidden">
-  {#if currentView === 'dashboard'}
-    <!-- Dashboard View -->
-    <div class="h-full p-6 overflow-y-auto">
+  <!-- Dashboard View -->
+  <div class="h-full p-6 overflow-y-auto">
       <!-- Header -->
       <div class="mb-6">
         <div class="flex items-center justify-between">
@@ -294,32 +283,7 @@
         </div>
       </div>
     </div>
-
-  {:else if currentView === 'tools'}
-    <ToolExplorer />
-
-  {:else if currentView === 'resources'}
-    <ResourceBrowser />
-
-  {:else if currentView === 'prompts'}
-    <PromptDesigner />
-
-  {:else if currentView === 'sampling'}
-    <SamplingWorkbench />
-
-  {:else if currentView === 'elicitation'}
-    <ElicitationFlow />
-
-  {:else if currentView === 'protocol'}
-    <ProtocolInspector />
-
-  {:else if currentView === 'collections'}
-    <CollectionsManager />
-
-  {:else if currentView === 'settings'}
-    <Settings />
-  {/if}
-</div>
+  </div>
 
 <!-- Modals -->
 {#if modals.addServer}

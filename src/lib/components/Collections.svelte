@@ -599,8 +599,8 @@
           class="space-y-4 max-w-2xl"
         >
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
-            <select bind:value={newCollection.type} class="form-select">
+            <label for="collections-new-type" class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+            <select id="collections-new-type" bind:value={newCollection.type} class="form-select">
               <option value="workflow">Workflow</option>
               <option value="tool-sequence">Tool Sequence</option>
               <option value="test-scenario">Test Scenario</option>
@@ -610,8 +610,9 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+            <label for="collections-new-name" class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
             <input
+              id="collections-new-name"
               type="text"
               bind:value={newCollection.name}
               placeholder="Enter collection name..."
@@ -621,8 +622,9 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label for="collections-new-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea
+              id="collections-new-description"
               bind:value={newCollection.description}
               placeholder="Describe what this collection does..."
               class="form-input h-20 resize-none"
@@ -630,8 +632,9 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+            <label for="collections-new-tags" class="block text-sm font-medium text-gray-700 mb-1">Tags</label>
             <input
+              id="collections-new-tags"
               type="text"
               bind:value={newCollection.tags}
               placeholder="development, automation, testing (comma-separated)"

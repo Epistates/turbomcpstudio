@@ -117,7 +117,6 @@
 
   const filteredResources = $derived.by(() => {
     let filtered = resources;
-    console.log('🔍 FILTER DEBUG: Starting with resources:', resources.length);
 
     // Filter by search query
     if (searchQuery.trim()) {
@@ -127,7 +126,6 @@
         resource.name?.toLowerCase().includes(query) ||
         resource.description?.toLowerCase().includes(query)
       );
-      console.log('🔍 FILTER DEBUG: After search filter:', filtered.length);
     }
 
     // Filter by type
@@ -147,10 +145,8 @@
             return true;
         }
       });
-      console.log('🔍 FILTER DEBUG: After type filter:', filtered.length, 'filterType:', filterType);
     }
 
-    console.log('🔍 FILTER DEBUG: Final filtered resources:', filtered.length);
     return filtered;
   });
 
@@ -161,28 +157,16 @@
     try {
       // Check if server supports resources capability
       const serverInfo = await invoke<ServerInfo>('get_server_info', { serverId: selectedServerId });
-      console.log('🔍 RESOURCE DEBUG: Server info received:', serverInfo);
-      console.log('🔍 RESOURCE DEBUG: Capabilities:', serverInfo.capabilities);
-      console.log('🔍 RESOURCE DEBUG: Resources capability:', serverInfo.capabilities?.resources);
-      console.log('🔍 RESOURCE DEBUG: typeof capabilities:', typeof serverInfo.capabilities);
-      console.log('🔍 RESOURCE DEBUG: typeof resources:', typeof serverInfo.capabilities?.resources);
-      console.log('🔍 RESOURCE DEBUG: resources truthy?:', !!serverInfo.capabilities?.resources);
-      console.log('🔍 RESOURCE DEBUG: JSON.stringify capabilities:', JSON.stringify(serverInfo.capabilities, null, 2));
 
       if (!serverInfo.capabilities?.resources) {
         resources = [];
-        console.log('❌ RESOURCE DEBUG: No resources capability found, showing info message');
         uiStore.showInfo('This server does not support resources operations. Try the Tools tab instead.');
         return;
       }
 
-      console.log('✅ RESOURCE DEBUG: Capability check passed, calling list_resources...');
       const resourceList = await invoke('list_resources', { serverId: selectedServerId }) as any[];
-      console.log('✅ RESOURCE DEBUG: list_resources call succeeded, got:', resourceList);
-      console.log('✅ RESOURCE DEBUG: Raw resource list structure:', JSON.stringify(resourceList, null, 2));
 
       resources = resourceList.map((resource: any) => {
-        console.log('✅ RESOURCE DEBUG: Processing resource:', resource);
         return {
           uri: resource.uri,
           name: resource.name || extractNameFromUri(resource.uri),
@@ -192,8 +176,6 @@
         };
       });
 
-      console.log('✅ RESOURCE DEBUG: Processed resources array:', resources);
-      console.log('✅ RESOURCE DEBUG: Resources length:', resources.length);
       uiStore.showSuccess(`Loaded ${resources.length} resources`);
     } catch (error) {
       console.error('Failed to load resources:', error);
@@ -259,13 +241,6 @@
       // Substitute parameters in URI
       let actualUri = selectedResource.uri.replace(`{${parameterName}}`, resourceParameters[parameterName]);
 
-      console.log('🔍 RESOURCE DEBUG: About to call read_resource with:', {
-        serverId: selectedServerId,
-        originalUri: selectedResource.uri,
-        actualUri: actualUri,
-        parameters: resourceParameters
-      });
-
       const content = await invoke('read_resource', {
         serverId: selectedServerId,
         resourceUri: actualUri
@@ -329,11 +304,6 @@
     isHistoricalResult = false;
 
     try {
-      console.log('🔍 RESOURCE DEBUG: About to call read_resource with:', {
-        serverId: selectedServerId,
-        resourceUri: resource.uri
-      });
-
       const content = await invoke('read_resource', {
         serverId: selectedServerId,
         resourceUri: resource.uri

@@ -117,9 +117,7 @@
   });
 
   let filteredPrompts = $derived.by(() => {
-    console.log('🔍 PROMPT FILTER DEBUG: Starting with prompts:', prompts.length);
     if (!searchQuery.trim()) {
-      console.log('🔍 PROMPT FILTER DEBUG: No search query, returning all prompts:', prompts.length);
       return prompts;
     }
 
@@ -129,7 +127,6 @@
       prompt.title?.toLowerCase().includes(query) ||
       prompt.description?.toLowerCase().includes(query)
     );
-    console.log('🔍 PROMPT FILTER DEBUG: After search filter:', filtered.length);
     return filtered;
   });
 
@@ -140,24 +137,14 @@
     try {
       // Check if server supports prompts capability
       const serverInfo = await invoke<ServerInfo>('get_server_info', { serverId: selectedServerId });
-      console.log('🔍 PROMPT DEBUG: Server info received:', serverInfo);
-      console.log('🔍 PROMPT DEBUG: Capabilities:', serverInfo.capabilities);
-      console.log('🔍 PROMPT DEBUG: Prompts capability:', serverInfo.capabilities?.prompts);
-      console.log('🔍 PROMPT DEBUG: typeof capabilities:', typeof serverInfo.capabilities);
-      console.log('🔍 PROMPT DEBUG: typeof prompts:', typeof serverInfo.capabilities?.prompts);
-      console.log('🔍 PROMPT DEBUG: prompts truthy?:', !!serverInfo.capabilities?.prompts);
-      console.log('🔍 PROMPT DEBUG: JSON.stringify capabilities:', JSON.stringify(serverInfo.capabilities, null, 2));
 
       if (!serverInfo.capabilities?.prompts) {
         prompts = [];
-        console.log('❌ PROMPT DEBUG: No prompts capability found, showing info message');
         uiStore.showInfo('This server does not support prompts operations. Try the Tools tab instead.');
         return;
       }
 
-      console.log('✅ PROMPT DEBUG: Capability check passed, calling list_prompts...');
       const promptList = await invoke<any[]>('list_prompts', { serverId: selectedServerId });
-      console.log('✅ PROMPT DEBUG: list_prompts call succeeded, got:', promptList);
       prompts = promptList.map((prompt: any) => ({
         name: prompt.name,
         title: prompt.title,
@@ -171,8 +158,6 @@
         })) : []
       }));
 
-      console.log('✅ PROMPT DEBUG: Processed prompts array:', prompts);
-      console.log('✅ PROMPT DEBUG: Prompts length:', prompts.length);
       uiStore.showSuccess(`Loaded ${prompts.length} prompts`);
     } catch (error) {
       console.error('Failed to load prompts:', error);
@@ -215,13 +200,6 @@
     let executionError: string | undefined;
 
     try {
-      console.log('🔍 PROMPT DEBUG: About to call get_prompt with:', {
-        serverId: selectedServerId,
-        promptName: selectedPrompt.name,
-        parameters: promptArguments,
-        selectedPrompt: selectedPrompt
-      });
-
       const result = await invoke<any>('get_prompt', {
         serverId: selectedServerId,
         promptName: selectedPrompt.name,

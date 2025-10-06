@@ -192,8 +192,6 @@
         invoke('get_llm_config')
       ]);
 
-      console.log('🔧 Settings: Provider status data from backend:', providerStatusData);
-      console.log('🔧 Settings: LLM config data from backend:', llmConfigData);
 
       const backendConfig = llmConfigData as any;
       const activeProviderId = backendConfig?.active_provider;
@@ -204,17 +202,12 @@
         const isActiveProvider = activeProviderId === available.id;
         const providerConfig = backendConfig?.providers?.[available.id];
 
-        console.log(`🔧 Settings: Provider ${available.id}:`);
-        console.log(`  - existing status data:`, existing);
-        console.log(`  - is active provider: ${isActiveProvider}`);
-        console.log(`  - provider config:`, providerConfig);
 
         let status = 'unconfigured';
         if (providerConfig?.enabled) {
           status = isActiveProvider ? 'active' : 'configured';
         }
 
-        console.log(`🔧 Settings: Provider ${available.id} - final status: ${status}`);
 
         return {
           ...available,
@@ -226,7 +219,6 @@
         } as LLMProvider;
       });
 
-      console.log('🔧 Settings: Final providers array:', providers);
     } catch (error) {
       console.error('Failed to load providers:', error);
     } finally {
@@ -418,7 +410,6 @@
       // Preload/warm up the selected model for better UX
       if (quickSetup.provider.type === 'local' && defaultModel && quickSetup.base_url) {
         try {
-          console.log(`🔥 Warming up model: ${defaultModel}`);
           // Send a small completion request to warm up the model
           await invoke('llm_completion_request', {
             baseUrl: quickSetup.base_url,
@@ -428,9 +419,7 @@
             maxTokens: 1,
             temperature: 0.1
           });
-          console.log(`✅ Model ${defaultModel} warmed up successfully`);
         } catch (error) {
-          console.log(`⚠️ Model warmup failed (this is normal): ${error}`);
           // Warmup failure is not critical - the model will load on first real request
         }
       }
@@ -753,8 +742,8 @@
         </div>
 
         <div class="setting-group">
-          <label class="setting-label">Default Temperature</label>
-          <input type="range" min="0" max="2" step="0.1" value="0.7" class="setting-slider" />
+          <label for="settings-default-temperature" class="setting-label">Default Temperature</label>
+          <input id="settings-default-temperature" type="range" min="0" max="2" step="0.1" value="0.7" class="setting-slider" />
           <p class="setting-description">
             Default temperature for sampling requests (0.7 recommended)
           </p>
@@ -836,9 +825,10 @@
         <!-- API Key (if required) -->
         {#if quickSetup.provider.requires_api_key}
           <div class="form-group">
-            <label class="form-label">API Key</label>
+            <label for="settings-api-key" class="form-label">API Key</label>
             <div class="relative">
               <input
+                id="settings-api-key"
                 type={showApiKeys ? "text" : "password"}
                 bind:value={quickSetup.api_key}
                 placeholder="sk-..."
@@ -847,6 +837,7 @@
               <button
                 onclick={() => showApiKeys = !showApiKeys}
                 class="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-75 text-tertiary"
+                aria-label={showApiKeys ? "Hide API key" : "Show API key"}
               >
                 {#if showApiKeys}
                   <EyeOff size={16} />
@@ -860,13 +851,14 @@
 
         <!-- Base URL -->
         <div class="form-group">
-          <label class="form-label">
+          <label for="settings-base-url" class="form-label">
             Base URL
             {#if quickSetup.provider.type === 'local'}
               <span class="text-xs text-gray-500">(Make sure your local server is running)</span>
             {/if}
           </label>
           <input
+            id="settings-base-url"
             type="text"
             bind:value={quickSetup.base_url}
             class="form-input"
@@ -889,8 +881,9 @@
         <!-- Model Selection (shown after successful test) -->
         {#if quickSetup.test_result === 'success' && quickSetup.available_models.length > 0}
           <div class="form-group">
-            <label class="form-label">Default Model</label>
+            <label for="settings-default-model" class="form-label">Default Model</label>
             <select
+              id="settings-default-model"
               bind:value={quickSetup.selected_model}
               class="form-input"
             >

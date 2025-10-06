@@ -121,12 +121,12 @@
     serverStore.selectServer(serverId);
   }
 
-  async function loadRealElicitationRequests() {
+  async function loadElicitationRequests() {
     if (!selectedServerId) return;
 
     loading = true;
     try {
-      // Get real elicitation requests from the MCP server
+      // Get elicitation requests from the MCP server
       const requests = await invoke<any[]>('get_elicitation_requests', {
         serverId: selectedServerId
       });
@@ -275,9 +275,9 @@
   }
 
   onMount(() => {
-    // Load real elicitation requests on component mount
+    // Load elicitation requests on component mount
     if (selectedServerId) {
-      setTimeout(() => loadRealElicitationRequests(), 500);
+      setTimeout(() => loadElicitationRequests(), 500);
     }
   });
 </script>
@@ -290,7 +290,7 @@
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Elicitation</h2>
         <button
-          onclick={loadRealElicitationRequests}
+          onclick={loadElicitationRequests}
           class="btn-primary text-sm"
           title="Load real elicitation requests"
           disabled={loading}
@@ -733,7 +733,7 @@
 
           {#if elicitationFlows.length === 0 && pendingRequests.length === 0}
             <button
-              onclick={loadRealElicitationRequests}
+              onclick={loadElicitationRequests}
               class="btn-primary mt-4"
               disabled={loading}
             >
@@ -742,7 +742,7 @@
                 Loading...
               {:else}
                 <RefreshCw size={16} class="mr-2" />
-                Load Real Requests
+                Refresh Requests
               {/if}
             </button>
           {/if}

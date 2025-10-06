@@ -29,6 +29,12 @@
   let jsonConfig = $state('');
   let jsonError = $state('');
 
+  // Clipboard detection state
+  let clipboardDetected = $state(false);
+  let detectedServerName = $state('');
+  let detectedServerCount = $state(0);
+  let showClipboardBanner = $state(false);
+
   // Form data
   let formData = $state({
     name: '',
@@ -114,6 +120,13 @@
 
   $effect(() => {
     loadTemplates();
+  });
+
+  // Check clipboard for MCP config when modal opens
+  $effect(() => {
+    if (showModal && currentStep === 1) {
+      checkClipboardForConfig();
+    }
   });
 
   async function loadTemplates() {
@@ -236,7 +249,6 @@
 
   // Directory picker for STDIO transport
   async function selectDirectory() {
-    console.log('selectDirectory called');
     try {
       // Temporarily hide modal to prevent z-index interference
       const originalShow = showModal;
@@ -245,20 +257,17 @@
       // Small delay to ensure modal is hidden
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      console.log('Opening directory dialog...');
       const result = await open({
         directory: true,
         multiple: false,
         title: 'Select Working Directory'
       });
-      console.log('Directory dialog result:', result);
 
       // Restore modal
       showModal = originalShow;
 
       if (result && typeof result === 'string') {
         formData.stdio.workingDirectory = result;
-        console.log('Updated working directory to:', result);
       }
     } catch (error) {
       console.error('Failed to select directory:', error);
@@ -269,7 +278,6 @@
 
   // File picker for executable selection
   async function selectExecutable() {
-    console.log('selectExecutable called');
     try {
       // Temporarily hide modal to prevent z-index interference
       const originalShow = showModal;
@@ -278,21 +286,18 @@
       // Small delay to ensure modal is hidden
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      console.log('Opening file dialog...');
       const result = await open({
         directory: false,
         multiple: false,
         title: 'Select Server Executable'
         // No filters - allow all files including extensionless executables
       });
-      console.log('Dialog result:', result);
 
       // Restore modal
       showModal = originalShow;
 
       if (result && typeof result === 'string') {
         formData.stdio.command = result;
-        console.log('Updated command to:', result);
       }
     } catch (error) {
       console.error('Failed to select executable:', error);
@@ -348,6 +353,67 @@
     }
   }
 
+  // Clipboard detection for MCP config
+  async function checkClipboardForConfig() {
+    try {
+      // Use browser's native clipboard API (available in Tauri)
+      const clipboardText = await navigator.clipboard.readText();
+      if (!clipboardText || !clipboardText.trim()) return;
+
+      const detected = detectMCPConfig(clipboardText);
+
+      if (detected.valid) {
+        clipboardDetected = true;
+        detectedServerCount = detected.servers.length;
+        jsonConfig = clipboardText; // Store for both single and multiple
+
+        if (detected.servers.length === 1) {
+          // Single server: pre-fill form and show banner
+          detectedServerName = detected.servers[0].name;
+          showClipboardBanner = true;
+        } else if (detected.servers.length > 1) {
+          // Multiple servers: show JSON import with all servers
+          detectedServerName = `${detected.servers.length} servers`;
+          showClipboardBanner = true;
+        }
+      }
+    } catch (error) {
+      // Silently fail - clipboard might be empty, inaccessible, or not text
+      // This is expected behavior, not an error condition
+    }
+  }
+
+  function detectMCPConfig(text: string): { valid: boolean; servers: Array<{name: string, config: any}> } {
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.mcpServers && typeof parsed.mcpServers === 'object') {
+        const servers = Object.entries(parsed.mcpServers).map(([name, config]) => ({
+          name,
+          config: config as any
+        }));
+        return { valid: true, servers };
+      }
+    } catch {}
+    return { valid: false, servers: [] };
+  }
+
+  function useDetectedConfig() {
+    if (detectedServerCount === 1) {
+      // Single server: import and jump to step 3
+      importFromJson();
+      showClipboardBanner = false;
+    } else {
+      // Multiple servers: open JSON editor
+      showJsonImport = true;
+      showClipboardBanner = false;
+    }
+  }
+
+  function dismissDetection() {
+    showClipboardBanner = false;
+    clipboardDetected = false;
+  }
+
   function importFromJson() {
     try {
       jsonError = '';
@@ -363,68 +429,152 @@
         throw new Error('Invalid config: no servers defined in "mcpServers"');
       }
 
-      // Use the first server if multiple are defined
-      const serverName = serverNames[0];
-      const serverConfig = config.mcpServers[serverName];
-
-      // Import basic fields
-      formData.name = serverName;
-      formData.description = serverConfig.description || '';
-
-      // Determine transport type based on config properties
-      if (serverConfig.command) {
-        // STDIO transport
-        formData.transportType = 'stdio';
-        formData.stdio.command = serverConfig.command;
-        formData.stdio.args = serverConfig.args || [];
-        formData.stdio.workingDirectory = serverConfig.cwd || '';
-        argsInput = (serverConfig.args || []).join(' ');
-
-        // Import environment variables
-        formData.environmentVariables = serverConfig.env || {};
-      } else if (serverConfig.url) {
-        // Determine if it's HTTP or WebSocket based on URL scheme
-        const url = serverConfig.url.toLowerCase();
-        if (url.startsWith('ws://') || url.startsWith('wss://')) {
-          formData.transportType = 'websocket';
-          formData.websocket.url = serverConfig.url;
-          formData.websocket.headers = serverConfig.headers || {};
-          headerPairs = Object.entries(formData.websocket.headers).map(([key, value]) => ({ key, value }));
-        } else {
-          formData.transportType = 'http';
-          formData.http.url = serverConfig.url;
-          formData.http.headers = serverConfig.headers || {};
-          headerPairs = Object.entries(formData.http.headers).map(([key, value]) => ({ key, value }));
-        }
-        formData.environmentVariables = {};
-      } else if (serverConfig.host && serverConfig.port) {
-        // TCP transport
-        formData.transportType = 'tcp';
-        formData.tcp.host = serverConfig.host;
-        formData.tcp.port = serverConfig.port;
-        formData.environmentVariables = {};
-      } else if (serverConfig.path) {
-        // Unix socket transport
-        formData.transportType = 'unix';
-        formData.unix.path = serverConfig.path;
-        formData.environmentVariables = {};
+      // Handle single vs multiple servers
+      if (serverNames.length === 1) {
+        // Single server: use existing logic (import to form)
+        importSingleServer(serverNames[0], config.mcpServers[serverNames[0]]);
       } else {
-        throw new Error('Unable to determine transport type from configuration');
+        // Multiple servers: import all and connect
+        importMultipleServers(config.mcpServers);
       }
-
-      // Ensure header and env pairs have at least one empty entry
-      if (headerPairs.length === 0) headerPairs = [{ key: '', value: '' }];
-
-      envPairs = Object.entries(formData.environmentVariables).map(([key, value]) => ({ key, value }));
-      if (envPairs.length === 0) envPairs = [{ key: '', value: '' }];
-
-      // Jump to final step
-      currentStep = 3;
-      showJsonImport = false;
-
     } catch (error) {
       jsonError = `Failed to import config: ${error}`;
     }
+  }
+
+  function importSingleServer(serverName: string, serverConfig: any) {
+    // Import basic fields
+    formData.name = serverName;
+    formData.description = serverConfig.description || '';
+
+    // Determine transport type based on config properties
+    if (serverConfig.command) {
+      // STDIO transport
+      formData.transportType = 'stdio';
+      formData.stdio.command = serverConfig.command;
+      formData.stdio.args = serverConfig.args || [];
+      formData.stdio.workingDirectory = serverConfig.cwd || '';
+      argsInput = (serverConfig.args || []).join(' ');
+
+      // Import environment variables
+      formData.environmentVariables = serverConfig.env || {};
+    } else if (serverConfig.url) {
+      // Determine if it's HTTP or WebSocket based on URL scheme
+      const url = serverConfig.url.toLowerCase();
+      if (url.startsWith('ws://') || url.startsWith('wss://')) {
+        formData.transportType = 'websocket';
+        formData.websocket.url = serverConfig.url;
+        formData.websocket.headers = serverConfig.headers || {};
+        headerPairs = Object.entries(formData.websocket.headers).map(([key, value]) => ({ key, value }));
+      } else {
+        formData.transportType = 'http';
+        formData.http.url = serverConfig.url;
+        formData.http.headers = serverConfig.headers || {};
+        headerPairs = Object.entries(formData.http.headers).map(([key, value]) => ({ key, value }));
+      }
+      formData.environmentVariables = {};
+    } else if (serverConfig.host && serverConfig.port) {
+      // TCP transport
+      formData.transportType = 'tcp';
+      formData.tcp.host = serverConfig.host;
+      formData.tcp.port = serverConfig.port;
+      formData.environmentVariables = {};
+    } else if (serverConfig.path) {
+      // Unix socket transport
+      formData.transportType = 'unix';
+      formData.unix.path = serverConfig.path;
+      formData.environmentVariables = {};
+    } else {
+      throw new Error('Unable to determine transport type from configuration');
+    }
+
+    // Ensure header and env pairs have at least one empty entry
+    if (headerPairs.length === 0) headerPairs = [{ key: '', value: '' }];
+
+    envPairs = Object.entries(formData.environmentVariables).map(([key, value]) => ({ key, value }));
+    if (envPairs.length === 0) envPairs = [{ key: '', value: '' }];
+
+    // Jump to final step
+    currentStep = 3;
+    showJsonImport = false;
+  }
+
+  async function importMultipleServers(serversConfig: Record<string, any>) {
+    try {
+      const serverNames = Object.keys(serversConfig);
+      const importPromises = serverNames.map(async (name) => {
+        const serverConfig = serversConfig[name];
+
+        // Build ServerConfig for each server
+        const config = await convertMCPConfigToServerConfig(name, serverConfig);
+        return serverStore.connectServer(config);
+      });
+
+      const results = await Promise.allSettled(importPromises);
+      const successful = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      if (successful > 0) {
+        uiStore.showSuccess(`Successfully imported and connected ${successful}/${serverNames.length} server(s)`);
+      }
+      if (failed > 0) {
+        uiStore.showError(`Failed to import ${failed} server(s)`);
+      }
+
+      // Close modals on success
+      showJsonImport = false;
+      closeModal();
+    } catch (error) {
+      jsonError = `Failed to import servers: ${error}`;
+    }
+  }
+
+  async function convertMCPConfigToServerConfig(name: string, mcpConfig: any): Promise<ServerConfig> {
+    let transport: TransportConfig;
+
+    if (mcpConfig.command) {
+      transport = {
+        type: 'stdio',
+        command: mcpConfig.command,
+        args: mcpConfig.args || [],
+        working_directory: mcpConfig.cwd || undefined,
+      };
+    } else if (mcpConfig.url) {
+      const url = mcpConfig.url.toLowerCase();
+      if (url.startsWith('ws://') || url.startsWith('wss://')) {
+        transport = {
+          type: 'websocket',
+          url: mcpConfig.url,
+          headers: mcpConfig.headers || {},
+        };
+      } else {
+        transport = {
+          type: 'http',
+          url: mcpConfig.url,
+          headers: mcpConfig.headers || {},
+        };
+      }
+    } else if (mcpConfig.host && mcpConfig.port) {
+      transport = {
+        type: 'tcp',
+        host: mcpConfig.host,
+        port: mcpConfig.port,
+      };
+    } else if (mcpConfig.path) {
+      transport = {
+        type: 'unix',
+        path: mcpConfig.path,
+      };
+    } else {
+      throw new Error(`Unable to determine transport type for server: ${name}`);
+    }
+
+    return await serverStore.createServerConfig(
+      name,
+      mcpConfig.description || undefined,
+      transport,
+      mcpConfig.env || {}
+    );
   }
 
   async function testConfiguration() {
@@ -545,6 +695,36 @@
         {#if currentStep === 1}
           <!-- Step 1: Choose Transport Type -->
           <div class="space-y-4">
+            <!-- Clipboard Detection Banner -->
+            {#if showClipboardBanner}
+              <div class="clipboard-banner">
+                <div class="flex items-start">
+                  <div class="clipboard-banner-icon">
+                    <Check size={20} />
+                  </div>
+                  <div class="flex-1">
+                    <h4 class="clipboard-banner-title">
+                      Configuration Detected
+                    </h4>
+                    <p class="clipboard-banner-text">
+                      Found <strong>{detectedServerName}</strong> in clipboard
+                      {#if detectedServerCount > 1}
+                        - {detectedServerCount} servers ready to import
+                      {/if}
+                    </p>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <button onclick={useDetectedConfig} class="btn-primary text-sm">
+                      Use {detectedServerCount > 1 ? 'These' : 'This'}
+                    </button>
+                    <button onclick={dismissDetection} class="btn-ghost text-sm">
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              </div>
+            {/if}
+
             <div class="text-center mb-6">
               <h3 class="text-lg font-medium mb-2 text-primary">Choose Transport Type</h3>
               <p class="text-secondary">Select how you want to connect to your MCP server</p>
@@ -574,30 +754,6 @@
             </div>
 
             <!-- Templates -->
-            <!-- TODO: Revisit Quick Start templates - commented out for cleaner UX
-            {#if templates.length > 0}
-              <div class="mt-8">
-                <h4 class="text-sm font-medium text-gray-900 mb-3">Quick Start Templates</h4>
-                <div class="space-y-2">
-                  {#each templates as template}
-                    <button
-                      onclick={() => useTemplate(template)}
-                      class="w-full p-3 text-left bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
-                    >
-                      <div class="flex items-center justify-between">
-                        <div>
-                          <h5 class="font-medium text-gray-900">{template.name}</h5>
-                          <p class="text-xs text-gray-600">{template.description}</p>
-                          <span class="text-xs text-gray-500 uppercase">{template.transport_config.type}</span>
-                        </div>
-                        <FileText size={16} class="text-gray-400" />
-                      </div>
-                    </button>
-                  {/each}
-                </div>
-              </div>
-            {/if}
-            -->
 
             <!-- JSON Import Option -->
             <div class="mt-8 pt-6 border-t border-gray-200">
@@ -627,8 +783,9 @@
             </div>
 
             <div>
-              <label class="form-label">Server Name *</label>
+              <label for="add-server-name" class="form-label">Server Name *</label>
               <input
+                id="add-server-name"
                 type="text"
                 bind:value={formData.name}
                 placeholder="My MCP Server"
@@ -638,8 +795,9 @@
             </div>
 
             <div>
-              <label class="form-label">Description</label>
+              <label for="add-server-description" class="form-label">Description</label>
               <textarea
+                id="add-server-description"
                 bind:value={formData.description}
                 placeholder="Brief description of what this server does..."
                 class="form-input h-20 resize-none"
@@ -674,9 +832,10 @@
 
             {#if formData.transportType === 'stdio'}
               <div>
-                <label class="form-label">Command *</label>
+                <label for="add-server-stdio-command" class="form-label">Command *</label>
                 <div class="flex gap-2">
                   <input
+                    id="add-server-stdio-command"
                     type="text"
                     bind:value={formData.stdio.command}
                     placeholder="node server.js"
@@ -699,8 +858,9 @@
               </div>
 
               <div>
-                <label class="form-label">Arguments</label>
+                <label for="add-server-stdio-args" class="form-label">Arguments</label>
                 <input
+                  id="add-server-stdio-args"
                   type="text"
                   bind:value={argsInput}
                   oninput={updateArgs}
@@ -712,9 +872,10 @@
 
               {#if !isAbsolutePath()}
                 <div>
-                  <label class="form-label">Working Directory</label>
+                  <label for="add-server-stdio-workdir" class="form-label">Working Directory</label>
                   <div class="flex gap-2">
                     <input
+                      id="add-server-stdio-workdir"
                       type="text"
                       bind:value={formData.stdio.workingDirectory}
                       placeholder="/path/to/server"
@@ -732,9 +893,10 @@
                 </div>
               {:else}
                 <div>
-                  <label class="form-label">Working Directory Override</label>
+                  <label for="add-server-stdio-workdir-override" class="form-label">Working Directory Override</label>
                   <div class="flex gap-2">
                     <input
+                      id="add-server-stdio-workdir-override"
                       type="text"
                       bind:value={formData.stdio.workingDirectory}
                       placeholder="Leave empty to use directory from command path"
@@ -754,8 +916,9 @@
 
             {:else if formData.transportType === 'http' || formData.transportType === 'websocket'}
               <div>
-                <label class="form-label">URL *</label>
+                <label for="add-server-http-url" class="form-label">URL *</label>
                 <input
+                  id="add-server-http-url"
                   type="url"
                   value={formData.transportType === 'http' ? formData.http.url : formData.websocket.url}
                   oninput={(e) => {
@@ -776,14 +939,18 @@
                 <label class="form-label">Headers</label>
                 {#each headerPairs as pair, index}
                   <div class="flex items-center space-x-2 mb-2">
+                    <label for="add-server-header-key-{index}" class="sr-only">Header name</label>
                     <input
+                      id="add-server-header-key-{index}"
                       type="text"
                       bind:value={pair.key}
                       oninput={updateHeaders}
                       placeholder="Header name"
                       class="form-input flex-1"
                     />
+                    <label for="add-server-header-value-{index}" class="sr-only">Header value</label>
                     <input
+                      id="add-server-header-value-{index}"
                       type="text"
                       bind:value={pair.value}
                       oninput={updateHeaders}
@@ -793,6 +960,7 @@
                     <button
                       onclick={() => removeHeaderPair(index)}
                       class="p-2 text-red-600 hover:bg-red-50 rounded"
+                      aria-label="Remove header"
                     >
                       <X size={16} />
                     </button>
@@ -809,8 +977,9 @@
             {:else if formData.transportType === 'tcp'}
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="form-label">Host *</label>
+                  <label for="add-server-tcp-host" class="form-label">Host *</label>
                   <input
+                    id="add-server-tcp-host"
                     type="text"
                     bind:value={formData.tcp.host}
                     placeholder="localhost"
@@ -819,8 +988,9 @@
                   />
                 </div>
                 <div>
-                  <label class="form-label">Port *</label>
+                  <label for="add-server-tcp-port" class="form-label">Port *</label>
                   <input
+                    id="add-server-tcp-port"
                     type="number"
                     bind:value={formData.tcp.port}
                     placeholder="8080"
@@ -832,8 +1002,9 @@
 
             {:else if formData.transportType === 'unix'}
               <div>
-                <label class="form-label">Socket Path *</label>
+                <label for="add-server-unix-path" class="form-label">Socket Path *</label>
                 <input
+                  id="add-server-unix-path"
                   type="text"
                   bind:value={formData.unix.path}
                   placeholder="/tmp/mcp.sock"
@@ -1113,5 +1284,26 @@
   .json-import-subtitle {
     font-size: var(--mcp-text-sm);
     color: var(--mcp-text-secondary);
+  }
+
+  /* Clipboard Detection Banner */
+  .clipboard-banner {
+    @apply mb-6 p-4 border rounded-lg;
+    background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
+    border-color: #3b82f6;
+  }
+
+  .clipboard-banner-icon {
+    @apply p-2 rounded-lg mr-3 flex-shrink-0;
+    background-color: #3b82f6;
+    color: white;
+  }
+
+  .clipboard-banner-title {
+    @apply font-semibold text-blue-900 mb-1;
+  }
+
+  .clipboard-banner-text {
+    @apply text-sm text-blue-800;
   }
 </style>

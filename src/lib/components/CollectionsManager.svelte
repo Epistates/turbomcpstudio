@@ -20,6 +20,7 @@
   import ResourceStepConfig from './collections/ResourceStepConfig.svelte';
   import PromptStepConfig from './collections/PromptStepConfig.svelte';
   import SamplingStepConfig from './collections/SamplingStepConfig.svelte';
+  import ElicitationStepConfig from './collections/ElicitationStepConfig.svelte';
   import VariableExtractor from './collections/VariableExtractor.svelte';
   import AssertionEditor from './collections/AssertionEditor.svelte';
   import type {
@@ -690,10 +691,11 @@
                 <div class="space-y-4">
                   <!-- Step Name -->
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label for="collection-step-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Step Name
                     </label>
                     <input
+                      id="collection-step-name"
                       bind:value={selectedStep.name}
                       placeholder="Enter step name..."
                       class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -702,10 +704,11 @@
 
                   <!-- Step Description -->
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label for="collection-step-description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Description
                     </label>
                     <textarea
+                      id="collection-step-description"
                       bind:value={selectedStep.description}
                       placeholder="Describe what this step does..."
                       rows="2"
@@ -715,16 +718,18 @@
 
                   <!-- Step Options -->
                   <div class="flex items-center space-x-6">
-                    <label class="flex items-center space-x-2">
+                    <label for="collection-step-enabled" class="flex items-center space-x-2">
                       <input
+                        id="collection-step-enabled"
                         type="checkbox"
                         bind:checked={selectedStep.enabled}
                         class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
                       />
                       <span class="text-sm text-gray-700 dark:text-gray-300">Enabled</span>
                     </label>
-                    <label class="flex items-center space-x-2">
+                    <label for="collection-step-continue-error" class="flex items-center space-x-2">
                       <input
+                        id="collection-step-continue-error"
                         type="checkbox"
                         bind:checked={selectedStep.continue_on_error}
                         class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
@@ -735,10 +740,11 @@
 
                   <!-- Timeout -->
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label for="collection-step-timeout" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Timeout (ms)
                     </label>
                     <input
+                      id="collection-step-timeout"
                       type="number"
                       bind:value={selectedStep.timeout_ms}
                       min="0"
@@ -762,12 +768,7 @@
                     {:else if selectedStep.operation.type === 'prompt'}
                       <PromptStepConfig operation={selectedStep.operation} {servers} />
                     {:else if selectedStep.operation.type === 'elicitation'}
-                      <!-- TODO: Create ElicitationStepConfig component -->
-                      <div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
-                        <p class="text-sm text-yellow-700 dark:text-yellow-300">
-                          Elicitation operation configuration coming soon - will compose ElicitationFlow logic
-                        </p>
-                      </div>
+                      <ElicitationStepConfig operation={selectedStep.operation} {servers} />
                     {:else}
                       <div class="p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded">
                         <p class="text-sm text-gray-600 dark:text-gray-400">

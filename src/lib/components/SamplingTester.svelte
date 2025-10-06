@@ -228,7 +228,7 @@
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Sampling Tester</h2>
           <p class="text-sm text-gray-600 dark:text-gray-400">
-            Test sampling workflows with {serverData?.config.name || 'server'}
+            Test your MCP server's sampling capability with {serverData?.config.name || 'server'}
           </p>
         </div>
       </div>
@@ -272,10 +272,11 @@
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label for="sampling-api-key" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   API Key {llmProvider === 'openai' ? '(OpenAI)' : '(Anthropic)'}
                 </label>
                 <input
+                  id="sampling-api-key"
                   type="password"
                   bind:value={apiKey}
                   placeholder={llmProvider === 'openai' ? 'sk-...' : 'sk-ant-...'}
@@ -285,8 +286,8 @@
 
               {#if llmProvider === 'openai'}
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model</label>
-                  <select bind:value={model} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                  <label for="sampling-model-openai" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model</label>
+                  <select id="sampling-model-openai" bind:value={model} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
                     <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
                     <option value="gpt-4">GPT-4</option>
                     <option value="gpt-4-turbo">GPT-4 Turbo</option>
@@ -295,8 +296,8 @@
                 </div>
               {:else}
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model</label>
-                  <select bind:value={model} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                  <label for="sampling-model-anthropic" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model</label>
+                  <select id="sampling-model-anthropic" bind:value={model} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
                     <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
                     <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
                     <option value="claude-3-opus-20240229">Claude 3 Opus</option>
@@ -311,10 +312,11 @@
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Model Preferences</h3>
             <div class="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label for="sampling-cost-priority" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Cost Priority: {costPriority}
                 </label>
                 <input
+                  id="sampling-cost-priority"
                   type="range"
                   min="0"
                   max="1"
@@ -324,10 +326,11 @@
                 />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label for="sampling-speed-priority" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Speed Priority: {speedPriority}
                 </label>
                 <input
+                  id="sampling-speed-priority"
                   type="range"
                   min="0"
                   max="1"
@@ -337,10 +340,11 @@
                 />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label for="sampling-intelligence-priority" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Intelligence Priority: {intelligencePriority}
                 </label>
                 <input
+                  id="sampling-intelligence-priority"
                   type="range"
                   min="0"
                   max="1"
@@ -357,8 +361,8 @@
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Context Configuration</h3>
             <div class="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Include Context</label>
-                <select bind:value={includeContext} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                <label for="sampling-include-context" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Include Context</label>
+                <select id="sampling-include-context" bind:value={includeContext} class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
                   <option value="ThisServer">This Server Only</option>
                   <option value="AllServers">All Connected Servers</option>
                   <option value="None">No Server Context</option>
@@ -366,8 +370,9 @@
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">System Prompt</label>
+                <label for="sampling-system-prompt" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">System Prompt</label>
                 <textarea
+                  id="sampling-system-prompt"
                   bind:value={systemPrompt}
                   placeholder="You are a helpful AI assistant..."
                   class="w-full h-24 p-3 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
@@ -382,10 +387,11 @@
             <div class="space-y-4">
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label for="sampling-temperature" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Temperature: {temperature}
                   </label>
                   <input
+                    id="sampling-temperature"
                     type="range"
                     min="0"
                     max="2"
@@ -395,8 +401,9 @@
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Tokens</label>
+                  <label for="sampling-max-tokens" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Tokens</label>
                   <input
+                    id="sampling-max-tokens"
                     type="number"
                     bind:value={maxTokens}
                     min="1"
@@ -407,8 +414,9 @@
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stop Sequences (comma-separated)</label>
+                <label for="sampling-stop-sequences" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stop Sequences (comma-separated)</label>
                 <input
+                  id="sampling-stop-sequences"
                   type="text"
                   bind:value={stopSequences}
                   placeholder="\\n\\n, END, ..."
@@ -423,8 +431,9 @@
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Message Composer</h3>
             <div class="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">User Message</label>
+                <label for="sampling-user-message" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">User Message</label>
                 <textarea
+                  id="sampling-user-message"
                   bind:value={userMessage}
                   placeholder="Enter your message to test sampling..."
                   class="w-full h-24 p-3 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white"

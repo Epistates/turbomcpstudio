@@ -212,8 +212,8 @@
       {#if editedStep.operation.type === 'tool'}
         {@const operation = editedStep.operation as any}
         <div class="form-group">
-          <label class="form-label">Server</label>
-          <select bind:value={operation.server_alias} class="form-select">
+          <label class="form-label" for="step-tool-server">Server</label>
+          <select id="step-tool-server" bind:value={operation.server_alias} class="form-select">
             <option value="">Select a server...</option>
             {#each availableServers() as server}
               <option value={server.id}>{server.config.name}</option>
@@ -222,8 +222,8 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Tool</label>
-          <select bind:value={operation.tool_name} class="form-select" disabled={!operation.server_alias || loadingTools}>
+          <label class="form-label" for="step-tool-name">Tool</label>
+          <select id="step-tool-name" bind:value={operation.tool_name} class="form-select" disabled={!operation.server_alias || loadingTools}>
             <option value="">{loadingTools ? 'Loading tools...' : 'Select a tool...'}</option>
             {#each availableTools as tool}
               <option value={tool.name}>{tool.name}</option>
@@ -232,8 +232,9 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Parameters (JSON)</label>
+          <label class="form-label" for="step-tool-params">Parameters (JSON)</label>
           <textarea
+            id="step-tool-params"
             bind:value={operation.parameters}
             placeholder="&#123;&quot;param&quot;: &quot;value&quot;, &quot;user_id&quot;: &quot;$&#123;user_id&#125;&quot;&#125;"
             class="form-input font-mono text-sm h-32"
@@ -244,8 +245,8 @@
       {:else if editedStep.operation.type === 'resource'}
         {@const operation = editedStep.operation as any}
         <div class="form-group">
-          <label class="form-label">Server</label>
-          <select bind:value={operation.server_alias} class="form-select">
+          <label class="form-label" for="step-resource-server">Server</label>
+          <select id="step-resource-server" bind:value={operation.server_alias} class="form-select">
             <option value="">Select a server...</option>
             {#each availableServers() as server}
               <option value={server.id}>{server.config.name}</option>
@@ -254,8 +255,9 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Resource URI</label>
+          <label class="form-label" for="step-resource-uri">Resource URI</label>
           <input
+            id="step-resource-uri"
             type="text"
             bind:value={operation.resource_uri}
             placeholder="file:///path/to/resource or $&#123;resource_path&#125;"
@@ -267,8 +269,8 @@
       {:else if editedStep.operation.type === 'prompt'}
         {@const operation = editedStep.operation as any}
         <div class="form-group">
-          <label class="form-label">Server</label>
-          <select bind:value={operation.server_alias} class="form-select">
+          <label class="form-label" for="step-prompt-server">Server</label>
+          <select id="step-prompt-server" bind:value={operation.server_alias} class="form-select">
             <option value="">Select a server...</option>
             {#each availableServers() as server}
               <option value={server.id}>{server.config.name}</option>
@@ -277,8 +279,8 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Prompt</label>
-          <select bind:value={operation.prompt_name} class="form-select" disabled={!operation.server_alias || loadingPrompts}>
+          <label class="form-label" for="step-prompt-name">Prompt</label>
+          <select id="step-prompt-name" bind:value={operation.prompt_name} class="form-select" disabled={!operation.server_alias || loadingPrompts}>
             <option value="">{loadingPrompts ? 'Loading prompts...' : 'Select a prompt...'}</option>
             {#each availablePrompts as prompt}
               <option value={prompt.name}>{prompt.name}</option>
@@ -287,8 +289,9 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Arguments (JSON)</label>
+          <label class="form-label" for="step-prompt-args">Arguments (JSON)</label>
           <textarea
+            id="step-prompt-args"
             bind:value={operation.parameters}
             placeholder="&#123;&quot;arg1&quot;: &quot;value&quot;, &quot;context&quot;: &quot;$&#123;context&#125;&quot;&#125;"
             class="form-input font-mono text-sm h-32"
@@ -299,8 +302,8 @@
       {:else if editedStep.operation.type === 'sampling'}
         {@const operation = editedStep.operation as any}
         <div class="form-group">
-          <label class="form-label">Server</label>
-          <select bind:value={operation.server_alias} class="form-select">
+          <label class="form-label" for="step-sampling-server">Server</label>
+          <select id="step-sampling-server" bind:value={operation.server_alias} class="form-select">
             <option value="">Select a server...</option>
             {#each availableServers() as server}
               <option value={server.id}>{server.config.name}</option>
@@ -309,8 +312,9 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Messages (JSON)</label>
+          <label class="form-label" for="step-sampling-messages">Messages (JSON)</label>
           <textarea
+            id="step-sampling-messages"
             bind:value={operation.messages}
             placeholder="[&#123;&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Analyze $&#123;data&#125;&quot;&#125;]"
             class="form-input font-mono text-sm h-32"
@@ -319,8 +323,9 @@
 
         <div class="form-group-row">
           <div class="form-group">
-            <label class="form-label">Max Tokens</label>
+            <label class="form-label" for="step-sampling-max-tokens">Max Tokens</label>
             <input
+              id="step-sampling-max-tokens"
               type="number"
               bind:value={operation.max_tokens}
               class="form-input"
@@ -329,8 +334,9 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Temperature</label>
+            <label class="form-label" for="step-sampling-temperature">Temperature</label>
             <input
+              id="step-sampling-temperature"
               type="number"
               bind:value={operation.temperature}
               class="form-input"
@@ -366,8 +372,9 @@
             <div class="variable-extract-item">
               <div class="form-group-row">
                 <div class="form-group flex-1">
-                  <label class="form-label text-xs">Variable Name</label>
+                  <label class="form-label text-xs" for="step-extract-var-{index}">Variable Name</label>
                   <input
+                    id="step-extract-var-{index}"
                     type="text"
                     bind:value={extract.variable_name}
                     placeholder="user_id"
@@ -376,8 +383,9 @@
                 </div>
 
                 <div class="form-group flex-1">
-                  <label class="form-label text-xs">JSON Path</label>
+                  <label class="form-label text-xs" for="step-extract-path-{index}">JSON Path</label>
                   <input
+                    id="step-extract-path-{index}"
                     type="text"
                     bind:value={extract.path}
                     placeholder="$.response.user.id"
@@ -416,8 +424,9 @@
           {#each editedStep.assertions as assertion, index}
             <div class="assertion-item">
               <div class="form-group">
-                <label class="form-label text-xs">Assertion Name</label>
+                <label class="form-label text-xs" for="step-assertion-name-{index}">Assertion Name</label>
                 <input
+                  id="step-assertion-name-{index}"
                   type="text"
                   bind:value={assertion.name}
                   placeholder="Status code should be 200"
@@ -427,8 +436,8 @@
 
               <div class="form-group-row">
                 <div class="form-group flex-1">
-                  <label class="form-label text-xs">Type</label>
-                  <select bind:value={assertion.type} class="form-select text-sm">
+                  <label class="form-label text-xs" for="step-assertion-type-{index}">Type</label>
+                  <select id="step-assertion-type-{index}" bind:value={assertion.type} class="form-select text-sm">
                     <option value="response_status">Response Status</option>
                     <option value="response_contains">Response Contains</option>
                     <option value="response_equals">Response Equals</option>
@@ -438,8 +447,8 @@
                 </div>
 
                 <div class="form-group flex-1">
-                  <label class="form-label text-xs">Operator</label>
-                  <select bind:value={assertion.condition.operator} class="form-select text-sm">
+                  <label class="form-label text-xs" for="step-assertion-operator-{index}">Operator</label>
+                  <select id="step-assertion-operator-{index}" bind:value={assertion.condition.operator} class="form-select text-sm">
                     <option value="equals">Equals</option>
                     <option value="not_equals">Not Equals</option>
                     <option value="contains">Contains</option>
@@ -459,8 +468,9 @@
               </div>
 
               <div class="form-group">
-                <label class="form-label text-xs">Expected Value</label>
+                <label class="form-label text-xs" for="step-assertion-value-{index}">Expected Value</label>
                 <input
+                  id="step-assertion-value-{index}"
                   type="text"
                   bind:value={assertion.condition.expected_value}
                   placeholder="200"

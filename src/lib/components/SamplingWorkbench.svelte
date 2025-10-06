@@ -368,10 +368,8 @@
             // Use models from backend config instead of fetching again
             if (activeConfig.available_models && activeConfig.available_models.length > 0) {
               availableModels = activeConfig.available_models;
-              console.log('Using models from backend config:', availableModels);
             } else {
               // Only fetch if no models in config
-              console.log('No models in backend config, will need manual refresh');
               availableModels = [];
             }
           }
@@ -419,7 +417,6 @@
 
       if (data?.data) {
         availableModels = data.data.map((model: any) => model.id || model.name) || [];
-        console.log('Loaded models:', availableModels);
       }
     } catch (error) {
       console.error('Failed to load models:', error);
@@ -551,7 +548,6 @@
         const delay = initialDelayMs * Math.pow(2, attempt);
         const jitter = Math.random() * 0.1 * delay; // Add 10% jitter
 
-        console.log(`Request failed, retrying in ${Math.round(delay + jitter)}ms... (attempt ${attempt + 1}/${maxRetries + 1})`);
         await new Promise(resolve => setTimeout(resolve, delay + jitter));
       }
     }
@@ -628,7 +624,6 @@
 
       if (samplingMode === 'ai' && hasLLMConfig) {
         uiStore.showSuccess(`Processing with ${llmConfig.model || activeProviderModel}...`);
-        console.log(`🔥 Starting AI processing with model: ${llmConfig.model || activeProviderModel}`);
       } else {
         uiStore.showSuccess('Sampling request created - awaiting human review');
       }
@@ -671,15 +666,6 @@
             timestamp: new Date().toISOString()
           }
         };
-
-        // Debug: Log what we're sending to the LLM
-        console.log('🤖 Sending to LLM:', {
-          serverId: request.serverId,
-          messages: createMessageRequest.messages,
-          maxTokens: createMessageRequest.max_tokens,
-          temperature: createMessageRequest.temperature,
-          messageContent: createMessageRequest.messages?.[0]?.content || 'NO CONTENT'
-        });
 
         // Use the new runtime LLM configuration system with intelligent retry
         let result: SamplingResponse;
@@ -883,7 +869,6 @@
   $effect(() => {
     const currentView = $uiStore.currentView;
     if (previousView === 'settings' && currentView === 'sampling') {
-      console.log('Returning from Settings to Sampling - refreshing LLM config');
       // Use requestIdleCallback for non-critical updates to prevent blocking
       if (typeof requestIdleCallback !== 'undefined') {
         requestIdleCallback(() => loadLLMProviders());
@@ -969,8 +954,9 @@
       <!-- Server Selection -->
       {#if servers.length > 0}
         <div class="mb-4">
-          <label class="form-label">Server</label>
+          <label for="workbench-server-select" class="form-label">Server</label>
           <select
+            id="workbench-server-select"
             value={selectedServerId}
             onchange={(e) => selectServer((e.target as HTMLSelectElement).value)}
             class="form-input"
@@ -986,7 +972,7 @@
 
       <!-- Quick Test Message Composer -->
       <div class="space-y-3">
-        <label class="form-label flex items-center gap-2">
+        <label for="test-message-input" class="form-label flex items-center gap-2">
           <MessageSquare size={14} />
           Test Message
         </label>
@@ -1055,8 +1041,9 @@
 
           {#if samplingMode === 'ai'}
             <div>
-              <label class="form-label text-xs">System Prompt (Optional)</label>
+              <label for="workbench-system-prompt" class="form-label text-xs">System Prompt (Optional)</label>
               <textarea
+                id="workbench-system-prompt"
                 bind:value={testSystemPrompt}
                 class="form-input text-xs h-12 resize-none"
                 placeholder="Additional context for the AI..."
@@ -1064,8 +1051,9 @@
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="form-label text-xs">Max Tokens</label>
+                <label for="workbench-max-tokens" class="form-label text-xs">Max Tokens</label>
                 <input
+                  id="workbench-max-tokens"
                   type="number"
                   bind:value={testMaxTokens}
                   min="1"
@@ -1074,8 +1062,9 @@
                 />
               </div>
               <div>
-                <label class="form-label text-xs">Temperature</label>
+                <label for="workbench-temperature" class="form-label text-xs">Temperature</label>
                 <input
+                  id="workbench-temperature"
                   type="number"
                   bind:value={testTemperature}
                   min="0"
@@ -1589,10 +1578,11 @@
               </div>
             {:else if selectedRequest.status === 'error' && selectedRequest.error}
               <!-- Error Diagnosis -->
-              {@const diagnosis = diagnoseError(selectedRequest.error, {
-                estimatedTokens: selectedRequest.cost ? Math.ceil(selectedRequest.cost * 1000) : undefined,
+              {@const currentRequest = selectedRequest}
+              {@const diagnosis = diagnoseError(currentRequest.error, {
+                estimatedTokens: currentRequest.cost ? Math.ceil(currentRequest.cost * 1000) : undefined,
                 maxContextWindow: maxContextWindow,
-                serverStatus: servers.find(s => s.id === selectedRequest.serverId)?.status,
+                serverStatus: servers.find(s => s.id === currentRequest.serverId)?.status,
                 hasApiKey: !!(activeProvider?.configured)
               })}
 
@@ -1600,10 +1590,10 @@
                 {diagnosis}
                 onRetry={() => {
                   // Copy request params to test message for retry
-                  testMessage = formatMessageContent(selectedRequest.messages.find(m => m.role === 'user')?.content || '');
-                  if (selectedRequest.systemPrompt) testSystemPrompt = selectedRequest.systemPrompt;
-                  if (selectedRequest.maxTokens) testMaxTokens = selectedRequest.maxTokens;
-                  if (selectedRequest.temperature) testTemperature = selectedRequest.temperature;
+                  testMessage = formatMessageContent(currentRequest.messages.find(m => m.role === 'user')?.content || '');
+                  if (currentRequest.systemPrompt) testSystemPrompt = currentRequest.systemPrompt;
+                  if (currentRequest.maxTokens) testMaxTokens = currentRequest.maxTokens;
+                  if (currentRequest.temperature) testTemperature = currentRequest.temperature;
 
                   // Scroll to test message input
                   document.getElementById('test-message-input')?.scrollIntoView({ behavior: 'smooth' });

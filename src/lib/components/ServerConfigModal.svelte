@@ -248,9 +248,10 @@
 
               <div class="space-y-4">
                 <div>
-                  <label class="text-sm font-medium text-gray-700">Server Name</label>
+                  <label for="server-config-name" class="text-sm font-medium text-gray-700">Server Name</label>
                   {#if editMode}
                     <input
+                      id="server-config-name"
                       type="text"
                       bind:value={editForm.name}
                       class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -262,9 +263,10 @@
                 </div>
 
                 <div>
-                  <label class="text-sm font-medium text-gray-700">Description</label>
+                  <label for="server-config-description" class="text-sm font-medium text-gray-700">Description</label>
                   {#if editMode}
                     <textarea
+                      id="server-config-description"
                       bind:value={editForm.description}
                       class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       rows="2"
@@ -381,7 +383,9 @@
                     <div class="mt-2 space-y-2">
                       {#each Object.entries(editForm.environment_variables) as [key, value], index}
                         <div class="flex items-center space-x-2">
+                          <label for="server-config-env-key-{index}" class="sr-only">Environment variable name</label>
                           <input
+                            id="server-config-env-key-{index}"
                             type="text"
                             value={key}
                             onchange={(e) => updateEnvironmentVariableKey(key, (e.target as HTMLInputElement).value)}
@@ -389,7 +393,9 @@
                             class="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
                           <span class="text-gray-400">=</span>
+                          <label for="server-config-env-value-{index}" class="sr-only">Environment variable value</label>
                           <input
+                            id="server-config-env-value-{index}"
                             type="text"
                             value={value}
                             onchange={(e) => updateEnvironmentVariableValue(key, (e.target as HTMLInputElement).value)}
@@ -399,6 +405,7 @@
                           <button
                             onclick={() => removeEnvironmentVariable(key)}
                             class="text-red-500 hover:text-red-700"
+                            aria-label="Remove environment variable"
                           >
                             <Minus size={14} />
                           </button>
