@@ -89,7 +89,7 @@
 
   // Subscribe to stores
   $effect(() => {
-    const unsubscribeServers = serverStore.subscribe(state => {
+    const unsubscribeServers = serverStore.subscribe((state: any) => {
       // Filter to only show connected servers that support elicitation
       const connectedServers = filterServersByCapability(state.servers, 'elicitation');
       servers = connectedServers;
@@ -109,11 +109,11 @@
     };
   });
 
-  const activeFlows = $derived(() =>
+  const activeFlows = $derived.by(() =>
     elicitationFlows.filter(flow => flow.status === 'active')
   );
 
-  const completedFlows = $derived(() =>
+  const completedFlows = $derived.by(() =>
     elicitationFlows.filter(flow => flow.status === 'completed' || flow.status === 'failed' || flow.status === 'cancelled')
   );
 
@@ -127,20 +127,20 @@
     loading = true;
     try {
       // Get real elicitation requests from the MCP server
-      const requests = await invoke('get_elicitation_requests', {
-        server_id: selectedServerId
+      const requests = await invoke<any[]>('get_elicitation_requests', {
+        serverId: selectedServerId
       });
 
       // Convert the raw requests to our UI format
-      const convertedRequests = requests.map(req => ({
+      const convertedRequests: ElicitationRequest[] = requests.map((req: any) => ({
         id: req.id || crypto.randomUUID(),
-        serverId: selectedServerId,
+        serverId: selectedServerId!,  // Safe due to guard above
         serverName: servers.find(s => s.id === selectedServerId)?.config.name || 'Unknown Server',
         type: req.request_type || 'confirmation',
         title: req.title || 'Server Request',
         message: req.message || req.description || 'Server is requesting user input',
         timestamp: req.timestamp || new Date().toISOString(),
-        status: 'pending',
+        status: 'pending' as const,
         priority: req.priority || 'normal',
         timeout: req.timeout,
         context: req.context,
@@ -450,7 +450,7 @@
           {#if selectedRequest.status === 'pending'}
             <div class="flex items-center space-x-2">
               <button
-                onclick={() => cancelRequest(selectedRequest)}
+                onclick={() => cancelRequest(selectedRequest!)}
                 class="btn-secondary text-sm text-red-600 hover:bg-red-50"
               >
                 <X size={14} class="mr-1" />
@@ -485,7 +485,7 @@
               {#if selectedRequest.type === 'confirmation'}
                 <div class="space-y-3">
                   <button
-                    onclick={() => respondToRequest(selectedRequest, true)}
+                    onclick={() => respondToRequest(selectedRequest!, true)}
                     class="w-full p-3 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg text-left transition-colors"
                   >
                     <div class="flex items-center">
@@ -496,7 +496,7 @@
                     </div>
                   </button>
                   <button
-                    onclick={() => respondToRequest(selectedRequest, false)}
+                    onclick={() => respondToRequest(selectedRequest!, false)}
                     class="w-full p-3 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg text-left transition-colors"
                   >
                     <div class="flex items-center">
@@ -525,7 +525,7 @@
                     />
                   {/if}
                   <button
-                    onclick={() => respondToRequest(selectedRequest, responseData.input)}
+                    onclick={() => respondToRequest(selectedRequest!, responseData.input)}
                     disabled={!responseData.input?.trim()}
                     class="btn-primary"
                   >
@@ -538,7 +538,7 @@
                 <div class="space-y-2">
                   {#each selectedRequest.choices || [] as choice}
                     <button
-                      onclick={() => respondToRequest(selectedRequest, choice.id)}
+                      onclick={() => respondToRequest(selectedRequest!, choice.id)}
                       class="w-full p-3 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-lg text-left transition-colors"
                     >
                       <div class="flex items-start">
@@ -558,7 +558,7 @@
                 <form
                   onsubmit={(e) => {
                     e.preventDefault();
-                    respondToRequest(selectedRequest, responseData);
+                    respondToRequest(selectedRequest!, responseData);
                   }}
                   class="space-y-4"
                 >
@@ -625,17 +625,17 @@
               <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-xs text-green-700 dark:text-green-400 font-medium">
-                    Responded at {selectedRequest.respondedAt ? new Date(selectedRequest.respondedAt).toLocaleTimeString() : ''}
+                    Responded at {selectedRequest!.respondedAt ? new Date(selectedRequest!.respondedAt).toLocaleTimeString() : ''}
                   </span>
                   <button
-                    onclick={() => copyToClipboard(formatResponse(selectedRequest.response))}
+                    onclick={() => copyToClipboard(formatResponse(selectedRequest!.response))}
                     class="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300"
                   >
                     <Copy size={12} />
                   </button>
                 </div>
                 <pre class="text-sm text-green-800 dark:text-green-200 whitespace-pre-wrap font-sans">
-                  {formatResponse(selectedRequest.response)}
+                  {formatResponse(selectedRequest!.response)}
                 </pre>
               </div>
             </div>

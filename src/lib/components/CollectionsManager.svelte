@@ -14,6 +14,14 @@
   import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
   import ExecutionMonitor from './ExecutionMonitor.svelte';
+
+  // NEW: Composed components for operation configuration
+  import ToolStepConfig from './collections/ToolStepConfig.svelte';
+  import ResourceStepConfig from './collections/ResourceStepConfig.svelte';
+  import PromptStepConfig from './collections/PromptStepConfig.svelte';
+  import SamplingStepConfig from './collections/SamplingStepConfig.svelte';
+  import VariableExtractor from './collections/VariableExtractor.svelte';
+  import AssertionEditor from './collections/AssertionEditor.svelte';
   import type {
     Collection,
     WorkflowStep,
@@ -69,8 +77,8 @@
 
   // Subscribe to stores
   $effect(() => {
-    const unsubscribeServers = serverStore.subscribe(state => {
-      servers = state.servers.filter(s => s.status?.toLowerCase() === 'connected');
+    const unsubscribeServers = serverStore.subscribe((state: any) => {
+      servers = state.servers.filter((s: any) => s.status?.toLowerCase() === 'connected');
     });
 
     return () => {
@@ -114,7 +122,7 @@
       updated_at: new Date().toISOString(),
       created_by: 'user',
       version: '1.0.0',
-      last_run: null,
+      last_run: undefined,
       run_count: 0
     };
 
@@ -272,11 +280,11 @@
   let templates: any[] = $state([]);
   let selectedTemplate: any = $state(null);
   let templateName = $state('');
-  let templateVariables = $state({});
+  let templateVariables = $state<Record<string, string>>({});
 
   async function exportCollection(collection: Collection, includeHistory = false) {
     try {
-      const exportData = await invoke('export_collection', {
+      const exportData = await invoke<string>('export_collection', {
         collectionId: collection.id,
         includeExecutionHistory: includeHistory
       });
@@ -461,7 +469,10 @@
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {#each collections as collection}
               <div class="card hover:shadow-lg transition-shadow cursor-pointer"
-                   onclick={() => { selectedCollection = collection; viewMode = 'editor'; }}>
+                   onclick={() => { selectedCollection = collection; viewMode = 'editor'; }}
+                   onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (() => { selectedCollection = collection; viewMode = 'editor'; })()}
+                   role="button"
+                   tabindex="0">
                 <!-- Collection Header -->
                 <div class="flex items-start justify-between mb-3">
                   <div class="flex-1">
@@ -565,7 +576,7 @@
                 {selectedCollection.name}
               </h3>
               <button
-                onclick={() => saveCollection(selectedCollection)}
+                onclick={() => saveCollection(selectedCollection!)}
                 class="btn-primary text-sm"
                 disabled={saving}
               >
@@ -581,28 +592,28 @@
             <!-- Add Step Buttons -->
             <div class="grid grid-cols-2 gap-2">
               <button
-                onclick={() => addWorkflowStep(selectedCollection, 'tool')}
+                onclick={() => addWorkflowStep(selectedCollection!, 'tool')}
                 class="btn-secondary text-sm justify-center"
               >
                 <Zap size={12} class="mr-1" />
                 Tool
               </button>
               <button
-                onclick={() => addWorkflowStep(selectedCollection, 'resource')}
+                onclick={() => addWorkflowStep(selectedCollection!, 'resource')}
                 class="btn-secondary text-sm justify-center"
               >
                 <Database size={12} class="mr-1" />
                 Resource
               </button>
               <button
-                onclick={() => addWorkflowStep(selectedCollection, 'prompt')}
+                onclick={() => addWorkflowStep(selectedCollection!, 'prompt')}
                 class="btn-secondary text-sm justify-center"
               >
                 <MessageSquare size={12} class="mr-1" />
                 Prompt
               </button>
               <button
-                onclick={() => addWorkflowStep(selectedCollection, 'sampling')}
+                onclick={() => addWorkflowStep(selectedCollection!, 'sampling')}
                 class="btn-secondary text-sm justify-center"
               >
                 <Brain size={12} class="mr-1" />
@@ -675,10 +686,119 @@
                 </h4>
               </div>
               <div class="flex-1 overflow-y-auto p-4">
-                <!-- Step configuration form will go here -->
-                <p class="text-gray-600 dark:text-gray-400">
-                  Step editor implementation coming next...
-                </p>
+                <!-- Basic Step Settings -->
+                <div class="space-y-4">
+                  <!-- Step Name -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Step Name
+                    </label>
+                    <input
+                      bind:value={selectedStep.name}
+                      placeholder="Enter step name..."
+                      class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <!-- Step Description -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      bind:value={selectedStep.description}
+                      placeholder="Describe what this step does..."
+                      rows="2"
+                      class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    ></textarea>
+                  </div>
+
+                  <!-- Step Options -->
+                  <div class="flex items-center space-x-6">
+                    <label class="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        bind:checked={selectedStep.enabled}
+                        class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span class="text-sm text-gray-700 dark:text-gray-300">Enabled</span>
+                    </label>
+                    <label class="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        bind:checked={selectedStep.continue_on_error}
+                        class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span class="text-sm text-gray-700 dark:text-gray-300">Continue on Error</span>
+                    </label>
+                  </div>
+
+                  <!-- Timeout -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Timeout (ms)
+                    </label>
+                    <input
+                      type="number"
+                      bind:value={selectedStep.timeout_ms}
+                      min="0"
+                      step="1000"
+                      class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <h5 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                      Operation Configuration
+                    </h5>
+
+                    <!-- NEW: Composed operation-specific components -->
+                    {#if selectedStep.operation.type === 'tool'}
+                      <ToolStepConfig operation={selectedStep.operation} {servers} />
+                    {:else if selectedStep.operation.type === 'resource'}
+                      <ResourceStepConfig operation={selectedStep.operation} {servers} />
+                    {:else if selectedStep.operation.type === 'sampling'}
+                      <SamplingStepConfig operation={selectedStep.operation} {servers} />
+                    {:else if selectedStep.operation.type === 'prompt'}
+                      <PromptStepConfig operation={selectedStep.operation} {servers} />
+                    {:else if selectedStep.operation.type === 'elicitation'}
+                      <!-- TODO: Create ElicitationStepConfig component -->
+                      <div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                        <p class="text-sm text-yellow-700 dark:text-yellow-300">
+                          Elicitation operation configuration coming soon - will compose ElicitationFlow logic
+                        </p>
+                      </div>
+                    {:else}
+                      <div class="p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded">
+                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                          Operation type: {selectedStep.operation.type}
+                        </p>
+                      </div>
+                    {/if}
+                  </div>
+
+                  <!-- NEW: Variable Extraction -->
+                  <VariableExtractor bind:extracts={selectedStep.variable_extracts} />
+
+                  <!-- NEW: Assertions -->
+                  <AssertionEditor bind:assertions={selectedStep.assertions} />
+
+                  <!-- Delete Step Button -->
+                  <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-6">
+                    <button
+                      onclick={() => {
+                        if (confirm('Delete this step?')) {
+                          selectedCollection!.workflow = selectedCollection!.workflow.filter(s => s.id !== selectedStep!.id);
+                          selectedStep = null;
+                        }
+                      }}
+                      class="w-full btn-secondary text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 justify-center"
+                    >
+                      <Trash2 size={14} class="mr-2" />
+                      Delete Step
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           {:else}
@@ -829,13 +949,15 @@
                   </label>
                   <div class="space-y-2 max-h-[120px] overflow-y-auto">
                     {#each Object.entries(selectedTemplate.variables) as [key, defaultValue]}
+                      {@const value = templateVariables[key] ?? String(defaultValue ?? '')}
                       <div>
                         <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">
                           {key}
                         </label>
                         <input
-                          bind:value={templateVariables[key]}
-                          placeholder={defaultValue}
+                          value={value}
+                          oninput={(e) => templateVariables[key] = (e.target as HTMLInputElement).value}
+                          placeholder={String(defaultValue ?? '')}
                           class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded text-sm
                                  bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
                                  focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"

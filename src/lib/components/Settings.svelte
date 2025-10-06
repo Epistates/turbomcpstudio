@@ -7,6 +7,13 @@
   import { invoke } from '@tauri-apps/api/core';
   import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
   import Button from './ui/Button.svelte';
+
+  interface LLMModelsResponse {
+    data: Array<{
+      id?: string;
+      name?: string;
+    }>;
+  }
   import {
     Settings as SettingsIcon,
     Zap,
@@ -268,7 +275,7 @@
 
     try {
       // Use Tauri backend command to bypass CORS restrictions
-      const data = await invoke('fetch_llm_models', {
+      const data = await invoke<LLMModelsResponse>('fetch_llm_models', {
         baseUrl: quickSetup.base_url
       });
 
@@ -320,7 +327,7 @@
         } else {
           try {
             // Fetch models from local LM Studio API using Tauri backend (avoids CORS)
-            const data = await invoke('fetch_llm_models', {
+            const data = await invoke<LLMModelsResponse>('fetch_llm_models', {
               baseUrl: quickSetup.base_url
             });
 
@@ -511,8 +518,8 @@
         <SettingsIcon size={20} class="text-white" />
       </div>
       <div>
-        <h1 class="text-2xl font-semibold" style="color: var(--mcp-text-primary)">Settings</h1>
-        <p class="text-sm" style="color: var(--mcp-text-secondary)">Configure LLM providers and preferences</p>
+        <h1 class="text-2xl font-semibold text-primary">Settings</h1>
+        <p class="text-sm text-secondary">Configure LLM providers and preferences</p>
       </div>
     </div>
     <Button
@@ -563,11 +570,11 @@
             <div class="flex items-center gap-3">
               <span class="text-2xl">{activeProvider.icon}</span>
               <div>
-                <h3 class="font-semibold" style="color: var(--mcp-text-primary)">
+                <h3 class="font-semibold text-primary">
                   {activeProvider.name}
                   <span class="text-green-600 text-sm ml-2">Active</span>
                 </h3>
-                <p class="text-sm" style="color: var(--mcp-text-secondary)">
+                <p class="text-sm text-secondary">
                   {activeProvider.models?.length || 0} models available
                 </p>
               </div>
@@ -578,7 +585,7 @@
       {:else}
         <div class="no-active-provider">
           <AlertCircle size={24} class="text-orange-500 mx-auto mb-2" />
-          <p class="text-center" style="color: var(--mcp-text-secondary)">
+          <p class="text-center text-secondary">
             No active LLM provider. Choose one below to get started.
           </p>
         </div>
@@ -591,9 +598,9 @@
         <div class="section-header">
           <div class="flex items-center gap-2">
             <Cloud size={18} class="text-blue-600" />
-            <h2 class="text-lg font-semibold" style="color: var(--mcp-text-primary)">Cloud Providers</h2>
+            <h2 class="text-lg font-semibold text-primary">Cloud Providers</h2>
           </div>
-          <p class="text-sm" style="color: var(--mcp-text-secondary)">Requires API key</p>
+          <p class="text-sm text-secondary">Requires API key</p>
         </div>
 
         <div class="provider-grid">
@@ -663,9 +670,9 @@
         <div class="section-header">
           <div class="flex items-center gap-2">
             <Monitor size={18} class="text-green-600" />
-            <h2 class="text-lg font-semibold" style="color: var(--mcp-text-primary)">Local Providers</h2>
+            <h2 class="text-lg font-semibold text-primary">Local Providers</h2>
           </div>
-          <p class="text-sm" style="color: var(--mcp-text-secondary)">Run on your machine</p>
+          <p class="text-sm text-secondary">Run on your machine</p>
         </div>
 
         <div class="provider-grid">
@@ -733,7 +740,7 @@
     {:else if activeTab === 'global'}
       <div class="settings-section">
         <h2 class="section-title">Global Settings</h2>
-        <p class="mb-6" style="color: var(--mcp-text-secondary)">Application-wide preferences</p>
+        <p class="mb-6 text-secondary">Application-wide preferences</p>
 
         <div class="setting-group">
           <label class="setting-label">
@@ -757,7 +764,7 @@
     {:else if activeTab === 'usage'}
       <div class="settings-section">
         <h2 class="section-title">Usage & Costs</h2>
-        <p class="mb-6" style="color: var(--mcp-text-secondary)">Track your LLM usage and spending</p>
+        <p class="mb-6 text-secondary">Track your LLM usage and spending</p>
 
         {#if configuredProviders.length > 0}
           <div class="usage-grid">
@@ -791,7 +798,7 @@
         {:else}
           <div class="empty-state">
             <Cpu size={24} class="text-gray-400 mx-auto mb-2" />
-            <p class="text-center" style="color: var(--mcp-text-secondary)">
+            <p class="text-center text-secondary">
               No usage data yet. Configure a provider to start tracking.
             </p>
           </div>
@@ -806,21 +813,21 @@
 <!-- =============================================== -->
 
 {#if quickSetup.show && quickSetup.provider}
-  <div class="modal-overlay" onclick={closeQuickSetup}>
-    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
+  <div class="modal-overlay" onclick={closeQuickSetup} onkeydown={(e) => e.key === 'Escape' && closeQuickSetup()} role="button" tabindex="0">
+    <div class="modal-content" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
       <div class="modal-header">
         <div class="flex items-center gap-3">
           <span class="text-2xl">{quickSetup.provider.icon}</span>
           <div>
-            <h2 class="text-xl font-semibold" style="color: var(--mcp-text-primary)">
+            <h2 class="text-xl font-semibold text-primary">
               Setup {quickSetup.provider.name}
             </h2>
-            <p class="text-sm" style="color: var(--mcp-text-secondary)">
+            <p class="text-sm text-secondary">
               {quickSetup.provider.description}
             </p>
           </div>
         </div>
-        <button onclick={closeQuickSetup} class="hover:opacity-75" style="color: var(--mcp-text-tertiary)">
+        <button onclick={closeQuickSetup} class="hover:opacity-75 text-tertiary">
           ×
         </button>
       </div>
@@ -839,8 +846,7 @@
               />
               <button
                 onclick={() => showApiKeys = !showApiKeys}
-                class="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-75"
-                style="color: var(--mcp-text-tertiary)"
+                class="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-75 text-tertiary"
               >
                 {#if showApiKeys}
                   <EyeOff size={16} />

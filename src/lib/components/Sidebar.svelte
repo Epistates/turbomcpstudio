@@ -18,11 +18,11 @@
 
   // Subscribe to stores
   $effect(() => {
-    const unsubscribeServers = serverStore.subscribe(state => {
+    const unsubscribeServers = serverStore.subscribe((state: any) => {
       servers = state.servers;
     });
 
-    const unsubscribeUi = uiStore.subscribe(state => {
+    const unsubscribeUi = uiStore.subscribe((state: any) => {
       currentView = state.currentView;
     });
 

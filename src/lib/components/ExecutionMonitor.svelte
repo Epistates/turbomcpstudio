@@ -40,7 +40,7 @@
 
     try {
       // Load initial execution state
-      execution = await invoke('get_workflow_execution', { execution_id: executionId });
+      execution = await invoke('get_workflow_execution', { executionId: executionId });
 
       if (execution) {
         events = execution.events || [];
@@ -108,7 +108,8 @@
     }
   }
 
-  function formatDuration(startTime: string, endTime?: string) {
+  function formatDuration(startTime?: string, endTime?: string) {
+    if (!startTime) return '-';
     const start = new Date(startTime).getTime();
     const end = endTime ? new Date(endTime).getTime() : Date.now();
     const duration = end - start;
@@ -131,7 +132,7 @@
     if (!executionId) return;
 
     try {
-      await invoke('stop_workflow_execution', { execution_id: executionId });
+      await invoke('stop_workflow_execution', { executionId: executionId });
     } catch (err) {
       error = `Failed to stop execution: ${err}`;
     }
@@ -224,12 +225,12 @@
     <!-- Step Results -->
     <div class="execution-monitor__section">
       <h3 class="execution-monitor__section-title">
-        Step Results ({execution.step_results?.length || 0})
+        Step Results ({execution.step_results ? Object.keys(execution.step_results).length : 0})
       </h3>
 
-      {#if execution.step_results && execution.step_results.length > 0}
+      {#if execution.step_results && Object.keys(execution.step_results).length > 0}
         <div class="execution-monitor__steps">
-          {#each execution.step_results as stepResult}
+          {#each Object.values(execution.step_results) as stepResult}
             <div class="execution-monitor__step">
               <button
                 class="execution-monitor__step-header"
@@ -267,7 +268,7 @@
                     <h4 class="execution-monitor__step-detail-title">Operation</h4>
                     <div class="execution-monitor__step-detail-content">
                       <div class="execution-monitor__operation-info">
-                        <span class="execution-monitor__operation-type">{stepResult.operation_type.toUpperCase()}</span>
+                        <span class="execution-monitor__operation-type">{stepResult.operation_type?.toUpperCase() || 'UNKNOWN'}</span>
                         <span class="execution-monitor__operation-target">{stepResult.operation_target}</span>
                       </div>
                     </div>
@@ -291,12 +292,12 @@
                     </div>
                   {/if}
 
-                  {#if stepResult.variables_extracted && Object.keys(stepResult.variables_extracted).length > 0}
+                  {#if stepResult.extracted_variables && Object.keys(stepResult.extracted_variables).length > 0}
                     <div class="execution-monitor__step-detail">
                       <h4 class="execution-monitor__step-detail-title">Variables Extracted</h4>
                       <div class="execution-monitor__step-detail-content">
                         <div class="execution-monitor__extracted-variables">
-                          {#each Object.entries(stepResult.variables_extracted) as [key, value]}
+                          {#each Object.entries(stepResult.extracted_variables) as [key, value]}
                             <div class="execution-monitor__extracted-variable">
                               <span class="execution-monitor__extracted-variable-key">${key}</span>
                               <span class="execution-monitor__extracted-variable-value">

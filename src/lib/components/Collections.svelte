@@ -96,8 +96,8 @@
 
   // Subscribe to stores
   $effect(() => {
-    const unsubscribeServers = serverStore.subscribe(state => {
-      const connectedServers = state.servers.filter(s => s.status?.toLowerCase() === 'connected');
+    const unsubscribeServers = serverStore.subscribe((state: any) => {
+      const connectedServers = state.servers.filter((s: any) => s.status?.toLowerCase() === 'connected');
       servers = connectedServers;
 
       if (selectedServerId !== state.selectedServerId) {
@@ -115,7 +115,7 @@
     };
   });
 
-  const filteredCollections = $derived(() => {
+  const filteredCollections = $derived.by(() => {
     let filtered = collections;
 
     // Filter by type
@@ -678,7 +678,7 @@
 
           <div class="flex items-center space-x-2">
             <button
-              onclick={() => toggleStar(selectedCollection)}
+              onclick={() => toggleStar(selectedCollection!)}
               class="p-2 text-gray-400 hover:text-yellow-500 rounded"
             >
               <Star size={16} class="{selectedCollection.starred ? 'text-yellow-500 fill-current' : ''}" />
@@ -686,7 +686,7 @@
 
             {#if selectedCollection.type === 'workflow'}
               <button
-                onclick={() => executeWorkflow(selectedCollection.data)}
+                onclick={() => executeWorkflow(selectedCollection!.data)}
                 disabled={executingWorkflow}
                 class="btn-primary text-sm"
               >
@@ -695,7 +695,7 @@
               </button>
             {:else if selectedCollection.type === 'test-scenario'}
               <button
-                onclick={() => runTestScenario(selectedCollection.data)}
+                onclick={() => runTestScenario(selectedCollection!.data)}
                 class="btn-primary text-sm"
               >
                 <Play size={14} class="mr-1" />
@@ -704,14 +704,14 @@
             {/if}
 
             <button
-              onclick={() => duplicateCollection(selectedCollection)}
+              onclick={() => duplicateCollection(selectedCollection!)}
               class="btn-secondary text-sm"
             >
               <Copy size={14} />
             </button>
 
             <button
-              onclick={() => deleteCollection(selectedCollection)}
+              onclick={() => deleteCollection(selectedCollection!)}
               class="btn-secondary text-sm text-red-600 hover:bg-red-50"
             >
               <Trash2 size={14} />
@@ -875,7 +875,7 @@
           <div class="flex items-center justify-between mb-3">
             <h4 class="text-sm font-medium text-gray-900">Raw Data</h4>
             <button
-              onclick={() => copyToClipboard(JSON.stringify(selectedCollection.data, null, 2))}
+              onclick={() => copyToClipboard(JSON.stringify(selectedCollection!.data, null, 2))}
               class="btn-secondary text-sm"
             >
               <Copy size={14} class="mr-1" />
@@ -883,7 +883,7 @@
             </button>
           </div>
           <div class="bg-gray-50 rounded-lg p-4 font-mono text-xs overflow-auto max-h-64">
-            <pre>{JSON.stringify(selectedCollection.data, null, 2)}</pre>
+            <pre>{JSON.stringify(selectedCollection!.data, null, 2)}</pre>
           </div>
         </div>
       </div>

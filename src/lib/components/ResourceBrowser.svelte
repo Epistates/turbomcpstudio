@@ -5,6 +5,7 @@
   import { uiStore } from '$lib/stores/uiStore';
   import { createCapabilityStore } from '$lib/utils/serverStore';
   import EmptyCapabilityState from '$lib/components/ui/EmptyCapabilityState.svelte';
+  import JsonViewer from '$lib/components/ui/JsonViewer.svelte';
 
   interface ResourceExecution {
     id: string;
@@ -40,6 +41,16 @@
     History
   } from 'lucide-svelte';
 
+  // Type for capability store data
+  interface CapabilityStoreData {
+    servers: ServerInfo[];
+    totalServers: number;
+    connectedServers: number;
+    capableServers: number;
+    hasCapableServers: boolean;
+    selectedServerId: string | undefined;
+  }
+
   // Optimized reactive store for servers with resources capability
   const resourceServersStore = createCapabilityStore('resources');
   let selectedServerId: string | undefined = $state(undefined);
@@ -58,7 +69,7 @@
   let filterType = $state('all');
 
   // Reactive store access using Svelte 5 derived
-  let serverData = $state(null);
+  let serverData = $state<CapabilityStoreData | null>(null);
 
   $effect(() => {
     const unsubscribe = resourceServersStore.subscribe(value => {
@@ -69,7 +80,7 @@
 
   // Listen to global server selection changes
   $effect(() => {
-    const unsubscribe = serverStore.subscribe(state => {
+    const unsubscribe = serverStore.subscribe((state: any) => {
       const globalSelectedId = state.selectedServerId;
 
       // If global selection changed and points to a valid resources server, sync it
@@ -149,7 +160,7 @@
     loading = true;
     try {
       // Check if server supports resources capability
-      const serverInfo = await invoke('get_server_info', { serverId: selectedServerId });
+      const serverInfo = await invoke<ServerInfo>('get_server_info', { serverId: selectedServerId });
       console.log('🔍 RESOURCE DEBUG: Server info received:', serverInfo);
       console.log('🔍 RESOURCE DEBUG: Capabilities:', serverInfo.capabilities);
       console.log('🔍 RESOURCE DEBUG: Resources capability:', serverInfo.capabilities?.resources);
@@ -462,6 +473,15 @@
     uiStore.showSuccess('Copied to clipboard');
   }
 
+  function tryParseJson(str: string): { isJson: boolean; data: any } {
+    try {
+      const parsed = JSON.parse(str);
+      return { isJson: true, data: parsed };
+    } catch {
+      return { isJson: false, data: str };
+    }
+  }
+
   function formatResourceSize(resource: any) {
     // Try to get size from resource metadata or make an intelligent estimate
     if (resource.size !== undefined && resource.size !== null) {
@@ -631,7 +651,6 @@
           <File size={48} class="mx-auto text-gray-400 mb-4" />
           <h3 class="text-lg font-medium text-gray-900 mb-2">No Resources Found</h3>
           <p class="text-gray-600">
-            {#if console.log('🔍 UI DEBUG: Showing no resources. filteredResources.length:', filteredResources.length, 'resources.length:', resources.length)}<!-- -->{/if}
             {searchQuery ? 'No resources match your search' : 'This server has no available resources'}
           </p>
         </div>
@@ -770,28 +789,46 @@
                   <span class="text-gray-600">Loading content...</span>
                 </div>
               {:else if resourceContent}
+                {@const contentParsed = tryParseJson(resourceContent)}
                 <div class="h-full">
                   <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center space-x-2">
-                      <h4 class="text-sm font-medium text-gray-900">Content</h4>
+                      <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">Content</h4>
                       {#if isHistoricalResult}
-                        <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                        <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                           <History size={12} class="mr-1" />
                           Historical Result
                         </span>
                       {/if}
+                      {#if contentParsed.isJson}
+                        <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                          JSON
+                        </span>
+                      {/if}
                     </div>
-                    <button
-                      onclick={() => copyToClipboard(resourceContent)}
-                      class="btn-secondary text-sm"
-                    >
-                      <Copy size={14} class="mr-1" />
-                      Copy
-                    </button>
+                    {#if !contentParsed.isJson}
+                      <button
+                        onclick={() => copyToClipboard(resourceContent)}
+                        class="btn-secondary text-sm"
+                      >
+                        <Copy size={14} class="mr-1" />
+                        Copy
+                      </button>
+                    {/if}
                   </div>
 
-                  <div class="bg-gray-50 rounded-lg p-4 h-full overflow-auto font-mono text-sm">
-                    <pre class="whitespace-pre-wrap">{resourceContent}</pre>
+                  <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 h-full overflow-auto">
+                    {#if contentParsed.isJson}
+                      <JsonViewer
+                        data={contentParsed.data}
+                        expanded={true}
+                        showCopy={true}
+                        showSearch={true}
+                        title="Resource Content"
+                      />
+                    {:else}
+                      <pre class="whitespace-pre-wrap font-mono text-sm text-gray-900 dark:text-gray-100">{resourceContent}</pre>
+                    {/if}
                   </div>
                 </div>
               {:else}

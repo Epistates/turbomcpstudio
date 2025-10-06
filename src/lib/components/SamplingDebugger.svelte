@@ -84,8 +84,8 @@
 
   // Subscribe to stores
   $effect(() => {
-    const unsubscribeServers = serverStore.subscribe(state => {
-      const connectedServers = state.servers.filter(s => s.status?.toLowerCase() === 'connected');
+    const unsubscribeServers = serverStore.subscribe((state: any) => {
+      const connectedServers = state.servers.filter((s: any) => s.status?.toLowerCase() === 'connected');
       servers = connectedServers;
 
       if (selectedServerId !== state.selectedServerId) {
@@ -103,15 +103,15 @@
     };
   });
 
-  const pendingRequests = $derived(() =>
+  const pendingRequests = $derived.by(() =>
     samplingRequests.filter(req => req.status === 'pending')
   );
 
-  const completedRequests = $derived(() =>
+  const completedRequests = $derived.by(() =>
     samplingRequests.filter(req => req.status === 'completed' || req.status === 'error')
   );
 
-  const recentCompletedRequests = $derived(() =>
+  const recentCompletedRequests = $derived.by(() =>
     completedRequests.slice(0, 10)
   );
 
@@ -147,7 +147,7 @@
 
       // Extract usage info if available in result
       if (typeof result === 'object' && result && 'usage' in result) {
-        request.usage = result.usage;
+        request.usage = result.usage as { inputTokens: number; outputTokens: number };
       } else {
         // Fallback usage estimation
         request.usage = {
@@ -328,23 +328,23 @@
         <div class="flex items-center justify-between">
           <div>
             <h3 class="text-lg font-semibold text-gray-900">
-              Sampling Request - {selectedRequest.serverName}
+              Sampling Request - {selectedRequest!.serverName}
             </h3>
             <div class="flex items-center space-x-4 mt-1 text-sm text-gray-600">
-              <span class="px-2 py-1 rounded text-xs {getStatusColor(selectedRequest.status)}">
-                {selectedRequest.status.toUpperCase()}
+              <span class="px-2 py-1 rounded text-xs {getStatusColor(selectedRequest!.status)}">
+                {selectedRequest!.status.toUpperCase()}
               </span>
-              <span>{new Date(selectedRequest.timestamp).toLocaleString()}</span>
-              {#if selectedRequest.duration}
-                <span>{selectedRequest.duration}ms</span>
+              <span>{new Date(selectedRequest!.timestamp).toLocaleString()}</span>
+              {#if selectedRequest!.duration}
+                <span>{selectedRequest!.duration}ms</span>
               {/if}
             </div>
           </div>
 
-          {#if selectedRequest.status === 'pending'}
+          {#if selectedRequest!.status === 'pending'}
             <div class="flex items-center space-x-2">
               <button
-                onclick={() => rejectSamplingRequest(selectedRequest)}
+                onclick={() => rejectSamplingRequest(selectedRequest!)}
                 class="btn-secondary text-sm text-red-600 hover:bg-red-50"
                 disabled={processingRequest}
               >
@@ -352,7 +352,7 @@
                 Reject
               </button>
               <button
-                onclick={() => approveSamplingRequest(selectedRequest)}
+                onclick={() => approveSamplingRequest(selectedRequest!)}
                 class="btn-primary text-sm"
                 disabled={processingRequest}
               >
@@ -370,14 +370,14 @@
           <div class="w-1/2 border-r border-gray-200 p-4 overflow-y-auto">
             <div class="space-y-6">
               <!-- Model Preferences -->
-              {#if selectedRequest.modelPreferences}
+              {#if selectedRequest!.modelPreferences}
                 <div>
                   <h4 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
                     <Brain size={14} class="mr-2" />
                     Model Preferences
                   </h4>
                   <div class="space-y-2">
-                    {#each Object.entries(selectedRequest.modelPreferences) as [key, value]}
+                    {#each Object.entries(selectedRequest!.modelPreferences) as [key, value]}
                       {#if key !== 'hints' && typeof value === 'number'}
                         <div class="flex items-center justify-between">
                           <span class="text-xs text-gray-600">{getModelPreferenceLabel(key)}</span>
@@ -394,11 +394,11 @@
                       {/if}
                     {/each}
 
-                    {#if selectedRequest.modelPreferences.hints}
+                    {#if selectedRequest!.modelPreferences.hints}
                       <div class="mt-3">
                         <span class="text-xs text-gray-600">Hints:</span>
                         <div class="flex flex-wrap gap-1 mt-1">
-                          {#each selectedRequest.modelPreferences.hints as hint}
+                          {#each selectedRequest!.modelPreferences.hints as hint}
                             <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
                               {hint}
                             </span>
@@ -411,27 +411,27 @@
               {/if}
 
               <!-- System Prompt -->
-              {#if selectedRequest.systemPrompt && showSystemPrompts}
+              {#if selectedRequest!.systemPrompt && showSystemPrompts}
                 <div>
                   <h4 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
                     <Settings size={14} class="mr-2" />
                     System Prompt
                   </h4>
                   <div class="bg-gray-50 rounded-lg p-3">
-                    <p class="text-sm font-mono">{selectedRequest.systemPrompt}</p>
+                    <p class="text-sm font-mono">{selectedRequest!.systemPrompt}</p>
                   </div>
                 </div>
               {/if}
 
               <!-- Context -->
-              {#if selectedRequest.includeContext}
+              {#if selectedRequest!.includeContext}
                 <div>
                   <h4 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
                     <FileText size={14} class="mr-2" />
                     Include Context
                   </h4>
                   <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p class="text-sm text-blue-800">{selectedRequest.includeContext}</p>
+                    <p class="text-sm text-blue-800">{selectedRequest!.includeContext}</p>
                   </div>
                 </div>
               {/if}
@@ -440,10 +440,10 @@
               <div>
                 <h4 class="text-sm font-medium text-gray-900 mb-3 flex items-center">
                   <MessageSquare size={14} class="mr-2" />
-                  Messages ({selectedRequest.messages.length})
+                  Messages ({selectedRequest!.messages.length})
                 </h4>
                 <div class="space-y-3">
-                  {#each selectedRequest.messages as message, index}
+                  {#each selectedRequest!.messages as message, index}
                     <div class="border border-gray-200 rounded-lg p-3">
                       <div class="flex items-center justify-between mb-2">
                         <span class="text-xs font-medium text-gray-700 uppercase tracking-wide">
@@ -471,16 +471,16 @@
                   Parameters
                 </h4>
                 <div class="grid grid-cols-2 gap-3 text-sm">
-                  {#if selectedRequest.maxTokens}
+                  {#if selectedRequest!.maxTokens}
                     <div>
                       <span class="text-gray-600">Max Tokens:</span>
-                      <span class="font-medium">{selectedRequest.maxTokens}</span>
+                      <span class="font-medium">{selectedRequest!.maxTokens}</span>
                     </div>
                   {/if}
-                  {#if selectedRequest.temperature}
+                  {#if selectedRequest!.temperature}
                     <div>
                       <span class="text-gray-600">Temperature:</span>
-                      <span class="font-medium">{selectedRequest.temperature}</span>
+                      <span class="font-medium">{selectedRequest!.temperature}</span>
                     </div>
                   {/if}
                 </div>
@@ -492,9 +492,9 @@
           <div class="w-1/2 p-4 overflow-y-auto">
             <div class="flex items-center justify-between mb-4">
               <h4 class="text-sm font-medium text-gray-900">Response</h4>
-              {#if selectedRequest.response}
+              {#if selectedRequest!.response}
                 <button
-                  onclick={() => copyToClipboard(selectedRequest.response || '')}
+                  onclick={() => copyToClipboard(selectedRequest!.response || '')}
                   class="btn-secondary text-sm"
                 >
                   <Copy size={14} class="mr-1" />
@@ -503,29 +503,29 @@
               {/if}
             </div>
 
-            {#if processingRequest && selectedRequest.status === 'approved'}
+            {#if processingRequest && selectedRequest!.status === 'approved'}
               <div class="flex items-center justify-center py-12">
                 <RefreshCw size={24} class="animate-spin text-gray-400 mr-3" />
                 <span class="text-gray-600">Sampling from LLM...</span>
               </div>
-            {:else if selectedRequest.response}
+            {:else if selectedRequest!.response}
               <div class="space-y-4">
                 <!-- Usage Stats -->
-                {#if selectedRequest.usage}
+                {#if selectedRequest!.usage}
                   <div class="bg-gray-50 rounded-lg p-3">
                     <div class="grid grid-cols-3 gap-4 text-center">
                       <div>
                         <p class="text-xs text-gray-600">Input Tokens</p>
-                        <p class="text-lg font-semibold text-gray-900">{selectedRequest.usage.inputTokens}</p>
+                        <p class="text-lg font-semibold text-gray-900">{selectedRequest!.usage.inputTokens}</p>
                       </div>
                       <div>
                         <p class="text-xs text-gray-600">Output Tokens</p>
-                        <p class="text-lg font-semibold text-gray-900">{selectedRequest.usage.outputTokens}</p>
+                        <p class="text-lg font-semibold text-gray-900">{selectedRequest!.usage.outputTokens}</p>
                       </div>
                       <div>
                         <p class="text-xs text-gray-600">Total</p>
                         <p class="text-lg font-semibold text-gray-900">
-                          {selectedRequest.usage.inputTokens + selectedRequest.usage.outputTokens}
+                          {selectedRequest!.usage.inputTokens + selectedRequest!.usage.outputTokens}
                         </p>
                       </div>
                     </div>
@@ -538,23 +538,23 @@
                     <span class="text-xs font-medium text-gray-700 uppercase tracking-wide">
                       Assistant Response
                     </span>
-                    {#if selectedRequest.stopReason}
+                    {#if selectedRequest!.stopReason}
                       <span class="text-xs text-gray-500">
-                        Stop: {selectedRequest.stopReason}
+                        Stop: {selectedRequest!.stopReason}
                       </span>
                     {/if}
                   </div>
                   <div class="prose prose-sm max-w-none">
-                    <pre class="whitespace-pre-wrap font-sans">{selectedRequest.response}</pre>
+                    <pre class="whitespace-pre-wrap font-sans">{selectedRequest!.response}</pre>
                   </div>
                 </div>
               </div>
-            {:else if selectedRequest.status === 'pending'}
+            {:else if selectedRequest!.status === 'pending'}
               <div class="flex items-center justify-center py-12 text-gray-500">
                 <Shield size={24} class="mr-2" />
                 Awaiting approval to sample LLM
               </div>
-            {:else if selectedRequest.status === 'rejected'}
+            {:else if selectedRequest!.status === 'rejected'}
               <div class="flex items-center justify-center py-12 text-red-500">
                 <AlertCircle size={24} class="mr-2" />
                 Request was rejected

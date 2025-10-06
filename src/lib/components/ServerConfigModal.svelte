@@ -35,7 +35,7 @@
 
   // Subscribe to store changes
   $effect(() => {
-    const unsubscribe = serverStore.subscribe(state => {
+    const unsubscribe = serverStore.subscribe((state: any) => {
       servers = state.servers;
       selectedServerId = state.selectedServerId;
     });

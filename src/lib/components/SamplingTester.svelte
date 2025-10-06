@@ -3,20 +3,42 @@
   import { serverStore } from '$lib/stores/serverStore';
   import { invoke } from '@tauri-apps/api/core';
 
+  interface SamplingMessage {
+    role: string;
+    content: string | {
+      type: string;
+      text: string;
+    };
+  }
+
+  interface SamplingResponse {
+    role?: string;
+    content?: {
+      type: string;
+      text: string;
+    };
+    model?: string;
+    stopReason?: string;
+    usage?: {
+      inputTokens: number;
+      outputTokens: number;
+    };
+  }
+
   // Component props using Svelte 5 runes mode
   const { serverId = '' } = $props();
 
   // Get current selected server from store if serverId not provided
   const servers = $derived($serverStore.servers);
-  const selectedServer = $derived($serverStore.selectedServer);
-  const currentServerId = $derived(serverId || selectedServer?.id || '');
+  const selectedServerId = $derived($serverStore.selectedServerId);
+  const currentServerId = $derived(serverId || selectedServerId || '');
   const currentServer = $derived(servers.find(s => s.id === currentServerId));
 
   // Testing state
   let loading = $state(false);
-  let error = $state(null);
-  let lastRequest = $state(null);
-  let lastResponse = $state(null);
+  let error = $state<string | null>(null);
+  let lastRequest = $state<any>(null);
+  let lastResponse = $state<SamplingResponse | null>(null);
 
   // TurboMCP Production Sampling Configuration
   let llmProvider = $state('openai'); // 'openai' | 'anthropic'
@@ -36,7 +58,7 @@
 
   // Context and conversation management
   let includeContext = $state('ThisServer'); // 'ThisServer' | 'AllServers' | 'None'
-  let conversationHistory = $state([]);
+  let conversationHistory = $state<SamplingMessage[]>([]);
   let showAdvanced = $state(false);
   let userMessage = $state('');
 
@@ -71,11 +93,9 @@
       role: 'user',
       content: {
         type: 'text',
-        text: userMessage,
-        annotations: null,
-        meta: null
+        text: userMessage
       }
-    });
+    } as SamplingMessage);
 
     // Build TurboMCP CreateMessageRequest
     const createMessageRequest = {
@@ -94,7 +114,7 @@
       include_context: includeContext,
       temperature: temperature,
       max_tokens: maxTokens,
-      stop_sequences: stopSequences.trim() ? stopSequences.split(',').map(s => s.trim()).filter(Boolean) : null,
+      stop_sequences: stopSequences.trim() ? stopSequences.split(',').map((s: any) => s.trim()).filter(Boolean) : null,
       metadata: {
         user_id: 'mcp-studio-user',
         session_id: crypto.randomUUID(),
@@ -129,10 +149,10 @@
 
     try {
       // Use TurboMCP production sampling through Tauri backend
-      const response = await invoke('create_sampling_request', {
-        server_id: currentServerId,
-        create_message_request: createMessageRequest,
-        llm_backend_config: llmBackendConfig
+      const response = await invoke<SamplingResponse>('create_sampling_request', {
+        serverId: currentServerId,
+        createMessageRequest: createMessageRequest,
+        llmBackendConfig: llmBackendConfig
       });
 
       // Add user message to conversation history
@@ -208,7 +228,7 @@
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Sampling Tester</h2>
           <p class="text-sm text-gray-600 dark:text-gray-400">
-            Test sampling workflows with {serverData?.name || 'server'}
+            Test sampling workflows with {serverData?.config.name || 'server'}
           </p>
         </div>
       </div>
@@ -483,13 +503,13 @@
             <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
               <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                  <span>Model: {lastResponse.model}</span>
-                  <span>Stop: {lastResponse.stopReason}</span>
-                  {#if lastResponse.usage}
-                    <span>Tokens: {lastResponse.usage.inputTokens + lastResponse.usage.outputTokens}</span>
+                  <span>Model: {lastResponse!.model}</span>
+                  <span>Stop: {lastResponse!.stopReason}</span>
+                  {#if lastResponse!.usage}
+                    <span>Tokens: {lastResponse!.usage.inputTokens + lastResponse!.usage.outputTokens}</span>
                   {/if}
                 </div>
-                <Button variant="ghost" onclick={() => navigator.clipboard.writeText(lastResponse.content.text)}>
+                <Button variant="ghost" onclick={() => navigator.clipboard.writeText(lastResponse!.content?.text || '')}>
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                   </svg>
@@ -498,7 +518,7 @@
 
 
               <div class="text-gray-900 dark:text-white">
-                <pre class="whitespace-pre-wrap font-sans">{lastResponse.content.text || lastResponse.content}</pre>
+                <pre class="whitespace-pre-wrap font-sans">{lastResponse!.content?.text || JSON.stringify(lastResponse!.content)}</pre>
               </div>
             </div>
           </section>

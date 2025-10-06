@@ -74,7 +74,7 @@
   // Filter execution history by selected prompt
   let executionHistory = $derived(
     selectedPrompt
-      ? allExecutionHistory.filter((e: any) => e.tool === `prompt:${selectedPrompt.name}`)
+      ? allExecutionHistory.filter((e: any) => e.tool === `prompt:${selectedPrompt!.name}`)
       : allExecutionHistory
   );
 
@@ -85,7 +85,7 @@
 
   // Subscribe to stores
   $effect(() => {
-    const unsubscribeServers = serverStore.subscribe(state => {
+    const unsubscribeServers = serverStore.subscribe((state: any) => {
       // Filter to only show connected servers that support prompts
       const connectedServers = filterServersByCapability(state.servers, 'prompts');
       servers = connectedServers;
@@ -139,7 +139,7 @@
     loading = true;
     try {
       // Check if server supports prompts capability
-      const serverInfo = await invoke('get_server_info', { serverId: selectedServerId });
+      const serverInfo = await invoke<ServerInfo>('get_server_info', { serverId: selectedServerId });
       console.log('🔍 PROMPT DEBUG: Server info received:', serverInfo);
       console.log('🔍 PROMPT DEBUG: Capabilities:', serverInfo.capabilities);
       console.log('🔍 PROMPT DEBUG: Prompts capability:', serverInfo.capabilities?.prompts);
@@ -156,7 +156,7 @@
       }
 
       console.log('✅ PROMPT DEBUG: Capability check passed, calling list_prompts...');
-      const promptList = await invoke('list_prompts', { serverId: selectedServerId });
+      const promptList = await invoke<any[]>('list_prompts', { serverId: selectedServerId });
       console.log('✅ PROMPT DEBUG: list_prompts call succeeded, got:', promptList);
       prompts = promptList.map((prompt: any) => ({
         name: prompt.name,
@@ -222,7 +222,7 @@
         selectedPrompt: selectedPrompt
       });
 
-      const result = await invoke('get_prompt', {
+      const result = await invoke<any>('get_prompt', {
         serverId: selectedServerId,
         promptName: selectedPrompt.name,
         parameters: promptArguments
@@ -397,15 +397,16 @@
           disabled={loading || !selectedServerId}
           class="btn-secondary {loading ? 'opacity-50' : ''}"
         >
-          <RefreshCw size={16} class="{loading ? 'animate-spin' : ''}" />
+          <RefreshCw size={16} class={loading ? 'animate-spin' : ''} />
         </button>
       </div>
 
       <!-- Server Selection -->
       {#if servers.length > 1}
         <div class="mb-3">
-          <label class="block text-xs font-medium text-gray-700 mb-1">Server</label>
+          <label for="prompt-server-select" class="block text-xs font-medium text-gray-700 mb-1">Server</label>
           <select
+            id="prompt-server-select"
             bind:value={selectedServerId}
             onchange={(e) => selectServer(e.currentTarget.value)}
             class="form-select text-sm"

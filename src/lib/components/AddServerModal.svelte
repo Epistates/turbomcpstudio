@@ -119,7 +119,7 @@
   async function loadTemplates() {
     try {
       await serverStore.loadTemplates();
-      const state = serverStore.subscribe(s => {
+      const state = serverStore.subscribe((s: any) => {
         templates = s.templates;
       });
       return state;
@@ -153,31 +153,31 @@
   function useTemplate(template: ServerConfig) {
     formData.name = template.name;
     formData.description = template.description || '';
-    formData.transportType = template.transport.type;
+    formData.transportType = template.transport_config.type;
     
-    switch (template.transport.type) {
+    switch (template.transport_config.type) {
       case 'stdio':
-        formData.stdio.command = template.transport.command || '';
-        formData.stdio.args = template.transport.args || [];
-        formData.stdio.workingDirectory = template.transport.working_directory || '';
-        argsInput = (template.transport.args || []).join(' ');
+        formData.stdio.command = template.transport_config.command || '';
+        formData.stdio.args = template.transport_config.args || [];
+        formData.stdio.workingDirectory = template.transport_config.working_directory || '';
+        argsInput = (template.transport_config.args || []).join(' ');
         break;
       case 'http':
-        formData.http.url = template.transport.url || '';
-        formData.http.headers = template.transport.headers || {};
+        formData.http.url = template.transport_config.url || '';
+        formData.http.headers = template.transport_config.headers || {};
         headerPairs = Object.entries(formData.http.headers).map(([key, value]) => ({ key, value }));
         break;
       case 'websocket':
-        formData.websocket.url = template.transport.url || '';
-        formData.websocket.headers = template.transport.headers || {};
+        formData.websocket.url = template.transport_config.url || '';
+        formData.websocket.headers = template.transport_config.headers || {};
         headerPairs = Object.entries(formData.websocket.headers).map(([key, value]) => ({ key, value }));
         break;
       case 'tcp':
-        formData.tcp.host = template.transport.host || '';
-        formData.tcp.port = template.transport.port || 8080;
+        formData.tcp.host = template.transport_config.host || '';
+        formData.tcp.port = template.transport_config.port || 8080;
         break;
       case 'unix':
-        formData.unix.path = template.transport.path || '';
+        formData.unix.path = template.transport_config.path || '';
         break;
     }
     
@@ -546,8 +546,8 @@
           <!-- Step 1: Choose Transport Type -->
           <div class="space-y-4">
             <div class="text-center mb-6">
-              <h3 class="text-lg font-medium mb-2" style="color: var(--mcp-text-primary)">Choose Transport Type</h3>
-              <p style="color: var(--mcp-text-secondary)">Select how you want to connect to your MCP server</p>
+              <h3 class="text-lg font-medium mb-2 text-primary">Choose Transport Type</h3>
+              <p class="text-secondary">Select how you want to connect to your MCP server</p>
             </div>
 
             <div class="grid grid-cols-1 gap-3">
@@ -588,7 +588,7 @@
                         <div>
                           <h5 class="font-medium text-gray-900">{template.name}</h5>
                           <p class="text-xs text-gray-600">{template.description}</p>
-                          <span class="text-xs text-gray-500 uppercase">{template.transport.type}</span>
+                          <span class="text-xs text-gray-500 uppercase">{template.transport_config.type}</span>
                         </div>
                         <FileText size={16} class="text-gray-400" />
                       </div>
@@ -622,8 +622,8 @@
           <!-- Step 2: Basic Information -->
           <div class="space-y-4">
             <div class="text-center mb-6">
-              <h3 class="text-lg font-medium mb-2" style="color: var(--mcp-text-primary)">Server Information</h3>
-              <p style="color: var(--mcp-text-secondary)">Provide basic details about your MCP server</p>
+              <h3 class="text-lg font-medium mb-2 text-primary">Server Information</h3>
+              <p class="text-secondary">Provide basic details about your MCP server</p>
             </div>
 
             <div>
@@ -668,8 +668,8 @@
           <!-- Step 3: Transport Configuration -->
           <div class="space-y-4">
             <div class="text-center mb-6">
-              <h3 class="text-lg font-medium mb-2" style="color: var(--mcp-text-primary)">Transport Configuration</h3>
-              <p style="color: var(--mcp-text-secondary)">Configure the connection details for your {formData.transportType.toUpperCase()} server</p>
+              <h3 class="text-lg font-medium mb-2 text-primary">Transport Configuration</h3>
+              <p class="text-secondary">Configure the connection details for your {formData.transportType.toUpperCase()} server</p>
             </div>
 
             {#if formData.transportType === 'stdio'}

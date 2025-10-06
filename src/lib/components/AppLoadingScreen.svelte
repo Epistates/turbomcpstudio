@@ -8,15 +8,17 @@
     appStoreLoadingSteps,
     appStoreCompletedSteps,
     appStoreTotalSteps,
-    appStoreState
+    appStoreState,
+    type LoadingStep,
+    type AppState
   } from '$lib/stores/appStore';
 
   // Reactive state using Svelte 5 runes - access store values directly
   let isReady = $state(false);
-  let loadingSteps = $state([]);
+  let loadingSteps = $state<LoadingStep[]>([]);
   let completedSteps = $state(0);
   let totalSteps = $state(4);
-  let appState = $state({
+  let appState = $state<AppState>({
     isInitializing: true,
     databaseReady: false,
     mcpManagerReady: false,

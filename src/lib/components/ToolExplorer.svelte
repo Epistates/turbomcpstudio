@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
   import { serverStore, type ServerInfo, type ToolDefinition, type ToolExecution } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
   import DynamicForm from '$lib/components/ui/DynamicForm.svelte';
+  import JsonViewer from '$lib/components/ui/JsonViewer.svelte';
   import { validateToolParameters, generateDefaultParameters } from '$lib/utils/schemaValidation';
   import { filterServersByCapability } from '$lib/utils/serverCapabilities';
 
@@ -25,7 +27,8 @@
     ChevronRight,
     Copy,
     History,
-    AlertTriangle
+    AlertTriangle,
+    Bookmark
   } from 'lucide-svelte';
 
   let servers: ServerInfo[] = $state([]);
@@ -33,6 +36,7 @@
   let tools: ToolDefinition[] = $state([]);
   let loading = $state(false);
   let searchQuery = $state('');
+  let jsonSearchTerm = $state('');
   let selectedTool: ToolDefinition | null = $state(null);
   let toolParameters = $state<Record<string, any>>({});
   let toolResult: any = $state(null);
@@ -46,14 +50,14 @@
 
   // Subscribe to stores
   $effect(() => {
-    const unsubscribeServers = serverStore.subscribe(state => {
+    const unsubscribeServers = serverStore.subscribe((state: any) => {
       // Filter to only show connected servers that support tools
       const connectedServers = filterServersByCapability(state.servers, 'tools');
       servers = connectedServers;
 
       // Sync with global server selection if it's valid for tools
       const globalSelectedId = state.selectedServerId;
-      if (globalSelectedId && connectedServers.some(s => s.id === globalSelectedId)) {
+      if (globalSelectedId && connectedServers.some((s: any) => s.id === globalSelectedId)) {
         if (selectedServerId !== globalSelectedId) {
           selectedServerId = globalSelectedId;
           // Clear current tool selection when switching servers
@@ -64,7 +68,7 @@
         }
       }
       // Only update selectedServerId if current selection is no longer valid
-      else if (selectedServerId && !connectedServers.find(s => s.id === selectedServerId)) {
+      else if (selectedServerId && !connectedServers.find((s: any) => s.id === selectedServerId)) {
         // Current selection is invalid, pick first available
         selectedServerId = connectedServers.length > 0 ? connectedServers[0].id : undefined;
       } else if (!selectedServerId && connectedServers.length > 0) {
@@ -75,30 +79,31 @@
       // Update execution history from store - FIXED: Show all history when no tool selected
       if (selectedTool) {
         // Filter by specific tool when one is selected
+        const toolName = selectedTool.name;
         executionHistory = selectedServerId
-          ? state.toolExecutions.filter(e =>
+          ? state.toolExecutions.filter((e: any) =>
               e.serverId === selectedServerId &&
-              e.tool === selectedTool.name &&
+              e.tool === toolName &&
               !e.tool.startsWith('prompt:') // Exclude prompt executions
             )
-          : state.toolExecutions.filter(e =>
-              e.tool === selectedTool.name &&
+          : state.toolExecutions.filter((e: any) =>
+              e.tool === toolName &&
               !e.tool.startsWith('prompt:') // Exclude prompt executions
             );
       } else {
         // Show all history when no tool is selected (THIS IS THE KEY FIX)
         executionHistory = selectedServerId
-          ? state.toolExecutions.filter(e =>
+          ? state.toolExecutions.filter((e: any) =>
               e.serverId === selectedServerId &&
               !e.tool.startsWith('prompt:') // Exclude prompt executions
             )
-          : state.toolExecutions.filter(e =>
+          : state.toolExecutions.filter((e: any) =>
               !e.tool.startsWith('prompt:') // Exclude prompt executions
             );
       }
     });
 
-    const unsubscribeUi = uiStore.subscribe(state => {
+    const unsubscribeUi = uiStore.subscribe((state: any) => {
       persistedToolSelection = state.selectedTool;
     });
 
@@ -117,8 +122,8 @@
 
   // Restore persisted tool selection when tools are loaded
   $effect(() => {
-    if (tools.length > 0 && persistedToolSelection && selectedServerId === persistedToolSelection.serverId) {
-      const persistedTool = tools.find(t => t.name === persistedToolSelection.name);
+    if (tools.length > 0 && persistedToolSelection && persistedToolSelection.serverId && selectedServerId === persistedToolSelection.serverId) {
+      const persistedTool = tools.find(t => t.name === persistedToolSelection!.name);
       if (persistedTool && (!selectedTool || selectedTool.name !== persistedTool.name)) {
         selectedTool = persistedTool;
         toolParameters = persistedTool.input_schema ? generateDefaultParameters(persistedTool.input_schema) : {};
@@ -244,10 +249,6 @@
     uiStore.showSuccess('Copied to clipboard');
   }
 
-  function formatJson(obj: any): string {
-    return JSON.stringify(obj, null, 2);
-  }
-
   function selectServer(serverId: string) {
     selectedServerId = serverId;
     // Update global store so other components stay in sync
@@ -267,6 +268,63 @@
       // Also show the previous result
       toolResult = historyItem.result;
       isHistoricalResult = true;
+    }
+  }
+
+  // NEW: Save current tool configuration to a collection
+  async function saveToCollection() {
+    if (!selectedTool || !selectedServerId) return;
+
+    try {
+      // Create a new collection with this tool as first step
+      const newCollection = {
+        id: crypto.randomUUID(),
+        name: `${selectedTool.name} Test`,
+        description: `Test collection for ${selectedTool.name}`,
+        tags: ['tool-test'],
+        workflow: [
+          {
+            id: crypto.randomUUID(),
+            name: `Call ${selectedTool.name}`,
+            description: selectedTool.description || '',
+            enabled: true,
+            continue_on_error: false,
+            timeout_ms: 30000,
+            depends_on: [],
+            execution_order: 0,
+            operation: {
+              type: 'tool',
+              server_alias: selectedServerId,
+              tool_name: selectedTool.name,
+              parameters: { ...toolParameters }
+            },
+            variable_extracts: [],
+            assertions: []
+          }
+        ],
+        variables: {},
+        environment: {
+          name: 'Default',
+          description: 'Default environment',
+          servers: {
+            [selectedServerId]: selectedServerId
+          },
+          variables: {}
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        version: '1.0.0',
+        run_count: 0
+      };
+
+      // Save to database via invoke
+      await invoke('save_collection', { collection: newCollection });
+
+      uiStore.showSuccess(`Saved "${selectedTool.name}" to new collection`);
+      uiStore.setView('collections');
+    } catch (error) {
+      console.error('Failed to save to collection:', error);
+      uiStore.showError(`Failed to save to collection: ${error}`);
     }
   }
 </script>
@@ -391,11 +449,14 @@
               
               <!-- Expanded schema view -->
               {#if expandedTool === tool.name}
-                <div class="mt-3 pt-3 border-t border-gray-200">
-                  <div class="text-xs">
-                    <h4 class="font-medium text-gray-700 mb-2">Input Schema</h4>
-                    <pre class="bg-gray-100 p-2 rounded text-xs overflow-x-auto">{formatJson(tool.input_schema)}</pre>
-                  </div>
+                <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <h4 class="font-medium text-gray-700 dark:text-gray-300 mb-2 text-xs">Input Schema</h4>
+                  <JsonViewer
+                    data={tool.input_schema}
+                    expanded={false}
+                    showCopy={true}
+                    maxHeight="300px"
+                  />
                 </div>
               {/if}
             </button>
@@ -447,8 +508,20 @@
               {#if !validationResult.isValid && showValidationErrors}
                 <div class="flex items-center gap-1 text-sm text-red-600">
                   <AlertTriangle size={14} />
-                  <span>{validationResult.errors.length} validation error{validationResult.errors.length > 1 ? 's' : ''}</span>
+                  <span>{Object.keys(validationResult.errors).length} validation error{Object.keys(validationResult.errors).length > 1 ? 's' : ''}</span>
                 </div>
+              {/if}
+
+              <!-- NEW: Save to Collection button (shows after execution) -->
+              {#if toolResult && !isHistoricalResult}
+                <button
+                  onclick={saveToCollection}
+                  class="btn-secondary flex items-center gap-2"
+                  title="Save this tool configuration to a new collection"
+                >
+                  <Bookmark size={16} />
+                  Save to Collection
+                </button>
               {/if}
 
               <button
@@ -494,34 +567,53 @@
           </div>
 
           <!-- Results Panel -->
-          <div class="min-w-0 flex-1 flex flex-col">
-            <div class="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-              <h3 class="font-medium text-gray-900 flex items-center gap-2">
-                Result
+          <div class="min-w-0 flex-1 flex flex-col bg-white dark:bg-gray-800">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
+              <div class="flex items-center gap-2">
+                <h3 class="font-medium text-gray-900 dark:text-gray-100">
+                  Result
+                </h3>
                 {#if isHistoricalResult}
-                  <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">Historical</span>
+                  <span class="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 px-2 py-1 rounded-full">Historical</span>
                 {/if}
-              </h3>
+              </div>
               {#if toolResult}
-                <button
-                  onclick={() => copyToClipboard(formatJson(toolResult))}
-                  class="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-                  title="Copy result to clipboard"
-                >
-                  <Copy size={14} />
-                </button>
+                <div class="flex items-center gap-2">
+                  <div class="relative">
+                    <Search size={14} class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
+                    <input
+                      type="text"
+                      bind:value={jsonSearchTerm}
+                      placeholder="Search JSON..."
+                      class="pl-7 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    />
+                  </div>
+                  <button
+                    onclick={() => copyToClipboard(JSON.stringify(toolResult, null, 2))}
+                    class="px-3 py-1.5 text-sm flex items-center gap-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md transition-colors"
+                    title="Copy JSON"
+                  >
+                    <Copy size={14} />
+                    Copy
+                  </button>
+                </div>
               {/if}
             </div>
 
-            <div class="flex-1 overflow-y-auto p-4 min-h-0">
+            <div class="flex-1 overflow-hidden min-h-0">
               {#if toolResult}
-                <div class="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm">
-                  <pre class="whitespace-pre-wrap break-words">{formatJson(toolResult)}</pre>
-                </div>
+                <JsonViewer
+                  data={toolResult}
+                  expanded={true}
+                  embedded={true}
+                  bind:searchTerm={jsonSearchTerm}
+                />
               {:else}
-                <div class="text-center py-8">
-                  <CheckCircle size={32} class="mx-auto text-gray-400 mb-2" />
-                  <p class="text-sm text-gray-600">Execute the tool to see results</p>
+                <div class="flex items-center justify-center h-full">
+                  <div class="text-center">
+                    <CheckCircle size={32} class="mx-auto text-gray-400 dark:text-gray-500 mb-2" />
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Execute the tool to see results</p>
+                  </div>
                 </div>
               {/if}
             </div>
@@ -540,31 +632,52 @@
                 <span class="text-xs text-gray-500">{executionHistory.length} executions</span>
               </div>
               
-              <div class="space-y-2 max-h-32 overflow-y-auto">
+              <div class="space-y-2 max-h-48 overflow-y-auto">
                 {#each executionHistory.slice(0, 5) as item}
                   <button
                     onclick={() => rerunFromHistory(item)}
-                    class="w-full p-2 text-left bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded border border-gray-200 dark:border-gray-700 transition-colors"
+                    class="w-full p-3 text-left bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded border border-gray-200 dark:border-gray-700 transition-colors"
                   >
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between mb-1.5">
                       <div class="flex items-center space-x-2">
                         {#if item.status === 'success'}
-                          <CheckCircle size={12} class="text-green-600" />
+                          <CheckCircle size={12} class="text-green-600 dark:text-green-500" />
                         {:else}
-                          <AlertCircle size={12} class="text-red-600" />
+                          <AlertCircle size={12} class="text-red-600 dark:text-red-500" />
                         {/if}
                         <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{item.tool}</span>
                       </div>
-                      <span class="text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(item.timestamp).toLocaleTimeString()}
-                      </span>
+                      <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                        {#if item.duration}
+                          <span class="flex items-center gap-1">
+                            <Clock size={10} />
+                            {item.duration}ms
+                          </span>
+                        {/if}
+                        <span>{new Date(item.timestamp).toLocaleTimeString()}</span>
+                      </div>
                     </div>
-                    <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
-                      {Object.keys(item.parameters).length} parameters
-                      {#if item.duration}
-                        • {item.duration}ms
-                      {/if}
-                    </p>
+                    {#if Object.keys(item.parameters).length > 0}
+                      <div class="mt-1.5 pl-5">
+                        <div class="text-xs font-mono text-gray-600 dark:text-gray-400 space-y-0.5">
+                          {#each Object.entries(item.parameters).slice(0, 3) as [key, value]}
+                            <div class="flex items-start gap-1.5">
+                              <span class="text-gray-500 dark:text-gray-500 shrink-0">{key}:</span>
+                              <span class="truncate text-gray-700 dark:text-gray-300">
+                                {typeof value === 'string' ? value : JSON.stringify(value)}
+                              </span>
+                            </div>
+                          {/each}
+                          {#if Object.keys(item.parameters).length > 3}
+                            <div class="text-gray-400 dark:text-gray-500 italic">
+                              +{Object.keys(item.parameters).length - 3} more...
+                            </div>
+                          {/if}
+                        </div>
+                      </div>
+                    {:else}
+                      <p class="text-xs text-gray-500 dark:text-gray-400 pl-5 italic">No parameters</p>
+                    {/if}
                   </button>
                 {/each}
               </div>

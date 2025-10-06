@@ -9,6 +9,8 @@
   import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
   import Button from './ui/Button.svelte';
+  import ErrorDiagnosis from './ui/ErrorDiagnosis.svelte';
+  import { diagnoseError } from '$lib/utils/errorDiagnosis';
   import {
     MessageSquare,
     Bot,
@@ -65,6 +67,17 @@
     hints?: { name: string }[];
   }
 
+  interface SamplingResponse {
+    role: 'assistant';
+    content: { type: 'text'; text: string };
+    model?: string;
+    stopReason?: string;
+    usage?: {
+      inputTokens: number;
+      outputTokens: number;
+    };
+  }
+
   interface SamplingRequest {
     id: string;
     serverId: string;
@@ -78,22 +91,14 @@
     stopSequences?: string[];
     timestamp: string;
     status: 'pending' | 'approved' | 'rejected' | 'completed' | 'error';
-    response?: {
-      role: 'assistant';
-      content: { type: 'text'; text: string };
-      model?: string;
-      stopReason?: string;
-      usage?: {
-        inputTokens: number;
-        outputTokens: number;
-      };
-    };
+    response?: SamplingResponse;
+    error?: any; // Error information for diagnosis
     duration?: number;
     cost?: number;
   }
 
   interface LLMConfig {
-    provider: 'openai' | 'anthropic';
+    provider: 'openai' | 'anthropic' | 'local';
     apiKey: string;
     baseUrl?: string;
     organization?: string;
@@ -199,7 +204,7 @@
   function updateCanTestAI() {
     clearTimeout(canTestAITimeout);
     canTestAITimeout = setTimeout(() => {
-      canTestAI = selectedServerId && hasLLMConfig && testMessage.trim().length > 0 && !creatingRequest;
+      canTestAI = !!(selectedServerId && hasLLMConfig && testMessage.trim().length > 0 && !creatingRequest);
     }, 100); // Very fast update for UI responsiveness
   }
 
@@ -283,7 +288,7 @@
 
   // Use derived state instead of subscription effect for better performance
   const connectedServers = $derived(
-    $serverStore.servers.filter(s =>
+    $serverStore.servers.filter((s: any) =>
       s.status?.toLowerCase() === 'connected' &&
       s.capabilities?.sampling
     )
@@ -348,8 +353,8 @@
             };
 
             llmConfig = {
-              provider: activeConfig.provider_type === 'local' ? 'local' :
-                       activeConfig.provider_type === 'anthropic' ? 'anthropic' : 'openai',
+              provider: (activeConfig.provider_type === 'local' ? 'local' :
+                       activeConfig.provider_type === 'anthropic' ? 'anthropic' : 'openai') as 'openai' | 'anthropic' | 'local',
               apiKey: '', // Don't expose API keys in frontend
               baseUrl: activeConfig.base_url || 'http://localhost:1234/v1',
               model: activeConfig.default_model || 'gpt-3.5-turbo',
@@ -375,7 +380,7 @@
           // Reset to show unconfigured state
           activeLLMProvider = null;
           llmConfig = {
-            provider: 'local',
+            provider: 'local' as const,
             apiKey: '',
             baseUrl: 'http://localhost:1234/v1',
             model: '',
@@ -408,11 +413,11 @@
     if (!llmConfig.baseUrl) return;
 
     try {
-      const data = await invoke('fetch_llm_models', {
+      const data = await invoke<{ data?: any[] }>('fetch_llm_models', {
         baseUrl: llmConfig.baseUrl
       });
 
-      if (data && data.data) {
+      if (data?.data) {
         availableModels = data.data.map((model: any) => model.id || model.name) || [];
         console.log('Loaded models:', availableModels);
       }
@@ -565,8 +570,8 @@
   }
 
   // Initialize LLM providers on mount
-  onMount(async () => {
-    await loadLLMProviders();
+  onMount(() => {
+    loadLLMProviders();
 
     // Refresh provider status every 30 seconds
     const interval = setInterval(loadLLMProviders, 30000);
@@ -611,7 +616,7 @@
         maxTokens: testMaxTokens,
         temperature: testTemperature,
         timestamp: new Date().toISOString(),
-        status: samplingMode === 'ai' ? 'processing' : 'pending'
+        status: 'pending' as const
       };
 
       // Show immediate feedback
@@ -669,21 +674,21 @@
 
         // Debug: Log what we're sending to the LLM
         console.log('🤖 Sending to LLM:', {
-          server_id: request.serverId,
+          serverId: request.serverId,
           messages: createMessageRequest.messages,
-          max_tokens: createMessageRequest.max_tokens,
+          maxTokens: createMessageRequest.max_tokens,
           temperature: createMessageRequest.temperature,
-          message_content: createMessageRequest.messages?.[0]?.content || 'NO CONTENT'
+          messageContent: createMessageRequest.messages?.[0]?.content || 'NO CONTENT'
         });
 
         // Use the new runtime LLM configuration system with intelligent retry
-        let result;
+        let result: SamplingResponse;
         try {
           result = await retryWithExponentialBackoff(async () => {
-            return await invoke('create_sampling_request', {
-              server_id: request.serverId,
+            return await invoke<SamplingResponse>('create_sampling_request', {
+              serverId: request.serverId,
               messages: createMessageRequest.messages,
-              max_tokens: createMessageRequest.max_tokens,
+              maxTokens: createMessageRequest.max_tokens,
               temperature: createMessageRequest.temperature
             });
           });
@@ -709,7 +714,7 @@
       } else {
         // HITL mode - use real HITL sampling system
         try {
-          const hitlResult = await invoke('process_hitl_sampling_request', {
+          const hitlResult = await invoke<{ response: any; status: string }>('process_hitl_sampling_request', {
             serverId: request.serverId,
             serverName: request.serverName,
             request: {
@@ -756,6 +761,7 @@
 
     } catch (error) {
       request.status = 'error';
+      request.error = error; // Store error for diagnosis
       request.response = {
         role: 'assistant',
         content: {
@@ -1344,7 +1350,7 @@
               <Button
                 variant="secondary"
                 size="sm"
-                onclick={() => rejectRequest(selectedRequest)}
+                onclick={() => rejectRequest(selectedRequest!)}
                 disabled={processing}
               >
                 <Square size={14} />
@@ -1355,7 +1361,7 @@
                 <Button
                   variant="primary"
                   size="sm"
-                  onclick={() => approveAndProcess(selectedRequest, false)}
+                  onclick={() => approveAndProcess(selectedRequest!, false)}
                   disabled={processing}
                 >
                   <User size={14} />
@@ -1367,7 +1373,7 @@
                 <Button
                   variant="secondary"
                   size="sm"
-                  onclick={() => approveAndProcess(selectedRequest, false)}
+                  onclick={() => approveAndProcess(selectedRequest!, false)}
                   disabled={processing}
                 >
                   <User size={14} />
@@ -1376,7 +1382,7 @@
                 <Button
                   variant="primary"
                   size="sm"
-                  onclick={() => approveAndProcess(selectedRequest, true)}
+                  onclick={() => approveAndProcess(selectedRequest!, true)}
                   disabled={processing}
                   loading={processing}
                 >
@@ -1399,10 +1405,10 @@
                 variant="secondary"
                 size="sm"
                 onclick={() => {
-                  testMessage = formatMessageContent(selectedRequest.messages.find(m => m.role === 'user')?.content || '');
-                  testSystemPrompt = selectedRequest.systemPrompt || '';
-                  testMaxTokens = selectedRequest.maxTokens || 500;
-                  testTemperature = selectedRequest.temperature || 0.7;
+                  testMessage = formatMessageContent(selectedRequest!.messages.find(m => m.role === 'user')?.content || '');
+                  testSystemPrompt = selectedRequest!.systemPrompt || '';
+                  testMaxTokens = selectedRequest!.maxTokens || 500;
+                  testTemperature = selectedRequest!.temperature || 0.7;
                 }}
               >
                 <RotateCcw size={14} />
@@ -1550,7 +1556,7 @@
               <h4 class="font-medium text-gray-900 dark:text-white">Response</h4>
               {#if selectedRequest.response}
                 <button
-                  onclick={() => copyToClipboard(formatMessageContent(selectedRequest.response?.content))}
+                  onclick={() => copyToClipboard(formatMessageContent(selectedRequest!.response?.content))}
                   class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                   title="Copy response"
                 >
@@ -1581,6 +1587,30 @@
                   </div>
                 </div>
               </div>
+            {:else if selectedRequest.status === 'error' && selectedRequest.error}
+              <!-- Error Diagnosis -->
+              {@const diagnosis = diagnoseError(selectedRequest.error, {
+                estimatedTokens: selectedRequest.cost ? Math.ceil(selectedRequest.cost * 1000) : undefined,
+                maxContextWindow: maxContextWindow,
+                serverStatus: servers.find(s => s.id === selectedRequest.serverId)?.status,
+                hasApiKey: !!(activeProvider?.configured)
+              })}
+
+              <ErrorDiagnosis
+                {diagnosis}
+                onRetry={() => {
+                  // Copy request params to test message for retry
+                  testMessage = formatMessageContent(selectedRequest.messages.find(m => m.role === 'user')?.content || '');
+                  if (selectedRequest.systemPrompt) testSystemPrompt = selectedRequest.systemPrompt;
+                  if (selectedRequest.maxTokens) testMaxTokens = selectedRequest.maxTokens;
+                  if (selectedRequest.temperature) testTemperature = selectedRequest.temperature;
+
+                  // Scroll to test message input
+                  document.getElementById('test-message-input')?.scrollIntoView({ behavior: 'smooth' });
+                  document.getElementById('test-message-input')?.focus();
+                }}
+              />
+
             {:else if selectedRequest.response}
               <div class="space-y-4">
 

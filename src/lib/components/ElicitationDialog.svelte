@@ -1,26 +1,48 @@
 <script lang="ts">
   import Button from './ui/Button.svelte';
+  import SchemaValidator from './ui/SchemaValidator.svelte';
   import { invoke } from '@tauri-apps/api/core';
-  
+  import type { JsonSchema } from '$lib/utils/schemaValidation';
+  import { validateElicitationSchema } from '$lib/utils/elicitationSchemaValidator';
+
+  interface ElicitationRequest {
+    id: string;
+    serverId: string;
+    serverName?: string;
+    message: string;
+    requestedSchema: JsonSchema;
+  }
+
   // Component props using Svelte 5 runes mode
   const {
     visible = false,
     request = null,
     onResponse = () => {},
     onClose = () => {}
+  }: {
+    visible?: boolean;
+    request?: ElicitationRequest | null;
+    onResponse?: (data: any) => void;
+    onClose?: () => void;
   } = $props();
 
   // Local state using Svelte 5 runes
-  let formData = $state({});
-  let validationErrors = $state({});
+  let formData = $state<Record<string, any>>({});
+  let validationErrors = $state<Record<string, string>>({});
   let submitting = $state(false);
-  let error = $state(null);
+  let error = $state<string | null>(null);
+  let showSchemaValidation = $state(false);
+
+  // Validate schema when request changes
+  const schemaValidationResult = $derived(
+    request?.requestedSchema ? validateElicitationSchema(request.requestedSchema) : null
+  );
 
   // Reset form data when request changes
   $effect(() => {
     if (request?.requestedSchema) {
       const schema = request.requestedSchema;
-      const initialData = {};
+      const initialData: Record<string, any> = {};
       
       // Initialize form data with defaults from schema
       if (schema.properties) {
@@ -54,9 +76,9 @@
 
   function validateForm() {
     if (!request?.requestedSchema) return true;
-    
+
     const schema = request.requestedSchema;
-    const errors = {};
+    const errors: Record<string, string> = {};
     let isValid = true;
 
     // Check required fields
@@ -239,7 +261,30 @@
 
     <div class="overflow-auto max-h-[calc(90vh-120px)]">
       <div class="p-6">
-        
+
+        <!-- Schema Validation (Collapsible) -->
+        {#if schemaValidationResult && (!schemaValidationResult.valid || schemaValidationResult.warnings.length > 0)}
+          <div class="mb-4">
+            <button
+              onclick={() => showSchemaValidation = !showSchemaValidation}
+              class="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              {showSchemaValidation ? '▼' : '▶'} Schema Validation
+              {#if !schemaValidationResult.valid}
+                <span class="text-red-600 dark:text-red-400">(has errors)</span>
+              {:else if schemaValidationResult.warnings.length > 0}
+                <span class="text-yellow-600 dark:text-yellow-400">(has warnings)</span>
+              {/if}
+            </button>
+
+            {#if showSchemaValidation}
+              <div class="mt-2">
+                <SchemaValidator result={schemaValidationResult} compact />
+              </div>
+            {/if}
+          </div>
+        {/if}
+
         <!-- Request Message -->
         <div class="mb-6">
           <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
@@ -251,7 +296,7 @@
 
         <!-- Form Fields -->
         {#if request.requestedSchema?.properties}
-        <form on:submit|preventDefault={handleSubmit} class="space-y-4">
+        <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-4">
           {#each Object.entries(request.requestedSchema.properties) as [key, prop]}
             {@const field = renderFormField(key, prop)}
             <div>

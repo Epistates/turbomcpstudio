@@ -6,6 +6,7 @@
   import PromptDesigner from './PromptDesigner.svelte';
   import SamplingWorkbench from './SamplingWorkbench.svelte';
   import ElicitationFlow from './ElicitationFlow.svelte';
+  import ProtocolInspector from './ProtocolInspector.svelte';
   import CollectionsManager from './CollectionsManager.svelte';
   import ServerOverview from './ServerOverview.svelte';
   import AddServerModal from './AddServerModal.svelte';
@@ -30,13 +31,13 @@
 
   // Subscribe to stores
   $effect(() => {
-    const unsubscribeUi = uiStore.subscribe(state => {
+    const unsubscribeUi = uiStore.subscribe((state: any) => {
       currentView = state.currentView;
       modals = state.modals;
       error = state.error;
     });
 
-    const unsubscribeServers = serverStore.subscribe(state => {
+    const unsubscribeServers = serverStore.subscribe((state: any) => {
       servers = state.servers;
       selectedServerId = state.selectedServerId;
     });
@@ -52,14 +53,14 @@
   );
 
   const connectedServers = $derived(
-    servers.filter(s => getServerStatus(s) === 'connected')
+    servers.filter((s: any) => getServerStatus(s) === 'connected')
   );
 
   const stats = $derived({
     total: servers.length,
     connected: connectedServers.length,
-    disconnected: servers.filter(s => getServerStatus(s) === 'disconnected').length,
-    error: servers.filter(s => getServerStatus(s) === 'error').length,
+    disconnected: servers.filter((s: any) => getServerStatus(s) === 'disconnected').length,
+    error: servers.filter((s: any) => getServerStatus(s) === 'error').length,
   });
 
   function openAddServer() {
@@ -102,8 +103,8 @@
       <div class="mb-6">
         <div class="flex items-center justify-between">
           <div>
-            <h1 class="text-2xl font-bold" style="color: var(--mcp-text-primary)">Dashboard</h1>
-            <p style="color: var(--mcp-text-secondary)">Manage your MCP server connections and monitor activity</p>
+            <h1 class="text-2xl font-bold text-primary">Dashboard</h1>
+            <p class="text-secondary">Manage your MCP server connections and monitor activity</p>
           </div>
           <div class="flex space-x-3">
             <button
@@ -132,8 +133,8 @@
               <Database size={20} class="text-blue-600" />
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium" style="color: var(--mcp-text-secondary)">Total Servers</p>
-              <p class="text-2xl font-bold" style="color: var(--mcp-text-primary)">{stats.total}</p>
+              <p class="text-sm font-medium text-secondary">Total Servers</p>
+              <p class="text-2xl font-bold text-primary">{stats.total}</p>
             </div>
           </div>
         </div>
@@ -144,8 +145,8 @@
               <CheckCircle size={20} class="text-green-600" />
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium" style="color: var(--mcp-text-secondary)">Connected</p>
-              <p class="text-2xl font-bold" style="color: var(--mcp-text-primary)">{stats.connected}</p>
+              <p class="text-sm font-medium text-secondary">Connected</p>
+              <p class="text-2xl font-bold text-primary">{stats.connected}</p>
             </div>
           </div>
         </div>
@@ -156,8 +157,8 @@
               <Clock size={20} class="text-gray-600" />
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium" style="color: var(--mcp-text-secondary)">Disconnected</p>
-              <p class="text-2xl font-bold" style="color: var(--mcp-text-primary)">{stats.disconnected}</p>
+              <p class="text-sm font-medium text-secondary">Disconnected</p>
+              <p class="text-2xl font-bold text-primary">{stats.disconnected}</p>
             </div>
           </div>
         </div>
@@ -168,8 +169,8 @@
               <AlertCircle size={20} class="text-red-600" />
             </div>
             <div class="ml-4">
-              <p class="text-sm font-medium" style="color: var(--mcp-text-secondary)">Errors</p>
-              <p class="text-2xl font-bold" style="color: var(--mcp-text-primary)">{stats.error}</p>
+              <p class="text-sm font-medium text-secondary">Errors</p>
+              <p class="text-2xl font-bold text-primary">{stats.error}</p>
             </div>
           </div>
         </div>
@@ -181,7 +182,7 @@
         <div class="lg:col-span-2">
           <div class="card">
             <div class="flex items-center justify-between mb-4">
-              <h2 class="text-lg font-semibold" style="color: var(--mcp-text-primary)">Servers</h2>
+              <h2 class="text-lg font-semibold text-primary">Servers</h2>
               <button
                 onclick={openAddServer}
                 class="text-sm text-mcp-primary-600 hover:text-mcp-primary-700"
@@ -193,8 +194,8 @@
             {#if servers.length === 0}
               <div class="text-center py-12">
                 <Database size={48} class="mx-auto text-gray-400 mb-4" />
-                <h3 class="text-lg font-medium mb-2" style="color: var(--mcp-text-primary)">No servers configured</h3>
-                <p class="mb-4" style="color: var(--mcp-text-secondary)">Get started by adding your first MCP server</p>
+                <h3 class="text-lg font-medium mb-2 text-primary">No servers configured</h3>
+                <p class="mb-4 text-secondary">Get started by adding your first MCP server</p>
                 <button
                   onclick={openAddServer}
                   class="btn-primary"
@@ -217,47 +218,44 @@
         <div class="space-y-6">
           <!-- Quick Start -->
           <div class="card">
-            <h3 class="text-lg font-semibold mb-4" style="color: var(--mcp-text-primary)">Quick Start</h3>
+            <h3 class="text-lg font-semibold mb-4 text-primary">Quick Start</h3>
             <div class="space-y-3">
               <button
                 onclick={() => uiStore.setView('tools')}
-                class="w-full flex items-center p-3 text-left rounded-lg transition-colors"
-                style="background: var(--mcp-surface-secondary); color: var(--mcp-text-primary);"
-                onmouseenter={(e) => e.target.style.background = 'var(--mcp-surface-tertiary)'}
-                onmouseleave={(e) => e.target.style.background = 'var(--mcp-surface-secondary)'}
+                class="w-full flex items-center p-3 text-left rounded-lg transition-colors bg-surface-secondary text-primary"
+                onmouseenter={(e: MouseEvent) => (e.target as HTMLElement).style.background = 'var(--mcp-surface-tertiary)'}
+                onmouseleave={(e: MouseEvent) => (e.target as HTMLElement).style.background = 'var(--mcp-surface-secondary)'}
               >
                 <Zap size={20} class="text-mcp-primary-600 mr-3" />
                 <div>
-                  <p class="font-medium" style="color: var(--mcp-text-primary)">Explore Tools</p>
-                  <p class="text-xs" style="color: var(--mcp-text-tertiary)">Call MCP server tools</p>
+                  <p class="font-medium text-primary">Explore Tools</p>
+                  <p class="text-xs text-tertiary">Call MCP server tools</p>
                 </div>
               </button>
 
               <button
                 onclick={() => uiStore.setView('resources')}
-                class="w-full flex items-center p-3 text-left rounded-lg transition-colors"
-                style="background: var(--mcp-surface-secondary); color: var(--mcp-text-primary);"
-                onmouseenter={(e) => e.target.style.background = 'var(--mcp-surface-tertiary)'}
-                onmouseleave={(e) => e.target.style.background = 'var(--mcp-surface-secondary)'}
+                class="w-full flex items-center p-3 text-left rounded-lg transition-colors bg-surface-secondary text-primary"
+                onmouseenter={(e: MouseEvent) => (e.target as HTMLElement).style.background = 'var(--mcp-surface-tertiary)'}
+                onmouseleave={(e: MouseEvent) => (e.target as HTMLElement).style.background = 'var(--mcp-surface-secondary)'}
               >
                 <Database size={20} class="text-mcp-primary-600 mr-3" />
                 <div>
-                  <p class="font-medium" style="color: var(--mcp-text-primary)">Browse Resources</p>
-                  <p class="text-xs" style="color: var(--mcp-text-tertiary)">Access server resources</p>
+                  <p class="font-medium text-primary">Browse Resources</p>
+                  <p class="text-xs text-tertiary">Access server resources</p>
                 </div>
               </button>
 
               <button
                 onclick={() => uiStore.setView('prompts')}
-                class="w-full flex items-center p-3 text-left rounded-lg transition-colors"
-                style="background: var(--mcp-surface-secondary); color: var(--mcp-text-primary);"
-                onmouseenter={(e) => e.target.style.background = 'var(--mcp-surface-tertiary)'}
-                onmouseleave={(e) => e.target.style.background = 'var(--mcp-surface-secondary)'}
+                class="w-full flex items-center p-3 text-left rounded-lg transition-colors bg-surface-secondary text-primary"
+                onmouseenter={(e: MouseEvent) => (e.target as HTMLElement).style.background = 'var(--mcp-surface-tertiary)'}
+                onmouseleave={(e: MouseEvent) => (e.target as HTMLElement).style.background = 'var(--mcp-surface-secondary)'}
               >
                 <FileText size={20} class="text-mcp-primary-600 mr-3" />
                 <div>
-                  <p class="font-medium" style="color: var(--mcp-text-primary)">Design Prompts</p>
-                  <p class="text-xs" style="color: var(--mcp-text-tertiary)">Create prompt templates</p>
+                  <p class="font-medium text-primary">Design Prompts</p>
+                  <p class="text-xs text-tertiary">Create prompt templates</p>
                 </div>
               </button>
             </div>
@@ -266,27 +264,27 @@
           <!-- Selected Server Details -->
           {#if selectedServer}
             <div class="card">
-              <h3 class="text-lg font-semibold mb-4" style="color: var(--mcp-text-primary)">
+              <h3 class="text-lg font-semibold mb-4 text-primary">
                 {selectedServer?.config.name || 'Unknown Server'}
               </h3>
               <div class="space-y-3 text-sm">
                 <div class="flex justify-between">
-                  <span style="color: var(--mcp-text-secondary)">Status</span>
+                  <span class="text-secondary">Status</span>
                   <span class="status-{selectedServer?.status || 'unknown'} capitalize">
                     {selectedServer?.status || 'unknown'}
                   </span>
                 </div>
                 <div class="flex justify-between">
-                  <span style="color: var(--mcp-text-secondary)">Transport</span>
+                  <span class="text-secondary">Transport</span>
                   <span class="capitalize">{selectedServer.config.transport_config?.type || 'unknown'}</span>
                 </div>
                 {#if selectedServer.metrics}
                   <div class="flex justify-between">
-                    <span style="color: var(--mcp-text-secondary)">Messages</span>
+                    <span class="text-secondary">Messages</span>
                     <span>{(selectedServer?.metrics?.requests_sent || 0) + (selectedServer?.metrics?.responses_received || 0)}</span>
                   </div>
                   <div class="flex justify-between">
-                    <span style="color: var(--mcp-text-secondary)">Avg Response</span>
+                    <span class="text-secondary">Avg Response</span>
                     <span>{Math.round(selectedServer?.metrics?.avg_response_time_ms || 0)}ms</span>
                   </div>
                 {/if}
@@ -307,27 +305,19 @@
     <PromptDesigner />
 
   {:else if currentView === 'sampling'}
-    <SamplingWorkbench {selectedServerId} />
+    <SamplingWorkbench />
 
   {:else if currentView === 'elicitation'}
     <ElicitationFlow />
+
+  {:else if currentView === 'protocol'}
+    <ProtocolInspector />
 
   {:else if currentView === 'collections'}
     <CollectionsManager />
 
   {:else if currentView === 'settings'}
     <Settings />
-
-  {:else}
-    <!-- Other views placeholder -->
-    <div class="h-full flex items-center justify-center">
-      <div class="text-center">
-        <h2 class="text-xl font-semibold mb-2" style="color: var(--mcp-text-primary)">
-          {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
-        </h2>
-        <p style="color: var(--mcp-text-secondary)">This view is coming soon!</p>
-      </div>
-    </div>
   {/if}
 </div>
 
