@@ -129,8 +129,8 @@ pub enum McpOperation {
         duration_ms: u32,
     },
     Conditional {
-        condition: String, // JavaScript expression using variables
-        then_steps: Vec<Uuid>, // Step IDs to execute if true
+        condition: String,             // JavaScript expression using variables
+        then_steps: Vec<Uuid>,         // Step IDs to execute if true
         else_steps: Option<Vec<Uuid>>, // Step IDs to execute if false
     },
 }
@@ -363,6 +363,7 @@ pub struct ExecutionSummary {
 // Import/Export System
 // =============================================================================
 
+#[allow(dead_code)] // Planned for future import/export feature
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CollectionExport {
     pub format_version: String,
@@ -376,6 +377,7 @@ pub struct CollectionExport {
     pub recent_executions: Option<Vec<WorkflowExecution>>,
 }
 
+#[allow(dead_code)] // Planned for future import/export feature
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CollectionImportOptions {
     pub merge_environments: bool,
@@ -390,6 +392,7 @@ pub struct CollectionImportOptions {
 // Collection Templates System
 // =============================================================================
 
+#[allow(dead_code)] // Planned for future template marketplace feature
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CollectionTemplate {
     pub id: Uuid,
@@ -494,7 +497,9 @@ impl Collection {
             let ready_steps: Vec<Uuid> = remaining_steps
                 .iter()
                 .filter(|(_, step)| {
-                    step.depends_on.iter().all(|dep_id| executed.contains(dep_id))
+                    step.depends_on
+                        .iter()
+                        .all(|dep_id| executed.contains(dep_id))
                 })
                 .map(|(id, _)| *id)
                 .collect();

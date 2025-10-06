@@ -5,14 +5,13 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use turbomcp_transport::{TransportConfig as TurboTransportConfig, TransportType};
 use uuid::Uuid;
-use turbomcp_transport::{TransportType, TransportConfig as TurboTransportConfig};
 
 // Re-export key TurboMCP types we need
 pub use turbomcp_protocol::types::{
-    ServerCapabilities, Tool, ToolInputSchema, PromptMessage,
-    ContentBlock, TextContent, ImageContent, ResourceContent,
-    ToolsCapabilities, PromptsCapabilities, ResourcesCapabilities
+    PromptsCapabilities, ResourcesCapabilities, ServerCapabilities, Tool, ToolInputSchema,
+    ToolsCapabilities,
 };
 
 pub use turbomcp_transport::MessageDirection;
@@ -39,14 +38,9 @@ pub enum TransportConfig {
         headers: HashMap<String, String>,
     },
     /// TCP socket transport
-    Tcp {
-        host: String,
-        port: u16,
-    },
+    Tcp { host: String, port: u16 },
     /// Unix domain socket transport
-    Unix {
-        path: String,
-    },
+    Unix { path: String },
 }
 // Note: TurboMCP's ServerInfo only has name, models, capabilities - we need our own for UI
 // pub use turbomcp_client::sampling::ServerInfo;
@@ -190,6 +184,7 @@ pub struct MessageHistory {
 }
 
 /// Execution status for scenarios and workflows
+#[allow(dead_code)] // Planned for future execution tracking feature
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExecutionStatus {
     /// Not yet started

@@ -114,7 +114,7 @@ export interface PromptOperation {
   type: 'prompt';
   server_alias: string;
   prompt_name: string;
-  parameters: Record<string, any>;
+  parameters: Record<string, string>; // MCP spec requires string values only
 }
 
 export interface SamplingOperation {
@@ -132,8 +132,55 @@ export interface SamplingOperation {
 export interface ElicitationOperation {
   type: 'elicitation';
   server_alias: string;
-  request_id: string;
-  response_data: any; // Supports variable interpolation
+  message: string; // Message to show user
+  requested_schema: ElicitationSchema; // Form structure (MCP restricted schema)
+  auto_approve?: boolean; // For automated testing
+  default_values?: Record<string, string | number | boolean>; // Pre-fill form values
+}
+
+// MCP-compliant elicitation schema (restricted to primitives only)
+export interface ElicitationSchema {
+  type: 'object';
+  properties: Record<string, PrimitiveSchemaDefinition>;
+  required?: string[];
+}
+
+export type PrimitiveSchemaDefinition =
+  | StringSchemaDefinition
+  | NumberSchemaDefinition
+  | BooleanSchemaDefinition
+  | EnumSchemaDefinition;
+
+export interface StringSchemaDefinition {
+  type: 'string';
+  title?: string;
+  description?: string;
+  minLength?: number;
+  maxLength?: number;
+  format?: 'email' | 'uri' | 'date' | 'date-time';
+}
+
+export interface NumberSchemaDefinition {
+  type: 'number' | 'integer';
+  title?: string;
+  description?: string;
+  minimum?: number;
+  maximum?: number;
+}
+
+export interface BooleanSchemaDefinition {
+  type: 'boolean';
+  title?: string;
+  description?: string;
+  default?: boolean;
+}
+
+export interface EnumSchemaDefinition {
+  type: 'string';
+  title?: string;
+  description?: string;
+  enum: string[];
+  enumNames?: string[]; // Display names for enum values
 }
 
 export interface DelayOperation {
@@ -213,11 +260,13 @@ export interface AssertionCondition {
 export interface WorkflowExecution {
   id: string;
   collection_id: string;
+  collection_name?: string;
   collection_version: string;
 
   // Execution metadata
   started_at: string;
   completed_at?: string;
+  finished_at?: string;
   status: 'running' | 'completed' | 'failed' | 'cancelled' | 'paused';
 
   // Results
@@ -228,19 +277,38 @@ export interface WorkflowExecution {
   // Runtime configuration
   environment_name: string;
   user_variables: Record<string, any>;
+
+  // Real-time events
+  events?: WorkflowExecutionEvent[];
+}
+
+export interface WorkflowExecutionEvent {
+  execution_id: string;
+  event_type: 'step_started' | 'step_completed' | 'step_failed' | 'execution_completed' | 'execution_failed' | 'execution_paused' | 'variable_updated';
+  timestamp: string;
+  step_id?: string;
+  message?: string;
+  data?: any;
 }
 
 export interface StepResult {
   step_id: string;
+  step_name?: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+
+  // Operation details
+  operation_type?: string;
+  operation_target?: string;
 
   // Timing
   started_at?: string;
   completed_at?: string;
+  finished_at?: string;
   duration_ms?: number;
 
   // Results
   operation_result?: any;
+  result?: any;
   extracted_variables: Record<string, any>;
   assertion_results: AssertionResult[];
 
