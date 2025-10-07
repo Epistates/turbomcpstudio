@@ -41,6 +41,7 @@ pub use elicitation::*;
 pub use mcp_prompts::*;
 pub use mcp_resources::*;
 pub use mcp_tools::*;
+pub use profiles::*;
 pub use protocol_inspector::*;
 pub use sampling::*;
 pub use server_config::*;

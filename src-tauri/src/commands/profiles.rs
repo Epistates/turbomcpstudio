@@ -6,11 +6,7 @@
 //! - Activate/deactivate profiles
 //! - List and query profiles
 //!
-//! NOTE: These commands are fully implemented but not yet exposed to the frontend.
-//! They will be registered when the ProfileEditor UI component is built.
-
-// Allow dead code for future feature
-#![allow(dead_code)]
+//! These commands are now fully registered and available to the frontend.
 
 use crate::types::{
     ActiveProfileState, AddServerToProfileRequest, CreateProfileRequest, ProfileActivation,
@@ -692,6 +688,49 @@ pub async fn deactivate_profile(app_state: State<'_, AppState>) -> Result<(), St
     }
 
     Ok(())
+}
+
+/// Get all profile-server relationships (for frontend sync)
+#[tauri::command]
+pub async fn get_all_profile_server_relationships(
+    app_state: State<'_, AppState>,
+) -> Result<std::collections::HashMap<String, Vec<String>>, String> {
+    tracing::info!("Getting all profile-server relationships");
+
+    let db_lock = app_state.database.read().await;
+    let database = db_lock
+        .as_ref()
+        .ok_or_else(|| "Database not yet initialized".to_string())?;
+
+    let rows = sqlx::query(
+        r#"
+        SELECT profile_id, server_id
+        FROM profile_servers
+        ORDER BY profile_id, startup_order
+        "#,
+    )
+    .fetch_all(database.pool())
+    .await
+    .map_err(|e| format!("Failed to get relationships: {}", e))?;
+
+    let mut relationships: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+
+    for row in rows {
+        let profile_id: String = row.try_get("profile_id").unwrap_or_default();
+        let server_id: String = row.try_get("server_id").unwrap_or_default();
+
+        relationships
+            .entry(profile_id)
+            .or_insert_with(Vec::new)
+            .push(server_id);
+    }
+
+    tracing::info!(
+        "✓ Found {} profiles with server relationships",
+        relationships.len()
+    );
+    Ok(relationships)
 }
 
 /// Get the currently active profile state

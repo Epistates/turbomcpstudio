@@ -258,6 +258,19 @@ pub fn run() {
             // LLM API commands (avoids CORS issues)
             commands::fetch_llm_models,
             commands::llm_completion_request,
+            // Server Profile commands (enterprise server management)
+            commands::create_server_profile,
+            commands::update_server_profile,
+            commands::delete_server_profile,
+            commands::list_server_profiles,
+            commands::get_server_profile,
+            commands::get_profile_servers,
+            commands::get_all_profile_server_relationships,
+            commands::add_server_to_profile,
+            commands::remove_server_from_profile,
+            commands::activate_profile,
+            commands::deactivate_profile,
+            commands::get_active_profile,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
