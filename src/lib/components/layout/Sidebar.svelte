@@ -5,6 +5,7 @@
 <script lang="ts">
   import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
   import { uiStore, type View } from '$lib/stores/uiStore';
+  import { profileStore } from '$lib/stores/profileStore';
   import { getServerCapabilitySummary, serverSupportsCapability, type McpCapability } from '$lib/utils/serverCapabilities';
   import {
     Monitor,
@@ -31,10 +32,12 @@
   // Reactive store access using Svelte 5 patterns
   const serverState = $derived($serverStore);
   const uiState = $derived($uiStore);
+  const profileState = $derived($profileStore);
 
   const servers = $derived(serverState.servers);
   const selectedServerId = $derived(serverState.selectedServerId);
   const currentView = $derived(uiState.currentView);
+  const activeProfile = $derived(profileState.activeProfile);
 
   let expandedSections = $state(new Set(['navigation', 'servers']));
 
@@ -177,10 +180,51 @@
   }
 
 
-  // Simple server list - no filtering, just show all servers
-  const filteredServers = $derived(servers || []);
+  // Profile-aware server display logic
+  const shouldShowProfileView = $derived(activeProfile?.profile != null);
 
-  // No auto-deselection - let users manage their own server selection
+  const displayServers = $derived(() => {
+    if (shouldShowProfileView && activeProfile) {
+      // Show only active profile servers
+      const profileServerIds = new Set(activeProfile.servers.map(ps => ps.server_id));
+      return servers.filter(s => profileServerIds.has(s.id));
+    } else {
+      // Show all servers
+      return servers || [];
+    }
+  });
+
+  // Group servers when no profile is active
+  const groupedServers = $derived(() => {
+    if (shouldShowProfileView) return { grouped: [], ungrouped: [] };
+
+    const grouped: ServerInfo[] = [];
+    const ungrouped: ServerInfo[] = [];
+
+    servers.forEach(server => {
+      // Check if server is in any profile
+      const isInProfile = profileState.profiles.some(profile =>
+        profile.server_count > 0 // Simplified check - would need to query profile servers
+      );
+      // For now, show all as ungrouped since we don't have profile membership info here
+      ungrouped.push(server);
+    });
+
+    return { grouped, ungrouped };
+  });
+
+  // Connection count for active profile
+  const profileConnectionStatus = $derived(() => {
+    if (!shouldShowProfileView || !activeProfile) return null;
+
+    const profileServers = displayServers();
+    const connectedCount = profileServers.filter(s => s.status === 'connected').length;
+
+    return {
+      connected: connectedCount,
+      total: profileServers.length
+    };
+  });
 </script>
 
 <div class="mcp-sidebar-content">
@@ -222,7 +266,7 @@
 
   <!-- Servers Section -->
   <div class="mcp-sidebar__section">
-    <button 
+    <button
       class="mcp-sidebar__section-header"
       onclick={() => toggleSection('servers')}
       aria-expanded={expandedSections.has('servers')}
@@ -232,9 +276,18 @@
       {:else}
         <ChevronRight size={16} />
       {/if}
-      <span>Servers</span>
+      <span>{shouldShowProfileView && activeProfile?.profile ? `⚡ ${activeProfile.profile.name}` : 'Servers'}</span>
       <div class="mcp-sidebar__section-actions">
-        <span class="mcp-sidebar__server-count">{servers.length}</span>
+        {#if shouldShowProfileView && profileConnectionStatus()}
+          {@const status = profileConnectionStatus()}
+          {#if status}
+            <span class="mcp-sidebar__server-count text-green-600 dark:text-green-400">
+              {status.connected}/{status.total}
+            </span>
+          {/if}
+        {:else}
+          <span class="mcp-sidebar__server-count">{servers.length}</span>
+        {/if}
         <div
           class="mcp-sidebar__add-button"
           onclick={(e) => { e.stopPropagation(); addServer(); }}
@@ -251,7 +304,7 @@
 
     {#if expandedSections.has('servers')}
       <div class="mcp-sidebar__servers">
-        {#if filteredServers.length === 0}
+        {#if displayServers().length === 0}
           <div class="mcp-sidebar__empty-state">
             <Database size={32} class="mcp-sidebar__empty-icon" />
             <p class="mcp-sidebar__empty-text">No servers configured</p>
@@ -264,7 +317,7 @@
           </div>
         {:else}
           <div class="mcp-sidebar__server-list">
-            {#each filteredServers as server (server.id)}
+            {#each displayServers() as server (server.id)}
               <div class="mcp-sidebar__server-item {selectedServerId === server.id ? 'mcp-sidebar__server-item--selected border-mcp-primary-300 bg-mcp-primary-50 ring-2 ring-mcp-primary-200 dark:border-mcp-primary-600 dark:bg-mcp-primary-900/30 dark:ring-mcp-primary-700' : ''}">
                 <button
                   class="mcp-sidebar__server-main"
@@ -326,6 +379,28 @@
               </div>
             {/each}
           </div>
+
+          <!-- Profile Quick Actions (when profile active) -->
+          {#if shouldShowProfileView && activeProfile}
+            <div class="mcp-sidebar__profile-actions">
+              <button
+                class="mcp-sidebar__profile-action"
+                onclick={async () => await profileStore.deactivateProfile()}
+                title="Deactivate profile"
+              >
+                <Square size={14} />
+                <span>Deactivate Profile</span>
+              </button>
+              <button
+                class="mcp-sidebar__profile-action"
+                onclick={() => uiStore.setView('servers')}
+                title="Manage profiles"
+              >
+                <FolderOpen size={14} />
+                <span>Manage Profiles</span>
+              </button>
+            </div>
+          {/if}
         {/if}
       </div>
     {/if}
@@ -671,6 +746,36 @@
   }
 
   /* Footer */
+  /* Profile Actions */
+  .mcp-sidebar__profile-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mcp-space-2);
+    padding: var(--mcp-space-3);
+    border-top: 1px solid var(--mcp-border-secondary);
+    margin-top: var(--mcp-space-2);
+  }
+
+  .mcp-sidebar__profile-action {
+    display: flex;
+    align-items: center;
+    gap: var(--mcp-space-2);
+    padding: var(--mcp-space-2) var(--mcp-space-3);
+    background: var(--mcp-surface-primary);
+    border: 1px solid var(--mcp-border-primary);
+    border-radius: var(--mcp-radius-md);
+    color: var(--mcp-text-primary);
+    font-size: var(--mcp-text-sm);
+    font-weight: var(--mcp-font-medium);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .mcp-sidebar__profile-action:hover {
+    background: var(--mcp-surface-hover);
+    border-color: var(--mcp-border-hover);
+  }
+
   .mcp-sidebar__footer {
     margin-top: auto;
     padding: var(--mcp-space-4);

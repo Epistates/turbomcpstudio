@@ -16,7 +16,10 @@ interface UiStoreState {
     addServer: boolean;
     serverConfig: boolean;
     toolCall: boolean;
+    profileEditor: boolean;
   };
+  // Profile editor state
+  editingProfileId?: string | null;
   // Tool Explorer state persistence
   selectedTool?: {
     name: string;
@@ -34,7 +37,9 @@ const initialState: UiStoreState = {
     addServer: false,
     serverConfig: false,
     toolCall: false,
+    profileEditor: false,
   },
+  editingProfileId: undefined,
   selectedTool: undefined,
 };
 
@@ -118,7 +123,27 @@ function createUiStore() {
           addServer: false,
           serverConfig: false,
           toolCall: false,
+          profileEditor: false,
         },
+        editingProfileId: undefined,
+      }));
+    },
+
+    // Profile editor management
+    openProfileEditor(profileId?: string | null) {
+      update(state => ({
+        ...state,
+        modals: { ...state.modals, profileEditor: true },
+        editingProfileId: profileId,
+        currentView: 'servers', // Navigate to servers view
+      }));
+    },
+
+    closeProfileEditor() {
+      update(state => ({
+        ...state,
+        modals: { ...state.modals, profileEditor: false },
+        editingProfileId: undefined,
       }));
     },
 

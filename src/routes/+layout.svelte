@@ -4,6 +4,7 @@
   import { listen, once } from '@tauri-apps/api/event';
   import { themeStore } from '$lib/stores/themeStore';
   import { serverStore } from '$lib/stores/serverStore';
+  import { profileStore } from '$lib/stores/profileStore';
   import { appStore, appStoreIsReady, appStoreState, type AppState } from '$lib/stores/appStore';
   import AppLoadingScreen from '$lib/components/AppLoadingScreen.svelte';
 
@@ -66,6 +67,11 @@
       // Retry server initialization after database is ready
       await serverStore.initialize();
       appStore.markStepCompleted('servers');
+
+      // Load profiles and active profile state
+      await profileStore.loadProfiles();
+      await profileStore.loadActiveProfile();
+
       appStore.completeInitialization();
 
       const totalTime = Date.now() - initializationStartTime;
@@ -97,8 +103,15 @@
     appStore.markStepLoading('servers');
 
     // Attempt initial server load (non-blocking, might fail if database not ready)
-    serverStore.initialize().then(() => {
+    serverStore.initialize().then(async () => {
       // Don't complete here - wait for app-ready event for proper sequencing
+      // Also attempt to load profiles (may fail if database not ready)
+      try {
+        await profileStore.loadProfiles();
+        await profileStore.loadActiveProfile();
+      } catch (err) {
+        // Silent fail - will retry after database ready
+      }
     }).catch(err => {
       appStore.markStepError('servers', 'Database not ready yet');
     });

@@ -8,7 +8,7 @@
   import { uiStore } from '$lib/stores/uiStore';
   import { serverStore, getServerStatus } from '$lib/stores/serverStore';
   import Button from '../ui/Button.svelte';
-  import { 
+  import {
     Menu,
     X,
     Sun,
@@ -24,6 +24,7 @@
     FileText,
     Layers3
   } from 'lucide-svelte';
+  import ProfileContextBar from './ProfileContextBar.svelte';
 
   // Props using Svelte 5 runes
   const { isMobile = false, isSidebarCollapsed = false, isMobileMenuOpen = false } = $props();
@@ -290,6 +291,11 @@
           {/if}
         </div>
       </div>
+    {/if}
+
+    <!-- Profile Context Bar (Desktop only) -->
+    {#if !isMobile}
+      <ProfileContextBar isMobile={isMobile} />
     {/if}
 
     <!-- Right Section: Status & Controls -->

@@ -15,6 +15,7 @@
   import CollectionsManager from '../CollectionsManager.svelte';
   import Settings from '../Settings.svelte';
   import AddServerModal from '../AddServerModal.svelte';
+  import ServerConfigModal from '../ServerConfigModal.svelte';
 
   // Reactive view state using Svelte 5 runes
   // Access store properties directly with $derived to maintain reactivity
@@ -95,6 +96,12 @@
 {#if modals.addServer}
   <div class="mcp-modal-overlay" role="dialog" aria-modal="true">
     <AddServerModal />
+  </div>
+{/if}
+
+{#if modals.serverConfig}
+  <div class="mcp-modal-overlay" role="dialog" aria-modal="true">
+    <ServerConfigModal />
   </div>
 {/if}
 
