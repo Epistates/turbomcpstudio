@@ -150,8 +150,11 @@
         });
       }
 
-      // Reload profiles
-      await profileStore.loadProfiles();
+      // Reload profiles and active profile
+      await Promise.all([
+        profileStore.loadProfiles(),
+        profileStore.loadActiveProfile(),
+      ]);
 
       onClose();
     } catch (error) {

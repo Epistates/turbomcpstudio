@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
   import { profileStore } from '$lib/stores/profileStore';
+  import { serverStore, getServerStatus, type ServerInfo } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
   import Button from './ui/Button.svelte';
   import ProfileEditor from './ProfileEditor.svelte';
@@ -11,25 +13,111 @@
     Edit,
     Trash2,
     CheckCircle,
-    Server,
-    Clock,
+    Server as ServerIcon,
+    Settings,
+    Zap,
     AlertCircle,
+    ArrowRight,
+    X,
+    Copy,
+    LayoutGrid,
+    List,
   } from 'lucide-svelte';
 
-  // Reactive store subscriptions using Svelte 5 runes
-  const activeProfile = $derived($profileStore.activeProfile);
-  const profiles = $derived($profileStore.profiles);
-  const loading = $derived($profileStore.loading);
+  // Reactive store subscriptions
+  const profileState = $derived($profileStore);
+  const serverState = $derived($serverStore);
+  const uiState = $derived($uiStore);
 
-  // Modal state
-  let showProfileEditor = $state(false);
-  let editingProfile = $state<string | null>(null);
+  const activeProfile = $derived(profileState.activeProfile);
+  const profiles = $derived(profileState.profiles);
+  const loading = $derived(profileState.loading);
+  const servers = $derived(serverState.servers || []);
+
+  const showProfileEditor = $derived(uiState.modals.profileEditor);
+  const editingProfile = $derived(uiState.editingProfileId);
+
+  // Selection state for highlighting
+  let selectedProfileId = $state<string | null>(null);
+  // Dropdown state for Manage Profiles
+  let showProfileDropdown = $state<string | null>(null);
+  let profileSearchQuery = $state<string>('');
+  let togglingProfile = $state<string | null>(null); // Track which profile is being toggled
+
+  // View mode: 'card' or 'list' (compact)
+  let viewMode = $state<'card' | 'list'>('card');
 
   onMount(async () => {
-    await profileStore.loadProfiles();
-    await profileStore.loadActiveProfile();
+    await Promise.all([
+      profileStore.loadProfiles(),
+      profileStore.loadActiveProfile(),
+      serverStore.loadServers(),
+      loadAllProfileServerRelationships(), // Load ALL relationships on mount
+    ]);
   });
 
+  // Compute server-to-profile mapping
+  // TODO: This needs backend support to load full profile with server details
+  const serverProfileMap = $derived(() => {
+    const map = new Map<string, string | null>();
+
+    // Initialize all servers as unassigned
+    servers.forEach(server => {
+      map.set(server.id, null);
+    });
+
+    // If we have active profile, map its servers
+    if (activeProfile?.servers) {
+      activeProfile.servers.forEach(ps => {
+        map.set(ps.server_id, activeProfile.profile?.id || null);
+      });
+    }
+
+    return map;
+  });
+
+  // Get ALL profiles for a server (for multi-profile display)
+  function getServerProfiles(serverId: string) {
+    const serverProfiles = [];
+    for (const [profileId, serverIds] of localProfileServerMap.entries()) {
+      if (serverIds.has(serverId)) {
+        const profile = profiles.find(p => p.id === profileId);
+        if (profile) {
+          serverProfiles.push(profile);
+        }
+      }
+    }
+    return serverProfiles;
+  }
+
+  // Get profile for a server (returns first profile, for backward compatibility)
+  function getServerProfile(serverId: string) {
+    const serverProfiles = getServerProfiles(serverId);
+    return serverProfiles.length > 0 ? serverProfiles[0] : null;
+  }
+
+  // Get servers not in ANY profile (checks ALL profiles)
+  const unassignedServers = $derived(() => {
+    return servers.filter(server => {
+      // Check if server is in ANY profile in localProfileServerMap
+      for (const serverIds of localProfileServerMap.values()) {
+        if (serverIds.has(server.id)) {
+          return false; // Server is in at least one profile
+        }
+      }
+      return true; // Server not in any profile
+    });
+  });
+
+  // Check if server should be highlighted (checks ALL profiles)
+  function isServerHighlighted(serverId: string): boolean {
+    if (!selectedProfileId) return false;
+    // Check localProfileServerMap for the selected profile
+    const serverIds = localProfileServerMap.get(selectedProfileId);
+    return serverIds ? serverIds.has(serverId) : false;
+  }
+
+  // Profile actions
   async function handleActivateProfile(profileId: string) {
     const success = await profileStore.activateProfile(profileId);
     if (success) {
@@ -44,39 +132,387 @@
     }
   }
 
-  async function handleDeleteProfile(profileId: string, profileName: string) {
-    if (confirm(`Are you sure you want to delete profile "${profileName}"?`)) {
-      await profileStore.deleteProfile(profileId);
-    }
+  function handleEditProfile(profileId: string) {
+    uiStore.openProfileEditor(profileId);
   }
 
   function handleCreateProfile() {
-    editingProfile = null;
-    showProfileEditor = true;
+    uiStore.openProfileEditor(null);
   }
 
-  function handleEditProfile(profileId: string) {
-    editingProfile = profileId;
-    showProfileEditor = true;
+  async function handleDeleteProfile(profileId: string, profileName: string, isActive: boolean) {
+    if (isActive) {
+      uiStore.showError('Cannot delete the active profile. Deactivate it first.');
+      return;
+    }
+
+    if (confirm(`Are you sure you want to delete profile "${profileName}"? This action cannot be undone.`)) {
+      try {
+        const success = await profileStore.deleteProfile(profileId);
+        if (success) {
+          uiStore.showSuccess(`Profile "${profileName}" deleted successfully`);
+        } else {
+          uiStore.showError('Failed to delete profile');
+        }
+      } catch (error) {
+        console.error('Failed to delete profile:', error);
+        uiStore.showError(`Failed to delete profile: ${error}`);
+      }
+    }
   }
 
-  function formatTimestamp(timestamp: string): string {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
+  // Server actions
+  async function handleConnectServer(serverId: string) {
+    const server = servers.find(s => s.id === serverId);
+    if (server) {
+      await serverStore.connectServer(server.config);
+    }
+  }
 
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+  async function handleDisconnectServer(serverId: string) {
+    await serverStore.disconnectServer(serverId);
+  }
 
-    return date.toLocaleDateString();
+  function handleConfigureServer(serverId: string) {
+    serverStore.selectServer(serverId);
+    uiStore.openModal('serverConfig');
+  }
+
+  async function handleDeleteServer(serverId: string, serverName: string) {
+    if (!confirm(`Are you sure you want to delete server "${serverName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      console.log('🗑️ Deleting server:', serverId, serverName);
+
+      // Find the server to check its status
+      const server = servers.find(s => s.id === serverId);
+      if (!server) {
+        throw new Error('Server not found');
+      }
+
+      // If server is connected, disconnect it first
+      const status = getServerStatus(server);
+      if (status === 'connected' || status === 'connecting') {
+        console.log('🔌 Disconnecting server before deletion...');
+        try {
+          await serverStore.disconnectServer(serverId);
+        } catch (disconnectError) {
+          console.warn('Failed to disconnect server, continuing with deletion:', disconnectError);
+        }
+      }
+
+      console.log('🗑️ Calling deleteServerConfig...');
+      await serverStore.deleteServerConfig(serverId);
+      console.log('✅ Server deleted successfully');
+
+      uiStore.showSuccess(`Server "${serverName}" deleted successfully`);
+    } catch (error) {
+      console.error('❌ Failed to delete server:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      uiStore.showError(`Failed to delete server: ${error}`);
+    }
+  }
+
+  // Track ALL profile-server relationships (loaded from backend)
+  let localProfileServerMap = $state<Map<string, Set<string>>>(new Map());
+
+  // Load all profile-server relationships from backend
+  async function loadAllProfileServerRelationships() {
+    try {
+      console.log('📊 Loading ALL profile-server relationships...');
+      const relationships: Record<string, string[]> = await invoke('get_all_profile_server_relationships');
+
+      // Convert to Map<profileId, Set<serverId>>
+      const newMap = new Map<string, Set<string>>();
+      for (const [profileId, serverIds] of Object.entries(relationships)) {
+        newMap.set(profileId, new Set(serverIds));
+      }
+
+      localProfileServerMap = newMap;
+
+      console.log('✅ Loaded relationships for', newMap.size, 'profiles:', {
+        profiles: Array.from(newMap.entries()).map(([pid, sids]) => ({
+          profileId: pid,
+          serverCount: sids.size,
+          serverIds: Array.from(sids)
+        }))
+      });
+    } catch (error) {
+      console.error('❌ Failed to load profile-server relationships:', error);
+    }
+  }
+
+  // Incrementally sync active profile when it changes (for real-time updates)
+  $effect(() => {
+    if (activeProfile?.servers && activeProfile.profile) {
+      const profileId = activeProfile.profile.id;
+      const serverIds = new Set(activeProfile.servers.map(ps => ps.server_id));
+
+      console.log('🔄 Syncing active profile to local map:', {
+        profileId,
+        profileName: activeProfile.profile.name,
+        serverCount: serverIds.size,
+        serverIds: Array.from(serverIds)
+      });
+
+      // Create new Map to trigger reactivity
+      const newMap = new Map(localProfileServerMap);
+      newMap.set(profileId, serverIds);
+      localProfileServerMap = newMap;
+    }
+  });
+
+  // Also sync when active profile data changes (for edge cases)
+  $effect(() => {
+    // This effect runs when servers or profiles arrays change
+    // Re-sync active profile data if it changed
+    if (activeProfile?.servers && activeProfile.profile) {
+      const profileId = activeProfile.profile.id;
+      const serverIds = new Set(activeProfile.servers.map(ps => ps.server_id));
+
+      // Only update if data actually changed
+      const existing = localProfileServerMap.get(profileId);
+      const changed = !existing ||
+        existing.size !== serverIds.size ||
+        !Array.from(serverIds).every(id => existing.has(id));
+
+      if (changed) {
+        console.log('🔄 Active profile data changed, syncing to local map');
+        const newMap = new Map(localProfileServerMap);
+        newMap.set(profileId, serverIds);
+        localProfileServerMap = newMap;
+      }
+    }
+  });
+
+  // Check if a server is in a specific profile
+  function isServerInProfile(serverId: string, profileId: string): boolean {
+    // First check local map (includes recent changes)
+    if (localProfileServerMap.has(profileId)) {
+      return localProfileServerMap.get(profileId)!.has(serverId);
+    }
+
+    // Fall back to serverProfileMap (active profile only)
+    const profileId2 = serverProfileMap().get(serverId);
+    if (profileId2 === profileId) return true;
+
+    // Also check if this profile is active and has the server
+    if (activeProfile?.profile?.id === profileId) {
+      return activeProfile.servers?.some(ps => ps.server_id === serverId) || false;
+    }
+
+    return false;
+  }
+
+  // Update local map after toggle
+  function updateLocalProfileServerMap(serverId: string, profileId: string, inProfile: boolean) {
+    if (!localProfileServerMap.has(profileId)) {
+      localProfileServerMap.set(profileId, new Set());
+    }
+    const serverSet = localProfileServerMap.get(profileId)!;
+    if (inProfile) {
+      serverSet.add(serverId);
+    } else {
+      serverSet.delete(serverId);
+    }
+    localProfileServerMap = localProfileServerMap; // Trigger reactivity
+  }
+
+  async function handleAddServerToProfile(serverId: string, profileId: string) {
+    try {
+      await invoke('add_server_to_profile', {
+        request: {
+          profile_id: profileId,
+          server_id: serverId,
+          startup_order: 0,
+          startup_delay_ms: 0,
+          auto_connect: true,
+          auto_restart: false,
+          required: false,
+          environment_overrides: null,
+        }
+      });
+
+      // Reload data to reflect changes
+      await Promise.all([
+        profileStore.loadProfiles(),
+        profileStore.loadActiveProfile(),
+        serverStore.loadServers(),
+        loadAllProfileServerRelationships(), // Reload ALL relationships
+      ]);
+    } catch (error) {
+      console.error('Failed to add server to profile:', error);
+      throw error;
+    }
+  }
+
+  async function handleRemoveServerFromProfile(serverId: string, profileId: string) {
+    try {
+      await invoke('remove_server_from_profile', {
+        profileId,
+        serverId,
+      });
+
+      // Reload data to reflect changes
+      await Promise.all([
+        profileStore.loadProfiles(),
+        profileStore.loadActiveProfile(),
+        serverStore.loadServers(),
+        loadAllProfileServerRelationships(), // Reload ALL relationships
+      ]);
+    } catch (error) {
+      console.error('Failed to remove server from profile:', error);
+      throw error;
+    }
+  }
+
+  async function handleToggleServerProfile(serverId: string, profileId: string, currentlyInProfile: boolean) {
+    const profile = profiles.find(p => p.id === profileId);
+    const server = servers.find(s => s.id === serverId);
+
+    if (!profile || !server) {
+      console.error('❌ Profile or server not found:', { profileId, serverId, profile, server });
+      return;
+    }
+
+    console.log('🔄 Toggling server profile:', {
+      serverId,
+      serverName: server.config.name,
+      profileId,
+      profileName: profile.name,
+      currentlyInProfile,
+      action: currentlyInProfile ? 'REMOVE' : 'ADD'
+    });
+
+    togglingProfile = profileId;
+
+    // Optimistically update local map
+    updateLocalProfileServerMap(serverId, profileId, !currentlyInProfile);
+
+    try {
+      if (currentlyInProfile) {
+        console.log('🗑️ Removing server from profile...');
+        await handleRemoveServerFromProfile(serverId, profileId);
+        console.log('✅ Removed successfully');
+        uiStore.showSuccess(`Removed "${server.config.name}" from "${profile.name}"`);
+      } else {
+        console.log('➕ Adding server to profile...');
+        await handleAddServerToProfile(serverId, profileId);
+        console.log('✅ Added successfully');
+        uiStore.showSuccess(`Added "${server.config.name}" to "${profile.name}"`);
+      }
+
+      // Verify local map update
+      console.log('📊 Local map state:', {
+        profileId,
+        servers: Array.from(localProfileServerMap.get(profileId) || [])
+      });
+    } catch (error) {
+      console.error('❌ Failed to toggle:', error);
+      // Revert optimistic update on error
+      updateLocalProfileServerMap(serverId, profileId, currentlyInProfile);
+      uiStore.showError(`Failed to ${currentlyInProfile ? 'remove from' : 'add to'} profile: ${error}`);
+    } finally {
+      togglingProfile = null;
+    }
+  }
+
+  // Filtered profiles for search
+  const filteredProfilesForDropdown = $derived(() => {
+    if (!profileSearchQuery.trim()) return profiles;
+    const query = profileSearchQuery.toLowerCase();
+    return profiles.filter(p => p.name.toLowerCase().includes(query));
+  });
+
+  function handleSelectProfile(profileId: string) {
+    selectedProfileId = selectedProfileId === profileId ? null : profileId;
+  }
+
+  // Convert server config to standard MCP JSON format
+  function serverToMcpJson(server: ServerInfo): string {
+    const config = server.config;
+    const mcpConfig: any = {};
+
+    if (config.transport_config?.type === 'stdio') {
+      mcpConfig.command = config.transport_config.command;
+      if (config.transport_config.args && config.transport_config.args.length > 0) {
+        mcpConfig.args = config.transport_config.args;
+      }
+      if (config.environment_variables && Object.keys(config.environment_variables).length > 0) {
+        mcpConfig.env = config.environment_variables;
+      }
+    } else if (config.transport_config?.type === 'http') {
+      mcpConfig.url = config.transport_config.url;
+      mcpConfig.transport = 'http';
+      if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
+        mcpConfig.headers = config.transport_config.headers;
+      }
+    } else if (config.transport_config?.type === 'websocket') {
+      mcpConfig.url = config.transport_config.url;
+      mcpConfig.transport = 'websocket';
+      if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
+        mcpConfig.headers = config.transport_config.headers;
+      }
+    } else if (config.transport_config?.type === 'tcp') {
+      mcpConfig.host = config.transport_config.host;
+      mcpConfig.port = config.transport_config.port;
+      mcpConfig.transport = 'tcp';
+    } else if (config.transport_config?.type === 'unix') {
+      mcpConfig.path = config.transport_config.path;
+      mcpConfig.transport = 'unix';
+    }
+
+    // Wrap in mcpServers format
+    const fullConfig = {
+      mcpServers: {
+        [config.name]: mcpConfig
+      }
+    };
+
+    return JSON.stringify(fullConfig, null, 2);
+  }
+
+  async function handleCopyServerJson(server: ServerInfo) {
+    try {
+      const jsonConfig = serverToMcpJson(server);
+      await navigator.clipboard.writeText(jsonConfig);
+      uiStore.showSuccess(`Copied "${server.config.name}" configuration to clipboard`);
+      console.log('📋 Copied MCP config:', jsonConfig);
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      uiStore.showError('Failed to copy to clipboard');
+    }
   }
 
   function getProfileIcon(icon?: string): string {
     return icon || '📁';
+  }
+
+  function getTransportLabel(server: ServerInfo): string {
+    const type = server.config.transport_config?.type || 'unknown';
+    return type.toUpperCase();
+  }
+
+  function getServerStatusColor(server: ServerInfo): string {
+    const status = getServerStatus(server);
+    switch (status) {
+      case 'connected': return 'text-green-600 dark:text-green-400';
+      case 'connecting': return 'text-yellow-600 dark:text-yellow-400';
+      case 'error': return 'text-red-600 dark:text-red-400';
+      default: return 'text-gray-400 dark:text-gray-500';
+    }
+  }
+
+  function getServerStatusIcon(server: ServerInfo): string {
+    const status = getServerStatus(server);
+    switch (status) {
+      case 'connected': return '🟢';
+      case 'connecting': return '🟡';
+      case 'error': return '🔴';
+      default: return '⚪';
+    }
   }
 </script>
 
@@ -85,182 +521,532 @@
   <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Server Profiles</h1>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Server Management</h1>
         <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-          Manage groups of MCP servers for different environments
+          Manage MCP servers and organize them into profiles
         </p>
       </div>
-      <Button variant="primary" leftIcon={Plus} onclick={handleCreateProfile}>
-        New Profile
+      <Button variant="primary" leftIcon={Plus} onclick={() => uiStore.openModal('addServer')}>
+        Add Server
       </Button>
     </div>
   </div>
 
-  <!-- Active Profile Banner -->
-  {#if activeProfile?.profile}
-    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-b border-blue-200 dark:border-blue-800">
-      <div class="px-6 py-4">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <CheckCircle size={20} class="text-green-600" />
-            <div>
-              <h2 class="text-sm font-semibold text-gray-900 dark:text-white">
-                Active Profile: {activeProfile.profile.name}
-              </h2>
-              <p class="text-xs text-gray-600 dark:text-gray-400">
-                {activeProfile.servers.length} server{activeProfile.servers.length !== 1 ? 's' : ''} •
-                {#if activeProfile.activation}
-                  {activeProfile.activation.success_count}/{activeProfile.activation.success_count + activeProfile.activation.failure_count} connected
-                  • Activated {formatTimestamp(activeProfile.activation.activated_at)}
-                {:else}
-                  Ready
-                {/if}
-              </p>
-            </div>
-          </div>
-          <Button variant="secondary" leftIcon={Square} onclick={handleDeactivateProfile} disabled={loading}>
-            Deactivate
-          </Button>
+  <!-- Two-Column Layout -->
+  <div class="flex-1 overflow-hidden grid grid-cols-[30%_70%]">
+    <!-- LEFT PANEL: Profiles -->
+    <div class="border-r border-gray-200 dark:border-gray-700 overflow-y-auto bg-white dark:bg-gray-800">
+      <div class="p-4">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+            Profiles ({profiles.length})
+          </h2>
+          <button
+            onclick={handleCreateProfile}
+            class="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+          >
+            + New Profile
+          </button>
         </div>
 
-        <!-- Show errors if any -->
-        {#if activeProfile.activation?.errors && activeProfile.activation.errors.length > 0}
-          <div class="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-            <div class="flex items-start gap-2">
-              <AlertCircle size={16} class="text-amber-600 mt-0.5 flex-shrink-0" />
-              <div class="text-xs text-amber-800 dark:text-amber-200">
-                <strong>Connection Issues:</strong>
-                <ul class="mt-1 space-y-1">
-                  {#each activeProfile.activation.errors as error}
-                    <li>• {error}</li>
-                  {/each}
-                </ul>
+        {#if profiles.length === 0}
+          <div class="text-center py-8">
+            <ServerIcon size={32} class="mx-auto text-gray-400 mb-2" />
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">
+              No profiles yet
+            </p>
+            <button
+              onclick={handleCreateProfile}
+              class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
+            >
+              Create your first profile
+            </button>
+          </div>
+        {:else}
+          <div class="space-y-2">
+            {#each profiles as profile}
+              {@const isActive = activeProfile?.profile?.id === profile.id}
+              {@const isSelected = selectedProfileId === profile.id}
+              <div
+                role="button"
+                tabindex="0"
+                onclick={() => handleSelectProfile(profile.id)}
+                onkeydown={(e) => e.key === 'Enter' && handleSelectProfile(profile.id)}
+                class="w-full text-left p-3 rounded-lg border transition-all cursor-pointer {isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : isActive ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750'}"
+              >
+                <div class="flex items-start justify-between mb-2">
+                  <div class="flex items-center gap-2">
+                    <span class="text-lg">{getProfileIcon(profile.icon)}</span>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        {#if isActive}
+                          <Zap size={14} class="text-green-600 dark:text-green-400" />
+                        {/if}
+                        <span class="font-medium text-sm text-gray-900 dark:text-white">
+                          {profile.name}
+                        </span>
+                      </div>
+                      <span class="text-xs text-gray-500 dark:text-gray-400">
+                        {profile.server_count} server{profile.server_count !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {#if isActive}
+                  <div class="text-xs text-green-700 dark:text-green-300 font-medium mb-2">
+                    ACTIVE
+                  </div>
+                {/if}
+
+                <div class="flex items-center gap-1">
+                  <button
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      handleEditProfile(profile.id);
+                    }}
+                    class="flex-1 text-xs py-1.5 px-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
+                  >
+                    <Edit size={12} class="inline mr-1" />
+                    Edit
+                  </button>
+                  <button
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteProfile(profile.id, profile.name, isActive);
+                    }}
+                    class="text-xs py-1.5 px-2 bg-white dark:bg-gray-700 border border-red-300 dark:border-red-600 text-red-600 dark:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                    disabled={loading}
+                  >
+                    <Trash2 size={12} class="inline" />
+                  </button>
+                  {#if isActive}
+                    <button
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        handleDeactivateProfile();
+                      }}
+                      class="flex-1 text-xs py-1.5 px-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
+                      disabled={loading}
+                    >
+                      <Square size={12} class="inline mr-1" />
+                      Deactivate
+                    </button>
+                  {:else}
+                    <button
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        handleActivateProfile(profile.id);
+                      }}
+                      class="flex-1 text-xs py-1.5 px-2 bg-blue-600 dark:bg-blue-500 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-600"
+                      disabled={loading}
+                    >
+                      <Play size={12} class="inline mr-1" />
+                      Activate
+                    </button>
+                  {/if}
+                </div>
               </div>
-            </div>
+            {/each}
           </div>
         {/if}
       </div>
     </div>
-  {/if}
 
-  <!-- Main Content -->
-  <div class="flex-1 overflow-y-auto p-6">
-    {#if loading && profiles.length === 0}
-      <div class="flex items-center justify-center h-64">
-        <div class="text-center">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p class="text-sm text-gray-600 dark:text-gray-400">Loading profiles...</p>
-        </div>
-      </div>
-    {:else if profiles.length === 0}
-      <div class="flex items-center justify-center h-64">
-        <div class="text-center max-w-md">
-          <Server size={48} class="mx-auto text-gray-400 mb-4" />
-          <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            No Profiles Yet
-          </h3>
-          <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Create your first profile to group MCP servers together for quick environment switching.
-          </p>
-          <Button variant="primary" leftIcon={Plus} onclick={handleCreateProfile}>
-            Create Profile
-          </Button>
-        </div>
-      </div>
-    {:else}
-      <!-- Profile Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {#each profiles as profile}
-          {@const isActive = activeProfile?.profile?.id === profile.id}
-          <div
-            class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-lg transition-shadow"
-            class:ring-2={isActive}
-            class:ring-blue-500={isActive}
-          >
-            <!-- Profile Header -->
-            <div class="flex items-start justify-between mb-3">
-              <div class="flex items-center gap-2">
-                <span class="text-2xl">{getProfileIcon(profile.icon)}</span>
-                <div>
-                  <h3 class="font-semibold text-gray-900 dark:text-white">
-                    {profile.name}
-                  </h3>
-                  {#if isActive}
-                    <span class="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                      <CheckCircle size={12} />
-                      Active
-                    </span>
-                  {/if}
-                </div>
-              </div>
-
-              <!-- Actions Menu -->
-              <div class="flex items-center gap-1">
-                <button
-                  onclick={() => handleEditProfile(profile.id)}
-                  class="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
-                  title="Edit profile"
-                >
-                  <Edit size={16} />
-                </button>
-                <button
-                  onclick={() => handleDeleteProfile(profile.id, profile.name)}
-                  class="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                  title="Delete profile"
-                  disabled={isActive}
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-
-            <!-- Profile Description -->
-            {#if profile.description}
-              <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                {profile.description}
+    <!-- RIGHT PANEL: All Servers -->
+    <div class="overflow-y-auto bg-gray-50 dark:bg-gray-900">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+              All Servers ({servers.length})
+            </h2>
+            {#if unassignedServers().length > 0}
+              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                💡 {unassignedServers().length} server{unassignedServers().length !== 1 ? 's' : ''} not in any profile
               </p>
             {/if}
-
-            <!-- Profile Stats -->
-            <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-3">
-              <span class="flex items-center gap-1">
-                <Server size={12} />
-                {profile.server_count} server{profile.server_count !== 1 ? 's' : ''}
-              </span>
-              <span class="flex items-center gap-1">
-                <Clock size={12} />
-                {formatTimestamp(profile.updated_at)}
-              </span>
-            </div>
-
-            <!-- Activate Button -->
-            {#if !isActive}
-              <Button
-                variant="primary"
-                size="sm"
-                leftIcon={Play}
-                onclick={() => handleActivateProfile(profile.id)}
-                disabled={loading}
-                class="w-full"
-              >
-                Activate
-              </Button>
-            {:else}
-              <Button
-                variant="secondary"
-                size="sm"
-                leftIcon={Square}
-                onclick={handleDeactivateProfile}
-                disabled={loading}
-                class="w-full"
-              >
-                Deactivate
-              </Button>
-            {/if}
           </div>
-        {/each}
+
+          <!-- View Toggle -->
+          <div class="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <button
+              onclick={() => viewMode = 'card'}
+              class="px-3 py-1.5 rounded transition-colors {viewMode === 'card' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
+              title="Card View"
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              onclick={() => viewMode = 'list'}
+              class="px-3 py-1.5 rounded transition-colors {viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
+              title="List View (Compact)"
+            >
+              <List size={16} />
+            </button>
+          </div>
+        </div>
+
+        {#if servers.length === 0}
+          <div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <ServerIcon size={48} class="mx-auto text-gray-400 mb-4" />
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              No Servers Yet
+            </h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Add your first MCP server to get started
+            </p>
+            <Button variant="primary" leftIcon={Plus} onclick={() => uiStore.openModal('addServer')}>
+              Add Server
+            </Button>
+          </div>
+        {:else if viewMode === 'card'}
+          <div class="space-y-3">
+            {#each servers as server}
+              {@const serverProfiles = getServerProfiles(server.id)}
+              {@const isHighlighted = isServerHighlighted(server.id)}
+              {@const status = getServerStatus(server)}
+
+              <div
+                class="bg-white dark:bg-gray-800 rounded-lg border p-4 transition-all {isHighlighted ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800' : selectedProfileId ? 'opacity-60 border-gray-200 dark:border-gray-700' : 'border-gray-200 dark:border-gray-700'}"
+              >
+                <!-- Server Header -->
+                <div class="flex items-start justify-between mb-3">
+                  <div class="flex items-start gap-3 flex-1">
+                    <span class="text-2xl">{getServerStatusIcon(server)}</span>
+                    <div class="flex-1 min-w-0">
+                      <h3 class="font-semibold text-gray-900 dark:text-white truncate">
+                        {server.config.name}
+                      </h3>
+                      <p class="text-sm text-gray-600 dark:text-gray-400 font-mono truncate">
+                        {#if server.config.transport_config?.type === 'stdio'}
+                          {server.config.transport_config.command}
+                        {:else if server.config.transport_config?.type === 'http'}
+                          {server.config.transport_config.url}
+                        {:else if server.config.transport_config?.type === 'websocket'}
+                          {server.config.transport_config.url}
+                        {:else}
+                          {getTransportLabel(server)}
+                        {/if}
+                      </p>
+                      <div class="flex items-center gap-2 mt-1">
+                        <span class="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded">
+                          {getTransportLabel(server)}
+                        </span>
+                        {#if serverProfiles.length > 1}
+                          <span class="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
+                            In: {serverProfiles.length} profiles
+                          </span>
+                        {:else if serverProfiles.length === 1}
+                          <span class="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
+                            In: {serverProfiles[0].name}
+                          </span>
+                        {:else}
+                          <span class="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded">
+                            Not in any profile
+                          </span>
+                        {/if}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Server Actions -->
+                <div class="flex items-center gap-2">
+                  {#if status === 'connected'}
+                    <button
+                      onclick={() => handleDisconnectServer(server.id)}
+                      class="flex-1 text-sm py-2 px-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded hover:bg-red-100 dark:hover:bg-red-900/30"
+                    >
+                      <Square size={14} class="inline mr-1" />
+                      Disconnect
+                    </button>
+                  {:else}
+                    <button
+                      onclick={() => handleConnectServer(server.id)}
+                      class="flex-1 text-sm py-2 px-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 rounded hover:bg-green-100 dark:hover:bg-green-900/30"
+                    >
+                      <Play size={14} class="inline mr-1" />
+                      Connect
+                    </button>
+                  {/if}
+                  <button
+                    onclick={() => handleConfigureServer(server.id)}
+                    class="text-sm py-2 px-3 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600"
+                  >
+                    <Settings size={14} class="inline mr-1" />
+                    Configure
+                  </button>
+                  <button
+                    onclick={() => handleCopyServerJson(server)}
+                    class="text-sm py-2 px-3 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600"
+                    title="Copy MCP JSON configuration"
+                  >
+                    <Copy size={14} class="inline mr-1" />
+                    Copy JSON
+                  </button>
+                  <button
+                    onclick={() => handleDeleteServer(server.id, server.config.name)}
+                    class="text-sm py-2 px-3 bg-white dark:bg-gray-700 text-red-600 dark:text-red-400 border border-gray-300 dark:border-gray-600 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    <Trash2 size={14} class="inline mr-1" />
+                    Delete
+                  </button>
+                  <!-- Manage Profiles Dropdown (Always visible) -->
+                  <div class="relative">
+                    <button
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        showProfileDropdown = showProfileDropdown === server.id ? null : server.id;
+                        if (showProfileDropdown === server.id) {
+                          profileSearchQuery = '';
+                        }
+                      }}
+                      class="text-sm py-2 px-3 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                    >
+                      <Settings size={14} class="inline mr-1" />
+                      Profiles ▾
+                    </button>
+
+                    {#if showProfileDropdown === server.id}
+                      <div class="absolute z-10 mt-1 right-0 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
+                        {#if profiles.length === 0}
+                          <div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+                            No profiles available
+                          </div>
+                        {:else}
+                          <!-- Header with Search -->
+                          <div class="p-3 border-b border-gray-200 dark:border-gray-700">
+                            <div class="flex items-center justify-between mb-2">
+                              <span class="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                                Manage Profiles
+                              </span>
+                              <button
+                                onclick={(e) => {
+                                  e.stopPropagation();
+                                  showProfileDropdown = null;
+                                }}
+                                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                            {#if profiles.length > 5}
+                              <input
+                                type="text"
+                                bind:value={profileSearchQuery}
+                                placeholder="Search profiles..."
+                                class="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                onclick={(e) => e.stopPropagation()}
+                              />
+                            {/if}
+                          </div>
+
+                          <!-- Profile Checkboxes -->
+                          <div class="max-h-64 overflow-y-auto">
+                            {#if filteredProfilesForDropdown().length === 0}
+                              <div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+                                No profiles match your search
+                              </div>
+                            {:else}
+                              {#each filteredProfilesForDropdown() as prof}
+                                {@const inProfile = isServerInProfile(server.id, prof.id)}
+                                {@const isToggling = togglingProfile === prof.id}
+                                <label
+                                  class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors {isToggling ? 'opacity-50' : ''}"
+                                  onclick={(e) => e.stopPropagation()}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={inProfile}
+                                    disabled={isToggling}
+                                    onchange={() => handleToggleServerProfile(server.id, prof.id, inProfile)}
+                                    class="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                                  />
+                                  <div class="flex items-center gap-2 flex-1 min-w-0">
+                                    <span class="text-lg flex-shrink-0">{getProfileIcon(prof.icon)}</span>
+                                    <div class="flex-1 min-w-0">
+                                      <div class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                        {prof.name}
+                                      </div>
+                                      <div class="text-xs text-gray-500 dark:text-gray-400">
+                                        {prof.server_count} server{prof.server_count !== 1 ? 's' : ''}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </label>
+                              {/each}
+                            {/if}
+                          </div>
+
+                          <!-- Footer -->
+                          <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
+                            <p class="text-xs text-gray-600 dark:text-gray-400">
+                              💡 Check profiles to add, uncheck to remove
+                            </p>
+                          </div>
+                        {/if}
+                      </div>
+                    {/if}
+                  </div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <!-- List View (Compact) -->
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
+            {#each servers as server}
+              {@const serverProfiles = getServerProfiles(server.id)}
+              {@const isHighlighted = isServerHighlighted(server.id)}
+              {@const status = getServerStatus(server)}
+
+              <div
+                class="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors {isHighlighted ? 'bg-blue-50 dark:bg-blue-900/20' : ''}"
+              >
+                <!-- Status Icon -->
+                <span class="text-lg">{getServerStatusIcon(server)}</span>
+
+                <!-- Server Name & Details -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <h3 class="font-medium text-sm text-gray-900 dark:text-white truncate">
+                      {server.config.name}
+                    </h3>
+                    <span class="text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">
+                      {getTransportLabel(server)}
+                    </span>
+                    {#if serverProfiles.length > 1}
+                      <span class="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
+                        {serverProfiles.length} profiles
+                      </span>
+                    {:else if serverProfiles.length === 1}
+                      <span class="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
+                        {serverProfiles[0].name}
+                      </span>
+                    {/if}
+                  </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="flex items-center gap-1">
+                  {#if status === 'connected'}
+                    <button
+                      onclick={() => handleDisconnectServer(server.id)}
+                      class="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                      title="Disconnect"
+                    >
+                      <Square size={14} />
+                    </button>
+                  {:else}
+                    <button
+                      onclick={() => handleConnectServer(server.id)}
+                      class="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
+                      title="Connect"
+                    >
+                      <Play size={14} />
+                    </button>
+                  {/if}
+
+                  <!-- Profiles Dropdown -->
+                  <div class="relative">
+                    <button
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        showProfileDropdown = showProfileDropdown === server.id ? null : server.id;
+                        if (showProfileDropdown === server.id) {
+                          profileSearchQuery = '';
+                        }
+                      }}
+                      class="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                      title="Manage Profiles"
+                    >
+                      <Settings size={14} />
+                    </button>
+
+                    {#if showProfileDropdown === server.id}
+                      <div class="absolute z-10 mt-1 right-0 w-72 bg-white dark:bg-gray-800 border rounded-lg shadow-lg">
+                        <!-- Header with Search -->
+                        <div class="p-3 border-b">
+                          <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold uppercase">Manage Profiles</span>
+                            <button onclick={(e) => { e.stopPropagation(); showProfileDropdown = null; }}>
+                              <X size={16} />
+                            </button>
+                          </div>
+                          {#if profiles.length > 5}
+                            <input
+                              type="text"
+                              bind:value={profileSearchQuery}
+                              placeholder="Search profiles..."
+                              class="w-full px-2 py-1.5 text-sm border rounded"
+                              onclick={(e) => e.stopPropagation()}
+                            />
+                          {/if}
+                        </div>
+
+                        <!-- Profile Checkboxes -->
+                        <div class="max-h-64 overflow-y-auto">
+                          {#each filteredProfilesForDropdown() as prof}
+                            {@const inProfile = isServerInProfile(server.id, prof.id)}
+                            {@const isToggling = togglingProfile === prof.id}
+                            <label class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer {isToggling ? 'opacity-50' : ''}">
+                              <input
+                                type="checkbox"
+                                checked={inProfile}
+                                disabled={isToggling}
+                                onchange={() => handleToggleServerProfile(server.id, prof.id, inProfile)}
+                                class="w-4 h-4 text-blue-600 rounded"
+                              />
+                              <div class="flex items-center gap-2 flex-1">
+                                <span class="text-lg">{getProfileIcon(prof.icon)}</span>
+                                <div class="flex-1">
+                                  <div class="text-sm font-medium">{prof.name}</div>
+                                  <div class="text-xs text-gray-500">{prof.server_count} servers</div>
+                                </div>
+                              </div>
+                            </label>
+                          {/each}
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="p-3 border-t bg-gray-50">
+                          <p class="text-xs text-gray-600">💡 Check profiles to add, uncheck to remove</p>
+                        </div>
+                      </div>
+                    {/if}
+                  </div>
+
+                  <button
+                    onclick={() => handleCopyServerJson(server)}
+                    class="p-1.5 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    title="Copy JSON"
+                  >
+                    <Copy size={14} />
+                  </button>
+
+                  <button
+                    onclick={() => handleConfigureServer(server.id)}
+                    class="p-1.5 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    title="Configure"
+                  >
+                    <Edit size={14} />
+                  </button>
+
+                  <button
+                    onclick={() => handleDeleteServer(server.id, server.config.name)}
+                    class="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                    title="Delete"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
       </div>
-    {/if}
+    </div>
   </div>
 </div>
 
@@ -268,9 +1054,10 @@
 {#if showProfileEditor}
   <ProfileEditor
     profileId={editingProfile}
-    onClose={() => {
-      showProfileEditor = false;
-      editingProfile = null;
+    onClose={async () => {
+      uiStore.closeProfileEditor();
+      // Reload all profile-server relationships after editing
+      await loadAllProfileServerRelationships();
     }}
   />
 {/if}
