@@ -25,11 +25,13 @@ tauri-plugin-http = "2.0"
 # HTTP client for LLM API requests
 reqwest = { version = "0.12", features = ["json"] }
 
-# TurboMCP integration - using local development version
+# LLM Provider SDKs
+async-openai = "0.24"  # Official OpenAI SDK for Rust
+
+# TurboMCP integration - using local development version (v2.0 - core merged into protocol)
 turbomcp = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp" }
 turbomcp-client = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp-client" }
 turbomcp-transport = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp-transport", features = ["stdio", "http", "websocket", "tcp", "unix", "compression", "tls"] }
-turbomcp-core = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp-core" }
 turbomcp-protocol = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp-protocol" }
 
 # Async runtime

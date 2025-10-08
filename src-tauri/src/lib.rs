@@ -3,6 +3,7 @@ mod database;
 mod error;
 mod hitl_sampling;
 mod llm_config;
+mod llm_providers;
 mod mcp_client;
 mod types;
 mod workflow_engine;
@@ -40,11 +41,15 @@ pub fn run() {
         .setup(|app| {
             let app_handle = app.handle().clone();
 
-            // Initialize managers immediately (lightweight)
-            let (mcp_manager, mut event_receiver) = McpClientManager::new(app_handle.clone());
-            let mcp_manager = Arc::new(mcp_manager);
-
+            // Initialize LLM config first (needed by MCP manager)
             let llm_config = Arc::new(LLMConfigManager::new());
+
+            // Initialize managers immediately (lightweight)
+            let (mcp_manager, mut event_receiver) = McpClientManager::new(
+                app_handle.clone(),
+                llm_config.clone(),
+            );
+            let mcp_manager = Arc::new(mcp_manager);
 
             // Initialize HITL sampling manager with LLM config
             let (hitl_sampling, mut sampling_event_receiver) = HITLSamplingManager::new(llm_config.clone());

@@ -722,7 +722,7 @@ pub async fn get_all_profile_server_relationships(
 
         relationships
             .entry(profile_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(server_id);
     }
 

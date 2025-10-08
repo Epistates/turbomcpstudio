@@ -1,1 +1,1 @@
-//! step_editor commands - TODO: migrate from commands.rs
+//! step_editor commands
