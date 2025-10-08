@@ -144,7 +144,7 @@
         return;
       }
 
-      const promptList = await invoke<any[]>('list_prompts', { serverId: selectedServerId });
+      const promptList = await serverStore.listPrompts(selectedServerId);
       prompts = promptList.map((prompt: any) => ({
         name: prompt.name,
         title: prompt.title,

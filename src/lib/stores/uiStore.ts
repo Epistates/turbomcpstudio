@@ -17,7 +17,10 @@ interface UiStoreState {
     serverConfig: boolean;
     toolCall: boolean;
     profileEditor: boolean;
+    samplingApproval: boolean;
   };
+  // Sampling approval modal state
+  pendingSamplingRequest?: any;
   // Profile editor state
   editingProfileId?: string | null;
   // Tool Explorer state persistence
@@ -38,7 +41,9 @@ const initialState: UiStoreState = {
     serverConfig: false,
     toolCall: false,
     profileEditor: false,
+    samplingApproval: false,
   },
+  pendingSamplingRequest: undefined,
   editingProfileId: undefined,
   selectedTool: undefined,
 };
@@ -124,8 +129,27 @@ function createUiStore() {
           serverConfig: false,
           toolCall: false,
           profileEditor: false,
+          samplingApproval: false,
         },
         editingProfileId: undefined,
+        pendingSamplingRequest: undefined,
+      }));
+    },
+
+    // Sampling approval modal management
+    showSamplingApproval(request: any) {
+      update(state => ({
+        ...state,
+        modals: { ...state.modals, samplingApproval: true },
+        pendingSamplingRequest: request,
+      }));
+    },
+
+    closeSamplingApproval() {
+      update(state => ({
+        ...state,
+        modals: { ...state.modals, samplingApproval: false },
+        pendingSamplingRequest: undefined,
       }));
     },
 

@@ -21,6 +21,7 @@
   // Access store properties directly with $derived to maintain reactivity
   const currentView = $derived($uiStore.currentView);
   const modals = $derived($uiStore.modals);
+  const pendingSamplingRequest = $derived($uiStore.pendingSamplingRequest);
 
   // Debug logging
   $effect(() => {
@@ -96,6 +97,19 @@
 {#if modals.addServer}
   <div class="mcp-modal-overlay" role="dialog" aria-modal="true">
     <AddServerModal />
+  </div>
+{/if}
+
+{#if modals.samplingApproval && pendingSamplingRequest}
+  <div class="mcp-modal-overlay" role="dialog" aria-modal="true">
+    {#await import('../SamplingApprovalModal.svelte')}
+      <div class="loading">Loading...</div>
+    {:then { default: SamplingApprovalModal }}
+      <SamplingApprovalModal
+        request={pendingSamplingRequest}
+        onClose={() => uiStore.closeSamplingApproval()}
+      />
+    {/await}
   </div>
 {/if}
 

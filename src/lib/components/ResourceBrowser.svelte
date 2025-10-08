@@ -164,7 +164,7 @@
         return;
       }
 
-      const resourceList = await invoke('list_resources', { serverId: selectedServerId }) as any[];
+      const resourceList = await serverStore.listResources(selectedServerId);
 
       resources = resourceList.map((resource: any) => {
         return {

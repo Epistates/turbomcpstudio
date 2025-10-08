@@ -456,6 +456,26 @@ function createServerStore() {
       }
     },
 
+    async listPrompts(serverId: string) {
+      try {
+        const prompts: any[] = await invoke('list_prompts', { serverId });
+        return prompts;
+      } catch (error) {
+        console.error('Failed to list prompts:', error);
+        throw error;
+      }
+    },
+
+    async listResources(serverId: string) {
+      try {
+        const resources: any[] = await invoke('list_resources', { serverId });
+        return resources;
+      } catch (error) {
+        console.error('Failed to list resources:', error);
+        throw error;
+      }
+    },
+
     // Get server name by ID (utility method)
     getServerName(serverId: string): string {
       let currentState: ServerStoreState;
