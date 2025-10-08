@@ -514,7 +514,7 @@ impl HITLSamplingManager {
                 };
 
                 ConversationTurn {
-                    role: msg.role.clone(),
+                    role: msg.role,
                     content_preview,
                     token_count: None, // TODO: Implement token counting
                     timestamp: None,

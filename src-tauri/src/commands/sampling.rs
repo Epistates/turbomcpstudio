@@ -10,7 +10,7 @@ use crate::hitl_sampling::{PendingSamplingRequest, SamplingMode, SamplingResult}
 use crate::AppState;
 use serde_json::Value;
 use tauri::State;
-use turbomcp_protocol::CreateMessageRequest;
+use turbomcp_protocol::types::CreateMessageRequest;  // v2.0: Moved to types module
 use uuid::Uuid;
 
 /// Get current LLM configuration
@@ -197,35 +197,6 @@ pub async fn get_completed_sampling_requests(
     Ok(completed)
 }
 
-/// Approve a pending sampling request
-#[tauri::command]
-pub async fn approve_sampling_request(
-    request_id: String,
-    approved_by: String,
-    modified_request: Option<CreateMessageRequest>,
-    app_state: State<'_, AppState>,
-) -> Result<SamplingResult, String> {
-    app_state
-        .hitl_sampling
-        .approve_request(&request_id, approved_by, modified_request)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-/// Reject a pending sampling request
-#[tauri::command]
-pub async fn reject_sampling_request(
-    request_id: String,
-    reason: String,
-    app_state: State<'_, AppState>,
-) -> Result<(), String> {
-    app_state
-        .hitl_sampling
-        .reject_request(&request_id, reason)
-        .await
-        .map_err(|e| e.to_string())
-}
-
 /// Process a sampling request through the HITL system
 #[tauri::command]
 pub async fn process_hitl_sampling_request(
@@ -285,7 +256,7 @@ pub async fn test_sampling_request(
         model_preferences: None,
         system_prompt: None,
         include_context: Some(IncludeContext::ThisServer),
-        max_tokens: Some(1000),
+        max_tokens: 1000,  // MCP 2025-06-18: Required field
         temperature: Some(0.7),
         stop_sequences: None,
         _meta: None,
@@ -341,4 +312,35 @@ pub async fn create_sampling_request(
         .map_err(|e| format!("Failed to create sampling request: {}", e))?;
 
     Ok(result)
+}
+
+/// Approve a sampling request and forward to LLM (server-initiated sampling)
+#[tauri::command]
+pub async fn approve_sampling_request(
+    request_id: String,
+    approved_request: serde_json::Value,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    use turbomcp_protocol::types::CreateMessageRequest;
+
+    // Parse the approved request
+    let request: CreateMessageRequest = serde_json::from_value(approved_request)
+        .map_err(|e| format!("Invalid request format: {}", e))?;
+
+    // Forward to manager
+    app_state
+        .mcp_manager
+        .approve_sampling_request(request_id, request)
+}
+
+/// Reject a sampling request (server-initiated sampling)
+#[tauri::command]
+pub async fn reject_sampling_request(
+    request_id: String,
+    reason: String,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    app_state
+        .mcp_manager
+        .reject_sampling_request(request_id, reason)
 }
