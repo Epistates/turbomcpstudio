@@ -9,6 +9,7 @@ use turbomcp_client::handlers::{
     ElicitationHandler, LogHandler, ProgressHandler, ResourceUpdateHandler,
 };
 use turbomcp_client::Client;
+use turbomcp_protocol::{Error, ErrorKind};  // v2.0: Re-exported at root (was turbomcp_core)
 use turbomcp_protocol::types::{Prompt, PromptInput, Tool, ToolInputSchema};
 use turbomcp_transport::child_process::ChildProcessTransport;
 use turbomcp_transport::stdio::StdioTransport;
@@ -51,9 +52,9 @@ pub enum McpTransportClient {
 impl McpTransportClient {
     /// Helper to convert HTTP string errors to TurboMCP Error
     #[cfg(feature = "http")]
-    fn http_error(kind: turbomcp_core::ErrorKind, message: String) -> Box<turbomcp_core::Error> {
+    fn http_error(kind: ErrorKind, message: String) -> Box<Error> {
         // Error::new already returns Box<Error>
-        turbomcp_core::Error::new(kind, message)
+        Error::new(kind, message)
     }
 
     /// Create a basic tool schema for tools where we don't have full schema information
@@ -72,7 +73,7 @@ impl McpTransportClient {
     /// Get tools with their schemas from the MCP server
     /// This method is now an alias for list_tools() since TurboMCP 1.1.0
     /// returns full Tool objects with schemas by default
-    pub async fn list_tools_with_schemas(&self) -> Result<Vec<Tool>, Box<turbomcp_core::Error>> {
+    pub async fn list_tools_with_schemas(&self) -> Result<Vec<Tool>, Box<Error>> {
         tracing::info!("✅ Getting tool schemas using TurboMCP 1.1.0 API");
         self.list_tools().await
     }
@@ -82,7 +83,7 @@ impl McpTransportClient {
         &self,
         tool_name: &str,
         parameters: Option<HashMap<String, serde_json::Value>>,
-    ) -> Result<serde_json::Value, Box<turbomcp_core::Error>> {
+    ) -> Result<serde_json::Value, Box<Error>> {
         match self {
             McpTransportClient::Stdio(client) => client.call_tool(tool_name, parameters).await,
             McpTransportClient::ChildProcess(client) => {
@@ -93,7 +94,7 @@ impl McpTransportClient {
             McpTransportClient::Http(client) => {
                 client.call_tool(tool_name, parameters).await.map_err(|e| {
                     Self::http_error(
-                        turbomcp_core::ErrorKind::Transport,
+                        ErrorKind::Transport,
                         format!("HTTP call_tool failed: {}", e),
                     )
                 })
@@ -111,7 +112,7 @@ impl McpTransportClient {
     }
 
     /// List tools available on the MCP server (transport-agnostic)
-    pub async fn list_tools(&self) -> Result<Vec<Tool>, Box<turbomcp_core::Error>> {
+    pub async fn list_tools(&self) -> Result<Vec<Tool>, Box<Error>> {
         match self {
             McpTransportClient::Stdio(client) => client.list_tools().await,
             McpTransportClient::ChildProcess(client) => client.list_tools().await,
@@ -119,7 +120,7 @@ impl McpTransportClient {
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.list_tools().await.map_err(|e| {
                 Self::http_error(
-                    turbomcp_core::ErrorKind::Transport,
+                    ErrorKind::Transport,
                     format!("HTTP list_tools failed: {}", e),
                 )
             }),
@@ -136,7 +137,7 @@ impl McpTransportClient {
     }
 
     /// List prompts available on the MCP server (transport-agnostic)
-    pub async fn list_prompts(&self) -> Result<Vec<Prompt>, Box<turbomcp_core::Error>> {
+    pub async fn list_prompts(&self) -> Result<Vec<Prompt>, Box<Error>> {
         match self {
             McpTransportClient::Stdio(client) => client.list_prompts().await,
             McpTransportClient::ChildProcess(client) => client.list_prompts().await,
@@ -144,7 +145,7 @@ impl McpTransportClient {
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.list_prompts().await.map_err(|e| {
                 Self::http_error(
-                    turbomcp_core::ErrorKind::Transport,
+                    ErrorKind::Transport,
                     format!("HTTP list_prompts failed: {}", e),
                 )
             }),
@@ -165,7 +166,7 @@ impl McpTransportClient {
         &self,
         name: &str,
         arguments: Option<PromptInput>,
-    ) -> Result<serde_json::Value, Box<turbomcp_core::Error>> {
+    ) -> Result<serde_json::Value, Box<Error>> {
         match self {
             McpTransportClient::Stdio(client) => {
                 let result = client.get_prompt(name, arguments).await?;
@@ -180,7 +181,7 @@ impl McpTransportClient {
             McpTransportClient::Http(client) => {
                 let result = client.get_prompt(name, arguments).await.map_err(|e| {
                     Self::http_error(
-                        turbomcp_core::ErrorKind::Transport,
+                        ErrorKind::Transport,
                         format!("HTTP get_prompt failed: {}", e),
                     )
                 })?;
@@ -208,7 +209,7 @@ impl McpTransportClient {
     }
 
     /// List resources available on the MCP server (transport-agnostic)
-    pub async fn list_resources(&self) -> Result<Vec<String>, Box<turbomcp_core::Error>> {
+    pub async fn list_resources(&self) -> Result<Vec<String>, Box<Error>> {
         match self {
             McpTransportClient::Stdio(client) => client.list_resources().await,
             McpTransportClient::ChildProcess(client) => client.list_resources().await,
@@ -216,7 +217,7 @@ impl McpTransportClient {
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.list_resources().await.map_err(|e| {
                 Self::http_error(
-                    turbomcp_core::ErrorKind::Transport,
+                    ErrorKind::Transport,
                     format!("HTTP list_resources failed: {}", e),
                 )
             }),
@@ -236,7 +237,7 @@ impl McpTransportClient {
     pub async fn read_resource(
         &self,
         uri: &str,
-    ) -> Result<serde_json::Value, Box<turbomcp_core::Error>> {
+    ) -> Result<serde_json::Value, Box<Error>> {
         match self {
             McpTransportClient::Stdio(client) => {
                 let result = client.read_resource(uri).await?;
@@ -251,7 +252,7 @@ impl McpTransportClient {
             McpTransportClient::Http(client) => {
                 let result = client.read_resource(uri).await.map_err(|e| {
                     Self::http_error(
-                        turbomcp_core::ErrorKind::Transport,
+                        ErrorKind::Transport,
                         format!("HTTP read_resource failed: {}", e),
                     )
                 })?;
@@ -305,7 +306,7 @@ impl McpTransportClient {
         &self,
         completion_name: &str,
         partial_input: &str,
-    ) -> Result<Vec<String>, Box<turbomcp_core::Error>> {
+    ) -> Result<Vec<String>, Box<Error>> {
         match self {
             McpTransportClient::Stdio(client) => client
                 .complete(completion_name, partial_input)

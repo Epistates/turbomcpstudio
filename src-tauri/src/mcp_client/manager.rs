@@ -77,7 +77,9 @@ use super::connection::ManagedConnection;
 use super::elicitation::StudioElicitationHandler;
 use super::events::ConnectionEvent;
 use super::process::ManagedProcess;
+use super::sampling::{ContextAwareSamplingHandler, StudioSamplingHandler};
 use super::transport_client::McpTransportClient;
+use super::ServerContext;
 
 /// MCP Client Manager
 ///
@@ -93,8 +95,8 @@ pub struct McpClientManager {
     /// Event channel for connection updates
     event_sender: mpsc::UnboundedSender<ConnectionEvent>,
 
-    /// Sampling handler for LLM integration
-    sampling_handler: Option<Arc<dyn SamplingHandler>>,
+    /// Sampling handler for LLM integration (HITL approval)
+    sampling_handler: Arc<StudioSamplingHandler>,
 
     /// Elicitation handler for server-initiated user input requests
     elicitation_handler: Arc<StudioElicitationHandler>,
@@ -102,11 +104,17 @@ pub struct McpClientManager {
 
 impl McpClientManager {
     /// Create a new MCP client manager with enterprise-grade monitoring
-    pub fn new(app_handle: tauri::AppHandle) -> (Self, mpsc::UnboundedReceiver<ConnectionEvent>) {
+    pub fn new(
+        app_handle: tauri::AppHandle,
+        llm_config: Arc<crate::llm_config::LLMConfigManager>,
+    ) -> (Self, mpsc::UnboundedReceiver<ConnectionEvent>) {
         let (event_sender, event_receiver) = mpsc::unbounded_channel();
 
-        // Initialize sampling handler for LLM integration
-        let sampling_handler = None; // Will be set via set_sampling_handler method
+        // Initialize sampling handler with HITL approval
+        let sampling_handler = Arc::new(StudioSamplingHandler::new(
+            app_handle.clone(),
+            llm_config,
+        ));
 
         // Initialize elicitation handler with Tauri app handle
         let elicitation_handler = Arc::new(StudioElicitationHandler::new(app_handle));
@@ -123,11 +131,7 @@ impl McpClientManager {
         tracing::info!("Available transports: STDIO, HTTP, WebSocket, TCP, Unix");
         tracing::info!("TurboMCP v1.1.0 integration ready with plugin and LLM registry support");
         tracing::info!("Elicitation handler initialized - ready for server user input requests");
-        if manager.sampling_handler.is_some() {
-            tracing::info!("Production LLM sampling handler initialized");
-        } else {
-            tracing::warn!("No LLM providers registered - sampling will be unavailable");
-        }
+        tracing::info!("Sampling handler initialized with HITL approval");
 
         (manager, event_receiver)
     }
@@ -142,13 +146,25 @@ impl McpClientManager {
             .submit_response(request_id, response)
     }
 
-    /// Set the sampling handler for real MCP sampling flow
-    pub async fn set_sampling_handler(&mut self, handler: Arc<dyn SamplingHandler>) {
-        self.sampling_handler = Some(handler);
-        tracing::info!(
-            "🎯 Real MCP sampling handler registered - ready for server-initiated requests"
-        );
+    /// Approve a sampling request and forward to LLM
+    pub fn approve_sampling_request(
+        &self,
+        request_id: String,
+        approved_request: turbomcp_protocol::types::CreateMessageRequest,
+    ) -> Result<(), String> {
+        self.sampling_handler
+            .submit_approved_request(request_id, approved_request)
     }
+
+    /// Reject a sampling request
+    pub fn reject_sampling_request(
+        &self,
+        request_id: String,
+        reason: String,
+    ) -> Result<(), String> {
+        self.sampling_handler.reject_request(request_id, reason)
+    }
+
 
     /// Configure ClientBuilder with enterprise plugins for production reliability
     #[cfg(feature = "plugins")]
@@ -330,6 +346,7 @@ impl McpClientManager {
                     status: ConnectionStatus::Connected,
                 });
 
+
                 tracing::info!(
                     "Successfully connected to MCP server: {} ({})",
                     config.name,
@@ -377,6 +394,7 @@ impl McpClientManager {
                 server_id,
                 status: ConnectionStatus::Disconnected,
             });
+
 
             tracing::info!(
                 "Successfully disconnected from server: {}",
@@ -1479,19 +1497,25 @@ impl McpClientManager {
         tracing::info!("Mapped capabilities: {:?}", server_capabilities);
 
         // 🎯 CRITICAL: Register our sampling handler for real MCP sampling flow
-        if let Some(sampling_handler) = &self.sampling_handler {
-            tracing::info!(
-                "🚀 Registering MCP Studio sampling handler for server-initiated requests"
-            );
-            // Note: TurboMCP clients with sampling capability will automatically
-            // route sampling/createMessage requests to the registered handler
-            client.set_sampling_handler(sampling_handler.clone());
-            tracing::info!("✅ Sampling handler registered successfully - server can now send sampling requests");
-        } else {
-            tracing::warn!(
-                "🔄 No sampling handler available - server sampling requests will be rejected"
-            );
-        }
+        tracing::info!(
+            "🚀 Registering MCP Studio sampling handler for server-initiated requests"
+        );
+        // Create server context for this connection
+        let server_context = ServerContext {
+            server_id: connection.config.id,
+            server_name: connection.config.name.clone(),
+            server_description: connection.config.description.clone(),
+            connected_at: chrono::Utc::now(),
+        };
+        // Wrap the shared handler with context-aware wrapper
+        let context_handler = Arc::new(ContextAwareSamplingHandler::new(
+            server_context,
+            self.sampling_handler.clone(),
+        ));
+        // Note: TurboMCP clients with sampling capability will automatically
+        // route sampling/createMessage requests to the registered handler
+        client.set_sampling_handler(context_handler);
+        tracing::info!("✅ Sampling handler registered successfully - server can now send sampling requests");
 
         Ok(McpTransportClient::ChildProcess(client))
     }
@@ -1604,13 +1628,20 @@ impl McpClientManager {
         *connection.capabilities.write() = Some(server_capabilities.clone());
 
         // 🎯 CRITICAL: Register our sampling handler for real MCP sampling flow
-        if let Some(sampling_handler) = &self.sampling_handler {
-            tracing::info!("🚀 Registering MCP Studio sampling handler for WebSocket server-initiated requests");
-            client.set_sampling_handler(sampling_handler.clone());
-            tracing::info!("✅ Sampling handler registered successfully - WebSocket server can now send sampling requests");
-        } else {
-            tracing::warn!("🔄 No sampling handler available - WebSocket server sampling requests will be rejected");
-        }
+        tracing::info!("🚀 Registering MCP Studio sampling handler for WebSocket server-initiated requests");
+        // Create server context for this connection
+        let server_context = ServerContext {
+            server_id: connection.config.id,
+            server_name: connection.config.name.clone(),
+            server_description: connection.config.description.clone(),
+            connected_at: chrono::Utc::now(),
+        };
+        let context_handler = Arc::new(ContextAwareSamplingHandler::new(
+            server_context,
+            self.sampling_handler.clone(),
+        ));
+        client.set_sampling_handler(context_handler);
+        tracing::info!("✅ Sampling handler registered successfully - WebSocket server can now send sampling requests");
 
         tracing::info!(
             "WebSocket MCP client initialized successfully for server '{}' ({})",
@@ -1692,17 +1723,22 @@ impl McpClientManager {
         *connection.capabilities.write() = Some(server_capabilities.clone());
 
         // 🎯 CRITICAL: Register our sampling handler for real MCP sampling flow
-        if let Some(sampling_handler) = &self.sampling_handler {
-            tracing::info!(
-                "🚀 Registering MCP Studio sampling handler for TCP server-initiated requests"
-            );
-            client.set_sampling_handler(sampling_handler.clone());
-            tracing::info!("✅ Sampling handler registered successfully - TCP server can now send sampling requests");
-        } else {
-            tracing::warn!(
-                "🔄 No sampling handler available - TCP server sampling requests will be rejected"
-            );
-        }
+        tracing::info!(
+            "🚀 Registering MCP Studio sampling handler for TCP server-initiated requests"
+        );
+        // Create server context for this connection
+        let server_context = ServerContext {
+            server_id: connection.config.id,
+            server_name: connection.config.name.clone(),
+            server_description: connection.config.description.clone(),
+            connected_at: chrono::Utc::now(),
+        };
+        let context_handler = Arc::new(ContextAwareSamplingHandler::new(
+            server_context,
+            self.sampling_handler.clone(),
+        ));
+        client.set_sampling_handler(context_handler);
+        tracing::info!("✅ Sampling handler registered successfully - TCP server can now send sampling requests");
 
         tracing::info!(
             "TCP MCP client initialized successfully for server '{}' ({}:{})",
@@ -1778,13 +1814,20 @@ impl McpClientManager {
         *connection.capabilities.write() = Some(server_capabilities.clone());
 
         // 🎯 CRITICAL: Register our sampling handler for real MCP sampling flow
-        if let Some(sampling_handler) = &self.sampling_handler {
-            tracing::info!("🚀 Registering MCP Studio sampling handler for Unix socket server-initiated requests");
-            client.set_sampling_handler(sampling_handler.clone());
-            tracing::info!("✅ Sampling handler registered successfully - Unix socket server can now send sampling requests");
-        } else {
-            tracing::warn!("🔄 No sampling handler available - Unix socket server sampling requests will be rejected");
-        }
+        tracing::info!("🚀 Registering MCP Studio sampling handler for Unix socket server-initiated requests");
+        // Create server context for this connection
+        let server_context = ServerContext {
+            server_id: connection.config.id,
+            server_name: connection.config.name.clone(),
+            server_description: connection.config.description.clone(),
+            connected_at: chrono::Utc::now(),
+        };
+        let context_handler = Arc::new(ContextAwareSamplingHandler::new(
+            server_context,
+            self.sampling_handler.clone(),
+        ));
+        client.set_sampling_handler(context_handler);
+        tracing::info!("✅ Sampling handler registered successfully - Unix socket server can now send sampling requests");
 
         tracing::info!(
             "Unix socket MCP client initialized successfully for server '{}' ({})",
@@ -1905,7 +1948,7 @@ impl McpClientManager {
 
             let request = CreateMessageRequest {
                 messages: sampling_messages,
-                max_tokens: Some(max_tokens.unwrap_or(1000)), // TurboMCP 2.0: Option<u32>
+                max_tokens: max_tokens.unwrap_or(1000), // MCP 2025-06-18: Required field
                 temperature: temperature.map(|t| t as f64),
                 system_prompt: None,
                 stop_sequences: None,

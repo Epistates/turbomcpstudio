@@ -33,13 +33,54 @@
 //! let tools = manager.list_tools(server_id).await?;
 //! ```
 
+use chrono::{DateTime, Utc};
+use std::sync::Arc;
+use uuid::Uuid;
+
 // Module declarations
 mod connection;
 mod elicitation;
 mod events;
 pub mod manager;
 mod process;
+mod sampling;
 mod transport_client;
 
 // Re-export main types for convenient access
 pub use manager::McpClientManager;
+// Note: StudioElicitationHandler and StudioSamplingHandler
+// are only used internally in manager.rs, no need to re-export
+
+/// Server context information for attribution in handlers
+///
+/// This struct contains metadata about which MCP server initiated a request.
+/// Used with task-local storage to properly attribute sampling and elicitation
+/// requests in multi-server scenarios.
+#[derive(Debug, Clone)]
+pub struct ServerContext {
+    pub server_id: Uuid,
+    pub server_name: String,
+    pub server_description: Option<String>,
+    pub connected_at: DateTime<Utc>,
+}
+
+impl Default for ServerContext {
+    fn default() -> Self {
+        Self {
+            server_id: Uuid::nil(),
+            server_name: "Unknown Server".to_string(),
+            server_description: Some("Context unavailable".to_string()),
+            connected_at: Utc::now(),
+        }
+    }
+}
+
+// Task-local storage for server context
+//
+// This allows handlers (sampling, elicitation) to determine which server
+// made the request without requiring changes to TurboMCP's trait signatures.
+//
+// Set this before delegating to handlers, read it within handler implementations.
+tokio::task_local! {
+    pub static CURRENT_SERVER_CONTEXT: Arc<ServerContext>;
+}
