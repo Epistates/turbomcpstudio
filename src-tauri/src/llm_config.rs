@@ -1,4 +1,7 @@
 use crate::error::McpStudioError;
+use crate::llm_providers::{
+    AnthropicLLMClient, GeminiLLMClient, OpenAICompatibleClient, OpenAILLMClient,
+};
 use crate::types::{
     LLMConfiguration, LLMProviderStatus, ProviderUsageStats, SetAPIKeyRequest,
     UpdateLLMConfigRequest,
@@ -9,10 +12,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
-use turbomcp_client::sampling::DelegatingSamplingHandler;
+use turbomcp_client::sampling::{DelegatingSamplingHandler, LLMServerClient};
 
 /// LLM Configuration Manager with secure credential storage
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct LLMConfigManager {
     /// Current configuration (without sensitive data)
     config: Arc<RwLock<LLMConfiguration>>,
@@ -381,41 +384,164 @@ impl LLMConfigManager {
     /// Create sampling handler for local providers (Ollama, etc.)
     async fn create_local_provider_handler(
         &self,
-        _provider_id: &str,
-        _provider_config: &crate::types::LLMProviderConfig,
+        provider_id: &str,
+        provider_config: &crate::types::LLMProviderConfig,
     ) -> Result<DelegatingSamplingHandler, McpStudioError> {
-        use std::sync::Arc;
-        use turbomcp_client::sampling::{AutoApprovingUserHandler, DelegatingSamplingHandler};
+        use turbomcp_client::sampling::AutoApprovingUserHandler;
 
-        // For now, create a simple auto-approving handler
-        // TODO: Implement proper local LLM integration
+        info!(
+            "Creating local handler for {} with model {}",
+            provider_id, provider_config.default_model
+        );
+
+        // Get base URL for local provider
+        let base_url = provider_config.base_url.as_ref().ok_or_else(|| {
+            McpStudioError::Configuration(format!(
+                "Local provider {} requires base_url configuration",
+                provider_id
+            ))
+        })?;
+
+        // Create the appropriate OpenAI-compatible client
+        let llm_client: Arc<dyn LLMServerClient> = match provider_id {
+            "ollama" => {
+                debug!("Creating Ollama client at {}", base_url);
+                Arc::new(
+                    OpenAICompatibleClient::new_ollama(
+                        base_url.clone(),
+                        provider_config.default_model.clone(),
+                        provider_config.timeout_seconds,
+                    )
+                    .map_err(|e| {
+                        McpStudioError::Configuration(format!(
+                            "Failed to create Ollama client: {}",
+                            e
+                        ))
+                    })?,
+                )
+            }
+
+            "lmstudio" => {
+                debug!("Creating LMStudio client at {}", base_url);
+                Arc::new(
+                    OpenAICompatibleClient::new_lmstudio(
+                        base_url.clone(),
+                        provider_config.default_model.clone(),
+                        provider_config.timeout_seconds,
+                    )
+                    .map_err(|e| {
+                        McpStudioError::Configuration(format!(
+                            "Failed to create LMStudio client: {}",
+                            e
+                        ))
+                    })?,
+                )
+            }
+
+            // Other local providers can be added here
+            _ => {
+                error!("Unknown local provider: {}", provider_id);
+                return Err(McpStudioError::Configuration(format!(
+                    "Unknown local provider: {}",
+                    provider_id
+                )));
+            }
+        };
+
+        info!("✅ Created LLM client for local provider: {}", provider_id);
+
+        // Create user interaction handler (auto-approving for now)
+        // TODO: Replace with actual HITL handler from sampling store
         let user_handler = Arc::new(AutoApprovingUserHandler);
-        let llm_clients = vec![]; // Empty for now - would connect to local LLM servers
 
-        Ok(DelegatingSamplingHandler::new(llm_clients, user_handler))
+        Ok(DelegatingSamplingHandler::new(
+            vec![llm_client],
+            user_handler,
+        ))
     }
 
     /// Create sampling handler for cloud providers (OpenAI, Anthropic, etc.)
     async fn create_cloud_provider_handler(
         &self,
         provider_id: &str,
-        _provider_config: &crate::types::LLMProviderConfig, // TODO: Use config for provider setup
+        provider_config: &crate::types::LLMProviderConfig,
         api_key: &str,
     ) -> Result<DelegatingSamplingHandler, McpStudioError> {
-        use std::sync::Arc;
-        use turbomcp_client::sampling::{AutoApprovingUserHandler, DelegatingSamplingHandler};
+        use turbomcp_client::sampling::AutoApprovingUserHandler;
 
-        // For now, create a simple auto-approving handler
-        // TODO: Implement proper cloud LLM integration with provider_id: {} and api_key: {}
-        let user_handler = Arc::new(AutoApprovingUserHandler);
-        let llm_clients = vec![]; // Empty for now - would connect to cloud LLM servers
         info!(
-            "Creating cloud handler for {} (key length: {})",
-            provider_id,
-            api_key.len()
+            "Creating cloud handler for {} with model {}",
+            provider_id, provider_config.default_model
         );
 
-        Ok(DelegatingSamplingHandler::new(llm_clients, user_handler))
+        // Create the appropriate LLM client based on provider type
+        let llm_client: Arc<dyn LLMServerClient> = match provider_id {
+            // OpenAI and OpenAI variants (nano, etc.)
+            id if id.starts_with("openai") => {
+                debug!("Creating OpenAI client for provider: {}", id);
+                Arc::new(OpenAILLMClient::new(
+                    api_key.to_string(),
+                    provider_config.default_model.clone(),
+                    provider_config.base_url.clone(),
+                ))
+            }
+
+            // Anthropic Claude providers
+            id if id.starts_with("claude-") => {
+                debug!("Creating Anthropic client for provider: {}", id);
+                Arc::new(
+                    AnthropicLLMClient::new(
+                        api_key.to_string(),
+                        provider_config.default_model.clone(),
+                        provider_config.timeout_seconds,
+                    )
+                    .map_err(|e| {
+                        McpStudioError::Configuration(format!(
+                            "Failed to create Anthropic client: {}",
+                            e
+                        ))
+                    })?,
+                )
+            }
+
+            // Google Gemini
+            "gemini" => {
+                debug!("Creating Gemini client for provider: {}", provider_id);
+                Arc::new(
+                    GeminiLLMClient::new(
+                        api_key.to_string(),
+                        provider_config.default_model.clone(),
+                        provider_config.timeout_seconds,
+                    )
+                    .map_err(|e| {
+                        McpStudioError::Configuration(format!(
+                            "Failed to create Gemini client: {}",
+                            e
+                        ))
+                    })?,
+                )
+            }
+
+            // Unknown provider
+            _ => {
+                error!("Unknown cloud provider: {}", provider_id);
+                return Err(McpStudioError::Configuration(format!(
+                    "Unknown cloud provider: {}",
+                    provider_id
+                )));
+            }
+        };
+
+        info!("✅ Created LLM client for provider: {}", provider_id);
+
+        // Create user interaction handler (auto-approving for now)
+        // TODO: Replace with actual HITL handler from sampling store
+        let user_handler = Arc::new(AutoApprovingUserHandler);
+
+        Ok(DelegatingSamplingHandler::new(
+            vec![llm_client],
+            user_handler,
+        ))
     }
 
     /// Get status of all providers
@@ -527,5 +653,141 @@ impl LLMConfigManager {
 
         debug!("✅ Validation complete, {} issues found", issues.len());
         Ok(issues)
+    }
+
+    /// Direct LLM invocation for HITL sampling
+    ///
+    /// This bypasses the DelegatingSamplingHandler and directly calls the LLM client.
+    /// Used for human-in-the-loop sampling where we've already approved the request
+    /// and just need to execute it.
+    pub async fn invoke_llm_directly(
+        &self,
+        request: turbomcp_protocol::types::CreateMessageRequest,
+        provider_id: Option<String>,
+    ) -> Result<turbomcp_protocol::types::CreateMessageResult, Box<dyn std::error::Error + Send + Sync>> {
+        info!("🚀 invoke_llm_directly called");
+
+        // Get the provider to use
+        let provider_id = if let Some(id) = provider_id {
+            id
+        } else {
+            let config = self.config.read().await;
+            config.active_provider.clone()
+                .ok_or("No active provider configured")?
+        };
+
+        info!("📡 Using provider: {}", provider_id);
+
+        // Get provider configuration
+        let config = self.config.read().await;
+        let provider_config = config.providers.get(&provider_id)
+            .ok_or_else(|| format!("Provider not found: {}", provider_id))?
+            .clone();
+
+        if !provider_config.enabled {
+            return Err(format!("Provider {} is disabled", provider_id).into());
+        }
+
+        drop(config);
+
+        // Create LLM client based on provider type
+        let llm_client: Arc<dyn LLMServerClient> = match provider_config.provider_type {
+            crate::types::LLMProviderType::Local => {
+                info!("🔧 Creating local provider client for {}", provider_id);
+                self.create_local_llm_client(&provider_id, &provider_config).await?
+            }
+            _ => {
+                info!("🔧 Creating cloud provider client for {}", provider_id);
+                // Get API key for cloud providers
+                let api_key = self.get_api_key(&provider_id).await
+                    .ok_or_else(|| format!("No API key configured for provider: {}", provider_id))?;
+
+                self.create_cloud_llm_client(&provider_id, &provider_config, &api_key).await?
+            }
+        };
+
+        // Call the LLM directly
+        info!("💬 Calling LLM for provider: {}", provider_id);
+        let result = llm_client.create_message(request).await?;
+        info!("✅ LLM call succeeded for provider: {}", provider_id);
+
+        Ok(result)
+    }
+
+    /// Create LLM client for local providers
+    async fn create_local_llm_client(
+        &self,
+        provider_id: &str,
+        provider_config: &crate::types::LLMProviderConfig,
+    ) -> Result<Arc<dyn LLMServerClient>, Box<dyn std::error::Error + Send + Sync>> {
+        let base_url = provider_config.base_url.as_ref()
+            .ok_or_else(|| format!("Local provider {} requires base_url", provider_id))?;
+
+        let client: Arc<dyn LLMServerClient> = match provider_id {
+            "ollama" => {
+                Arc::new(
+                    OpenAICompatibleClient::new_ollama(
+                        base_url.clone(),
+                        provider_config.default_model.clone(),
+                        provider_config.timeout_seconds,
+                    )?
+                )
+            }
+            "lmstudio" => {
+                Arc::new(
+                    OpenAICompatibleClient::new_lmstudio(
+                        base_url.clone(),
+                        provider_config.default_model.clone(),
+                        provider_config.timeout_seconds,
+                    )?
+                )
+            }
+            _ => {
+                return Err(format!("Unknown local provider: {}", provider_id).into());
+            }
+        };
+
+        Ok(client)
+    }
+
+    /// Create LLM client for cloud providers
+    async fn create_cloud_llm_client(
+        &self,
+        provider_id: &str,
+        provider_config: &crate::types::LLMProviderConfig,
+        api_key: &str,
+    ) -> Result<Arc<dyn LLMServerClient>, Box<dyn std::error::Error + Send + Sync>> {
+        let client: Arc<dyn LLMServerClient> = match provider_id {
+            id if id.starts_with("openai") => {
+                Arc::new(OpenAILLMClient::new(
+                    api_key.to_string(),
+                    provider_config.default_model.clone(),
+                    provider_config.base_url.clone(),
+                ))
+            }
+            id if id.starts_with("claude-") => {
+                Arc::new(
+                    AnthropicLLMClient::new(
+                        api_key.to_string(),
+                        provider_config.default_model.clone(),
+                        provider_config.timeout_seconds,
+                    )?
+                )
+            }
+            "gemini" => {
+                Arc::new(
+                    GeminiLLMClient::new(
+                        api_key.to_string(),
+                        provider_config.default_model.clone(),
+                        provider_config.timeout_seconds,
+                    )?
+                )
+            }
+            _ => {
+                return Err(format!("Unknown cloud provider: {}", provider_id).into());
+            }
+        };
+
+        Ok(client)
     }
 }

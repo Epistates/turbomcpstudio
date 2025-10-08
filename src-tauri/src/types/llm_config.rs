@@ -463,6 +463,64 @@ impl Default for LLMConfiguration {
             },
         );
 
+        // Google Gemini - September 2025
+        providers.insert(
+            "gemini".to_string(),
+            LLMProviderConfig {
+                provider_type: LLMProviderType::Anthropic, // Using Anthropic as generic "cloud" type
+                display_name: "Google Gemini".to_string(),
+                enabled: false,
+                default_model: "gemini-pro".to_string(),
+                available_models: vec![
+                    "gemini-pro".to_string(),
+                    "gemini-pro-vision".to_string(),
+                    "gemini-ultra".to_string(),
+                ],
+                base_url: None, // Uses official Google API
+                organization: None,
+                max_retries: 3,
+                timeout_seconds: 45,
+                rate_limit: RateLimitConfig {
+                    requests_per_minute: 60,
+                    tokens_per_minute: Some(500000),
+                    exponential_backoff: true,
+                    initial_backoff_ms: 1000,
+                    max_backoff_ms: 45000,
+                },
+                cost_config: CostConfig {
+                    input_cost_per_1k: 0.50, // Gemini Pro pricing (September 2025)
+                    output_cost_per_1k: 1.50,
+                    thinking_cost_per_1k: None,
+                    currency: "USD".to_string(),
+                },
+                capabilities: LLMProviderCapabilities {
+                    supports_structured_outputs: true,
+                    structured_output_models: vec![
+                        "gemini-pro".to_string(),
+                        "gemini-ultra".to_string(),
+                    ],
+                    max_structured_output_tokens: Some(100000),
+                    supports_batch_processing: false,
+                    batch_discount_percentage: None,
+                    supports_parallel_function_calling: false,
+                    supports_strict_function_calling: false,
+                    supports_vision: true,
+                    supported_image_formats: vec![
+                        "jpeg".to_string(),
+                        "png".to_string(),
+                        "webp".to_string(),
+                    ],
+                    supports_audio: false,
+                    supported_audio_formats: vec![],
+                    supports_streaming: true,
+                    supports_function_calling: true,
+                    supports_computer_use: false,
+                    supports_thinking_tokens: false,
+                    max_context_tokens: Some(1000000), // 1M token context window
+                },
+            },
+        );
+
         // LOCAL PROVIDERS - No API keys required, local hosting
         // LM Studio - Popular GUI for GGUF models
         providers.insert(
