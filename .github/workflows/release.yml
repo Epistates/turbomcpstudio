@@ -1,0 +1,204 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v0.1.0)'
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Get version from tag or input
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: MCP Studio ${{ steps.get_version.outputs.version }}
+          body: |
+            # MCP Studio ${{ steps.get_version.outputs.version }}
+
+            ## Installation
+
+            Download the appropriate installer for your platform:
+            - **macOS**: `.dmg` file (Universal binary for Intel and Apple Silicon)
+            - **Windows**: `.msi` or `.exe` installer
+            - **Linux**: `.AppImage` (universal), `.deb` (Debian/Ubuntu), or `.rpm` (Fedora/RHEL)
+
+            ## What's New
+
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+
+            ## Requirements
+
+            - macOS: 11.0 (Big Sur) or later
+            - Windows: Windows 10 (1809+) or Windows 11
+            - Linux: Modern Linux distribution with GTK 3.24+
+
+            ## Notes
+
+            - First release of MCP Studio - "Postman for MCP"
+            - Native desktop application for Model Context Protocol development
+            - Powered by TurboMCP for enterprise-grade MCP operations
+          draft: true
+          prerelease: false
+
+  build-tauri:
+    name: Build ${{ matrix.platform }}
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS builds
+          - platform: 'macos-latest'
+            os: macos-latest
+            rust_target: 'x86_64-apple-darwin'
+            args: '--target x86_64-apple-darwin'
+          - platform: 'macos-latest'
+            os: macos-latest
+            rust_target: 'aarch64-apple-darwin'
+            args: '--target aarch64-apple-darwin'
+
+          # Windows build
+          - platform: 'windows-latest'
+            os: windows-latest
+            rust_target: 'x86_64-pc-windows-msvc'
+            args: ''
+
+          # Linux builds
+          - platform: 'ubuntu-22.04'
+            os: ubuntu-22.04
+            rust_target: 'x86_64-unknown-linux-gnu'
+            args: ''
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9.12.0
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          cache-on-failure: true
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      # CRITICAL: Handle TurboMCP dependencies
+      # Option 1: Use git dependencies (requires Cargo.toml changes)
+      # Option 2: Clone TurboMCP repo and use local paths
+      # For now, we'll use Option 2 since local paths are in Cargo.toml
+
+      - name: Clone TurboMCP (temporary solution)
+        run: |
+          git clone https://github.com/Epistates/turbomcp.git ../turbomcp
+          cd ../turbomcp
+          git checkout main
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          releaseId: ${{ needs.create-release.outputs.id }}
+          args: ${{ matrix.args }}
+
+  # Publish release (make it non-draft after all builds succeed)
+  publish-release:
+    name: Publish Release
+    needs: [create-release, build-tauri]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish Release
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: '${{ needs.create-release.outputs.version }}'
+            });
+
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+              draft: false
+            });
