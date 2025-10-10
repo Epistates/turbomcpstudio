@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api/core';
+	import { listen } from '@tauri-apps/api/event';
 	import { onMount } from 'svelte';
-	import { POLLING } from '$lib/constants';
 	import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
 	import { Search, Download, Trash2, Filter, ChevronRight, ChevronDown, Clock, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-svelte';
 	import JsonViewer from './ui/JsonViewer.svelte';
@@ -28,8 +28,6 @@
 	let sortBy = $state<'timestamp' | 'size' | 'latency' | 'direction'>('timestamp');
 	let sortOrder = $state<'asc' | 'desc'>('desc');
 
-	// Auto-refresh every 2 seconds
-	let refreshInterval: number;
 
 	// Subscribe to serverStore to get selected server
 	$effect(() => {
@@ -191,9 +189,23 @@
 	});
 
 	onMount(() => {
+		// Initial load
 		loadMessages();
-		refreshInterval = window.setInterval(loadMessages, POLLING.PROTOCOL_MESSAGES);
-		return () => clearInterval(refreshInterval);
+
+		// Set up real-time event listener for protocol messages
+		let unlisten: (() => void) | undefined;
+
+		listen('protocol_message', async () => {
+			// Reload messages when new protocol message is captured
+			await loadMessages();
+		}).then((fn) => {
+			unlisten = fn;
+		});
+
+		// Return cleanup function
+		return () => {
+			if (unlisten) unlisten();
+		};
 	});
 </script>
 

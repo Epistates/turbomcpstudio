@@ -265,8 +265,14 @@
     if (tool) {
       selectTool(tool);
       toolParameters = { ...historyItem.parameters };
-      // Also show the previous result
-      toolResult = historyItem.result;
+      // Also show the previous result - INCLUDE ERROR if present
+      if (historyItem.status === 'error' && historyItem.error) {
+        // For error executions, create result object with error
+        toolResult = { error: historyItem.error };
+      } else {
+        // For successful executions, use the result
+        toolResult = historyItem.result;
+      }
       isHistoricalResult = true;
     }
   }

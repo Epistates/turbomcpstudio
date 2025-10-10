@@ -74,7 +74,8 @@
   // STATE MANAGEMENT
   // ===============================================
 
-  let activeTab: 'providers' | 'global' | 'usage' = $state('providers');
+  // Note: 'providers' and 'usage' tabs commented out - vestigial code for future LLM integration
+  let activeTab: 'providers' | 'global' | 'usage' = $state('global');
 
   // Provider management
   let providers: LLMProvider[] = $state([]);
@@ -525,13 +526,14 @@
 
   <!-- Tab Navigation -->
   <div class="tab-navigation">
-    <button
+    <!-- LLM Providers tab - vestigial, commented out for future use -->
+    <!-- <button
       onclick={() => activeTab = 'providers'}
       class="tab-button {activeTab === 'providers' ? 'active' : ''}"
     >
       <Zap size={16} />
       LLM Providers
-    </button>
+    </button> -->
     <button
       onclick={() => activeTab = 'global'}
       class="tab-button {activeTab === 'global' ? 'active' : ''}"
@@ -539,13 +541,14 @@
       <SettingsIcon size={16} />
       Global Settings
     </button>
-    <button
+    <!-- Usage & Costs tab - vestigial, commented out for future use -->
+    <!-- <button
       onclick={() => activeTab = 'usage'}
       class="tab-button {activeTab === 'usage' ? 'active' : ''}"
     >
       <DollarSign size={16} />
       Usage & Costs
-    </button>
+    </button> -->
   </div>
 
   <!-- Tab Content -->

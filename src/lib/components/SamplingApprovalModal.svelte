@@ -6,8 +6,10 @@
 -->
 <script lang="ts">
 	import { samplingStore, type PendingSamplingRequest } from '$lib/stores/samplingStore';
+	import { uiStore } from '$lib/stores/uiStore';
+	import QuickResponseTemplates from './sampling/QuickResponseTemplates.svelte';
 	import JsonViewer from './ui/JsonViewer.svelte';
-	import { X, Edit, Check, XCircle, AlertTriangle, DollarSign, Hash, Server } from 'lucide-svelte';
+	import { X, Edit, Check, XCircle, AlertTriangle, DollarSign, Hash, Server, ExternalLink } from 'lucide-svelte';
 
 	// Props
 	const { request, onClose }: { request: PendingSamplingRequest; onClose: () => void } = $props();
@@ -76,6 +78,21 @@
 			modifiedRequest = { ...request.request };
 		}
 	}
+
+	// Handle quick response from templates
+	async function handleQuickResponse(response: any) {
+		if (isProcessing) return;
+		isProcessing = true;
+
+		try {
+			await samplingStore.submitManual(request.requestId, response);
+			onClose();
+		} catch (error) {
+			alert('Failed to submit manual response: ' + error);
+		} finally {
+			isProcessing = false;
+		}
+	}
 </script>
 
 <!-- Modal Overlay -->
@@ -100,17 +117,35 @@
 					</p>
 				</div>
 			</div>
-			<button
-				onclick={onClose}
-				class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-				aria-label="Close"
-			>
-				<X size={24} />
-			</button>
+			<div class="flex items-center gap-3">
+				{#if request.protocolMessageId}
+					<button
+						onclick={() => {
+							uiStore.jumpToProtocolInspector(request.protocolMessageId);
+							onClose();
+						}}
+						class="px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-2"
+						title="View in Protocol Inspector"
+					>
+						<ExternalLink size={16} />
+						<span>View Protocol</span>
+					</button>
+				{/if}
+				<button
+					onclick={onClose}
+					class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+					aria-label="Close"
+				>
+					<X size={24} />
+				</button>
+			</div>
 		</div>
 
 		<!-- Content -->
 		<div class="flex-1 overflow-y-auto p-6 space-y-6">
+			<!-- Quick Response Templates (Testing Tool Feature) -->
+			<QuickResponseTemplates onRespond={handleQuickResponse} showHistory={true} />
+
 			<!-- Warning Banner -->
 			<div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-start gap-3">
 				<AlertTriangle size={20} class="text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />

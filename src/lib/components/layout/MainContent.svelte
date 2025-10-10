@@ -9,13 +9,14 @@
   import ToolExplorer from '../ToolExplorer.svelte';
   import ResourceBrowser from '../ResourceBrowser.svelte';
   import PromptDesigner from '../PromptDesigner.svelte';
-  import SamplingTester from '../SamplingTester.svelte';
-  import ElicitationFlow from '../ElicitationFlow.svelte';
+  import SamplingView from '../SamplingView.svelte';
+  import ElicitationView from '../ElicitationView.svelte';
   import ProtocolInspector from '../ProtocolInspector.svelte';
   import CollectionsManager from '../CollectionsManager.svelte';
   import Settings from '../Settings.svelte';
   import AddServerModal from '../AddServerModal.svelte';
   import ServerConfigModal from '../ServerConfigModal.svelte';
+  import ModeIndicator from '../ModeIndicator.svelte';
 
   // Reactive view state using Svelte 5 runes
   // Access store properties directly with $derived to maintain reactivity
@@ -28,45 +29,41 @@
     console.log('🟣 MainContent: currentView changed to:', currentView);
   });
 
-  // Content component mapping
-  function getContentComponent(view: string) {
-    switch (view) {
-      case 'dashboard':
-        return Dashboard;
-      case 'tools':
-        return ToolExplorer;
-      case 'resources':
-        return ResourceBrowser;
-      case 'prompts':
-        return PromptDesigner;
-      case 'sampling':
-        return SamplingTester;
-      case 'elicitation':
-        return ElicitationFlow;
-      case 'collections':
-      case 'settings':
-        return PlaceholderView;
-      default:
-        return Dashboard;
-    }
-  }
+  // Check if current view should show mode indicator (testing-related views)
+  const showModeIndicator = $derived(
+    currentView === 'sampling' || currentView === 'elicitation' || currentView === 'protocol'
+  );
 
-  // Placeholder component for unimplemented views
-  function PlaceholderView() {
-    return {
-      render: () => `
-        <div class="mcp-placeholder">
-          <div class="mcp-placeholder__icon">🚧</div>
-          <h2 class="mcp-placeholder__title">${currentView.charAt(0).toUpperCase() + currentView.slice(1)} View</h2>
-          <p class="mcp-placeholder__description">This view is currently under development.</p>
-          <p class="mcp-placeholder__note">Part of the enterprise MCP Studio roadmap.</p>
-        </div>
-      `
-    };
-  }
+  // Content component mapping (unused - kept for reference)
+  // function getContentComponent(view: string) {
+  //   switch (view) {
+  //     case 'dashboard':
+  //       return Dashboard;
+  //     case 'tools':
+  //       return ToolExplorer;
+  //     case 'resources':
+  //       return ResourceBrowser;
+  //     case 'prompts':
+  //       return PromptDesigner;
+  //     case 'sampling':
+  //       return SamplingView;
+  //     case 'elicitation':
+  //       return ElicitationView;
+  //     case 'collections':
+  //     case 'settings':
+  //       return PlaceholderView;
+  //     default:
+  //       return Dashboard;
+  //   }
+  // }
 </script>
 
 <div class="mcp-main-content">
+  <!-- Mode Indicator for Testing Views -->
+  {#if showModeIndicator}
+    <ModeIndicator mode="manual" compact={true} />
+  {/if}
+
   <!-- Dynamic Content Area -->
   <div class="mcp-content-viewport">
     {#if currentView === 'dashboard'}
@@ -80,9 +77,9 @@
     {:else if currentView === 'prompts'}
       <PromptDesigner />
     {:else if currentView === 'sampling'}
-      <SamplingTester />
+      <SamplingView />
     {:else if currentView === 'elicitation'}
-      <ElicitationFlow />
+      <ElicitationView />
     {:else if currentView === 'protocol'}
       <ProtocolInspector />
     {:else if currentView === 'collections'}

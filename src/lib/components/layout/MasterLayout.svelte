@@ -17,15 +17,17 @@
   let isMobileMenuOpen = false;
   
   // Responsive breakpoints
-  let innerWidth = 0;
-  $: isMobile = innerWidth < 768;
-  $: isTablet = innerWidth >= 768 && innerWidth < 1024;
-  $: isDesktop = innerWidth >= 1024;
+  let innerWidth = $state(0);
+  const isMobile = $derived(innerWidth < 768);
+  const isTablet = $derived(innerWidth >= 768 && innerWidth < 1024);
+  const isDesktop = $derived(innerWidth >= 1024);
 
   // Sidebar state management
-  $: if (isMobile) {
-    isSidebarCollapsed = true;
-  }
+  $effect(() => {
+    if (isMobile) {
+      isSidebarCollapsed = true;
+    }
+  });
 
   // Panel resizing logic
   function startResize(event: MouseEvent) {
@@ -80,11 +82,11 @@
   }
 
   // CSS custom properties for dynamic layout
-  $: layoutStyles = `
+  const layoutStyles = $derived(`
     --sidebar-width: ${isSidebarCollapsed ? '0px' : `${sidebarWidth}px`};
     --sidebar-collapsed: ${isSidebarCollapsed ? '1' : '0'};
     --header-height: 64px;
-  `;
+  `);
 </script>
 
 <svelte:window bind:innerWidth onkeydown={handleKeydown} />
