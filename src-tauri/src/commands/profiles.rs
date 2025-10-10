@@ -720,10 +720,7 @@ pub async fn get_all_profile_server_relationships(
         let profile_id: String = row.try_get("profile_id").unwrap_or_default();
         let server_id: String = row.try_get("server_id").unwrap_or_default();
 
-        relationships
-            .entry(profile_id)
-            .or_default()
-            .push(server_id);
+        relationships.entry(profile_id).or_default().push(server_id);
     }
 
     tracing::info!(

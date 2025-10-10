@@ -55,6 +55,7 @@ export interface ConnectionMetrics {
   last_error?: string;
   bytes_sent: number;
   bytes_received: number;
+  uptime_seconds: number;
 }
 
 export interface ToolDefinition {
@@ -137,6 +138,7 @@ function createServerStore() {
             last_error: undefined,
             bytes_sent: 0,
             bytes_received: 0,
+            uptime_seconds: 0,
           },
         }));
 
@@ -269,6 +271,7 @@ function createServerStore() {
             last_error: undefined,
             bytes_sent: 0,
             bytes_received: 0,
+            uptime_seconds: 0,
           },
         };
 

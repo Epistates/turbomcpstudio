@@ -202,6 +202,16 @@ function createUiStore() {
         selectedTool: undefined,
       }));
     },
+
+    // Navigate to Protocol Inspector and optionally select a message
+    jumpToProtocolInspector(messageId?: string) {
+      this.setView('protocol');
+      // TODO: If messageId provided, scroll to and select that message in timeline
+      // This would require protocol store integration
+      if (messageId) {
+        console.log('📍 Jumping to protocol message:', messageId);
+      }
+    },
   };
 }
 

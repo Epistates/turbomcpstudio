@@ -15,6 +15,7 @@ import { listen } from '@tauri-apps/api/event';
 
 export interface PendingSamplingRequest {
 	requestId: string;
+	protocolMessageId?: string;  // For Protocol Inspector correlation
 	serverId: string;
 	serverName: string;
 	request: SamplingRequestDetails;
@@ -235,6 +236,63 @@ function createSamplingStore() {
 		 */
 		clearError(): void {
 			update((s) => ({ ...s, error: null }));
+		},
+
+		/**
+		 * Submit manual response for sampling request (testing tool feature)
+		 *
+		 * Bypasses LLM and provides a direct manual response
+		 *
+		 * @param requestId - Unique request identifier
+		 * @param manualResponse - The manual response to send back
+		 */
+		async submitManual(requestId: string, manualResponse: any): Promise<void> {
+			update((s) => ({ ...s, loading: true, error: null }));
+
+			try {
+				// Find the original request
+				const state = await new Promise<SamplingStoreState>((resolve) => {
+					const unsub = subscribe(resolve);
+					unsub();
+				});
+
+				const request = state.pending.find((r) => r.requestId === requestId);
+				if (!request) {
+					throw new Error(`Request not found: ${requestId}`);
+				}
+
+				// Call backend to submit manual response
+				await invoke('submit_manual_sampling_response', {
+					requestId,
+					manualResponse
+				});
+
+				// Move from pending to history
+				const completed: CompletedSamplingRequest = {
+					...request,
+					status: 'approved',
+					completedAt: new Date().toISOString(),
+					result: manualResponse
+				};
+
+				update((state) => ({
+					...state,
+					pending: state.pending.filter((r) => r.requestId !== requestId),
+					history: [completed, ...state.history],
+					loading: false
+				}));
+
+				console.log('✅ Manual sampling response submitted:', requestId);
+			} catch (error) {
+				update((s) => ({
+					...s,
+					loading: false,
+					error: error instanceof Error ? error.message : String(error)
+				}));
+
+				console.error('❌ Failed to submit manual sampling response:', error);
+				throw error;
+			}
 		},
 
 		/**

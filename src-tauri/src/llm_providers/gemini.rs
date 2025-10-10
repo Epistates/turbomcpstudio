@@ -50,6 +50,8 @@ struct GenerationConfig {
 #[derive(Debug, Deserialize)]
 struct GeminiResponse {
     candidates: Vec<GeminiCandidate>,
+    /// Usage metadata (deserialized by serde, not directly accessed)
+    #[allow(dead_code)]
     #[serde(default)]
     usage_metadata: Option<GeminiUsage>,
 }
@@ -64,6 +66,8 @@ struct GeminiCandidate {
 #[derive(Debug, Deserialize)]
 struct GeminiResponseContent {
     parts: Vec<GeminiResponsePart>,
+    /// Role field (deserialized by serde, not directly accessed)
+    #[allow(dead_code)]
     role: String,
 }
 
@@ -72,6 +76,9 @@ struct GeminiResponsePart {
     text: String,
 }
 
+/// Gemini token usage (future metrics feature)
+/// TODO(metrics): Expose token counts in CreateMessageResult
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct GeminiUsage {
     prompt_token_count: u64,
@@ -156,7 +163,8 @@ impl LLMServerClient for GeminiLLMClient {
             .as_ref()
             .and_then(|prefs| prefs.hints.as_ref())
             .and_then(|hints| hints.first())
-            .and_then(|hint| hint.name.as_ref()).cloned()
+            .and_then(|hint| hint.name.as_ref())
+            .cloned()
             .unwrap_or_else(|| self.default_model.clone());
 
         debug!("Using Gemini model: {}", model);
@@ -164,7 +172,7 @@ impl LLMServerClient for GeminiLLMClient {
         // Build generation config (max_tokens always required per MCP 2025-06-18)
         let generation_config = Some(GenerationConfig {
             temperature: request.temperature,
-            max_output_tokens: Some(request.max_tokens),  // Always present, wrap in Option for Gemini API
+            max_output_tokens: Some(request.max_tokens), // Always present, wrap in Option for Gemini API
             stop_sequences: request.stop_sequences,
         });
 
@@ -274,10 +282,7 @@ impl LLMServerClient for GeminiLLMClient {
                 "gemini-pro-vision".to_string(),
                 "gemini-ultra".to_string(),
             ],
-            capabilities: vec![
-                "vision".to_string(),
-                "function_calling".to_string(),
-            ],
+            capabilities: vec!["vision".to_string(), "function_calling".to_string()],
         })
     }
 }

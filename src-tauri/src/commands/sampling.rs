@@ -10,7 +10,7 @@ use crate::hitl_sampling::{PendingSamplingRequest, SamplingMode, SamplingResult}
 use crate::AppState;
 use serde_json::Value;
 use tauri::State;
-use turbomcp_protocol::types::CreateMessageRequest;  // v2.0: Moved to types module
+use turbomcp_protocol::types::CreateMessageRequest; // v2.0: Moved to types module
 use uuid::Uuid;
 
 /// Get current LLM configuration
@@ -256,7 +256,7 @@ pub async fn test_sampling_request(
         model_preferences: None,
         system_prompt: None,
         include_context: Some(IncludeContext::ThisServer),
-        max_tokens: 1000,  // MCP 2025-06-18: Required field
+        max_tokens: 1000, // MCP 2025-06-18: Required field
         temperature: Some(0.7),
         stop_sequences: None,
         _meta: None,
@@ -331,6 +331,25 @@ pub async fn approve_sampling_request(
     app_state
         .mcp_manager
         .approve_sampling_request(request_id, request)
+}
+
+/// Submit manual sampling response (testing tool feature - bypass LLM)
+#[tauri::command]
+pub async fn submit_manual_sampling_response(
+    request_id: String,
+    manual_response: serde_json::Value,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    use turbomcp_protocol::types::CreateMessageResult;
+
+    // Parse the manual response
+    let response: CreateMessageResult = serde_json::from_value(manual_response)
+        .map_err(|e| format!("Invalid response format: {}", e))?;
+
+    // Forward to manager
+    app_state
+        .mcp_manager
+        .submit_manual_sampling_response(request_id, response)
 }
 
 /// Reject a sampling request (server-initiated sampling)

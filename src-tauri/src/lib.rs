@@ -44,19 +44,20 @@ pub fn run() {
             // Initialize LLM config first (needed by MCP manager)
             let llm_config = Arc::new(LLMConfigManager::new());
 
+            // Database will be initialized asynchronously and set later
+            let database = Arc::new(tokio::sync::RwLock::new(None));
+
             // Initialize managers immediately (lightweight)
             let (mcp_manager, mut event_receiver) = McpClientManager::new(
                 app_handle.clone(),
                 llm_config.clone(),
+                database.clone(),
             );
             let mcp_manager = Arc::new(mcp_manager);
 
             // Initialize HITL sampling manager with LLM config
             let (hitl_sampling, mut sampling_event_receiver) = HITLSamplingManager::new(llm_config.clone());
             let hitl_sampling = Arc::new(hitl_sampling);
-
-            // Database will be initialized asynchronously and set later
-            let database = Arc::new(tokio::sync::RwLock::new(None));
 
             // Store lightweight state immediately to unblock UI
             app.manage(AppState {
@@ -99,7 +100,16 @@ pub fn run() {
                 let db_path = app_data_dir.join("mcp_studio.db");
                 tracing::info!("Attempting to initialize database at: {:?}", db_path);
 
-                let database = match Database::new_with_full_migration(db_path.to_str().unwrap()).await {
+                // Convert path to string, handling invalid Unicode gracefully
+                let db_path_str = match db_path.to_str() {
+                    Some(s) => s,
+                    None => {
+                        tracing::error!("Database path contains invalid Unicode characters");
+                        ":memory:" // Fallback to in-memory if path is invalid
+                    }
+                };
+
+                let database = match Database::new_with_full_migration(db_path_str).await {
                     Ok(db) => {
                         tracing::info!("✅ Successfully using persistent database at {:?}", db_path);
                         db
@@ -113,7 +123,14 @@ pub fn run() {
                             Ok(home) => {
                                 let fallback_path = std::path::PathBuf::from(home).join(".turbomcpstudio").join("mcp_studio.db");
                                 tracing::info!("🏠 Trying home directory fallback: {:?}", fallback_path);
-                                Database::new_with_full_migration(fallback_path.to_str().unwrap()).await
+                                let fallback_path_str = match fallback_path.to_str() {
+                                    Some(s) => s,
+                                    None => {
+                                        tracing::error!("Fallback path contains invalid Unicode characters");
+                                        ":memory:" // Final fallback
+                                    }
+                                };
+                                Database::new_with_full_migration(fallback_path_str).await
                             }
                             Err(_) => {
                                 tracing::warn!("Cannot determine home directory");
@@ -257,6 +274,7 @@ pub fn run() {
             commands::get_pending_sampling_requests,
             commands::get_completed_sampling_requests,
             commands::approve_sampling_request,
+            commands::submit_manual_sampling_response,
             commands::reject_sampling_request,
             commands::process_hitl_sampling_request,
             commands::test_sampling_request,

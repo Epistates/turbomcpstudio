@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Database manager for MCP Studio
+#[derive(Debug)]
 pub struct Database {
     pool: Pool<Sqlite>,
 }

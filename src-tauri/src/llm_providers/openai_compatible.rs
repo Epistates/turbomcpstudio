@@ -46,6 +46,8 @@ struct ChatMessage {
 struct ChatCompletionResponse {
     model: String,
     choices: Vec<Choice>,
+    /// Usage metadata (deserialized by serde, not directly accessed)
+    #[allow(dead_code)]
     #[serde(default)]
     usage: Option<Usage>,
 }
@@ -58,10 +60,15 @@ struct Choice {
 
 #[derive(Debug, Deserialize)]
 struct ChatResponseMessage {
+    /// Role field (deserialized by serde, not directly accessed)
+    #[allow(dead_code)]
     role: String,
     content: String,
 }
 
+/// OpenAI-compatible token usage (future metrics feature)
+/// TODO(metrics): Expose token counts in CreateMessageResult
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct Usage {
     prompt_tokens: u64,
@@ -183,7 +190,8 @@ impl LLMServerClient for OpenAICompatibleClient {
             .as_ref()
             .and_then(|prefs| prefs.hints.as_ref())
             .and_then(|hints| hints.first())
-            .and_then(|hint| hint.name.as_ref()).cloned()
+            .and_then(|hint| hint.name.as_ref())
+            .cloned()
             .unwrap_or_else(|| self.default_model.clone());
 
         debug!("Using {} model: {}", self.provider_name, model);
@@ -192,7 +200,7 @@ impl LLMServerClient for OpenAICompatibleClient {
         let chat_request = ChatCompletionRequest {
             model,
             messages,
-            max_tokens: Some(request.max_tokens),  // Wrap in Option for OpenAI-compatible API
+            max_tokens: Some(request.max_tokens), // Wrap in Option for OpenAI-compatible API
             temperature: request.temperature,
             stop: request.stop_sequences,
         };
@@ -216,7 +224,10 @@ impl LLMServerClient for OpenAICompatibleClient {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            error!("{} API error ({}): {}", self.provider_name, status, error_body);
+            error!(
+                "{} API error ({}): {}",
+                self.provider_name, status, error_body
+            );
 
             return Err(match status.as_u16() {
                 404 => LLMProviderError::ModelNotFound(format!("Model not found: {}", error_body)),
@@ -272,10 +283,7 @@ impl LLMServerClient for OpenAICompatibleClient {
         Ok(ServerInfo {
             name: self.provider_name.clone(),
             models: vec![self.default_model.clone()],
-            capabilities: vec![
-                "streaming".to_string(),
-                "function_calling".to_string(),
-            ],
+            capabilities: vec!["streaming".to_string(), "function_calling".to_string()],
         })
     }
 }

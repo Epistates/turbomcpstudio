@@ -3,9 +3,6 @@ use thiserror::Error;
 /// Main error type for MCP Studio operations
 #[derive(Error, Debug)]
 pub enum McpStudioError {
-    #[error("Server connection error: {0}")]
-    ConnectionError(String),
-
     #[error("Connection failed: {0}")]
     ConnectionFailed(String),
 
@@ -39,11 +36,8 @@ pub enum McpStudioError {
     #[error("Tauri error: {0}")]
     TauriError(#[from] tauri::Error),
 
-    #[error("Invalid configuration: {0}")]
-    ConfigError(String),
-
     #[error("Configuration error: {0}")]
-    Configuration(String),
+    ConfigError(String),
 
     #[error("Server not found: {0}")]
     ServerNotFound(String),

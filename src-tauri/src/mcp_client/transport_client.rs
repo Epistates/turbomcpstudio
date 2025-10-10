@@ -9,8 +9,8 @@ use turbomcp_client::handlers::{
     ElicitationHandler, LogHandler, ProgressHandler, ResourceUpdateHandler,
 };
 use turbomcp_client::Client;
-use turbomcp_protocol::{Error, ErrorKind};  // v2.0: Re-exported at root (was turbomcp_core)
 use turbomcp_protocol::types::{Prompt, PromptInput, Tool, ToolInputSchema};
+use turbomcp_protocol::{Error, ErrorKind}; // v2.0: Re-exported at root (was turbomcp_core)
 use turbomcp_transport::child_process::ChildProcessTransport;
 use turbomcp_transport::stdio::StdioTransport;
 
@@ -234,10 +234,7 @@ impl McpTransportClient {
     }
 
     /// Read a specific resource from the MCP server (transport-agnostic)
-    pub async fn read_resource(
-        &self,
-        uri: &str,
-    ) -> Result<serde_json::Value, Box<Error>> {
+    pub async fn read_resource(&self, uri: &str) -> Result<serde_json::Value, Box<Error>> {
         match self {
             McpTransportClient::Stdio(client) => {
                 let result = client.read_resource(uri).await?;

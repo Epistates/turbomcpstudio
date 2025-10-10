@@ -84,11 +84,11 @@ impl LLMConfigManager {
 
         // Store in system keyring
         let entry = Entry::new(&self.keyring_service, &key_id)
-            .map_err(|e| McpStudioError::Configuration(format!("Keyring error: {}", e)))?;
+            .map_err(|e| McpStudioError::ConfigError(format!("Keyring error: {}", e)))?;
 
-        entry.set_password(&request.api_key).map_err(|e| {
-            McpStudioError::Configuration(format!("Failed to store API key: {}", e))
-        })?;
+        entry
+            .set_password(&request.api_key)
+            .map_err(|e| McpStudioError::ConfigError(format!("Failed to store API key: {}", e)))?;
 
         // Enable the provider now that it has an API key
         let mut config = self.config.write().await;
@@ -202,7 +202,7 @@ impl LLMConfigManager {
     pub async fn remove_api_key(&self, provider_id: &str) -> Result<(), McpStudioError> {
         let key_id = format!("{}-api-key", provider_id);
         let entry = Entry::new(&self.keyring_service, &key_id)
-            .map_err(|e| McpStudioError::Configuration(format!("Keyring error: {}", e)))?;
+            .map_err(|e| McpStudioError::ConfigError(format!("Keyring error: {}", e)))?;
 
         if let Err(e) = entry.delete_password() {
             warn!("Failed to delete API key for {}: {}", provider_id, e);
@@ -249,7 +249,7 @@ impl LLMConfigManager {
                     _ => {
                         // Cloud providers need API keys
                         if self.get_api_key(&provider_id).await.is_none() {
-                            return Err(McpStudioError::Configuration(format!(
+                            return Err(McpStudioError::ConfigError(format!(
                                 "Provider {} is not configured with API key",
                                 provider_id
                             )));
@@ -258,13 +258,13 @@ impl LLMConfigManager {
                 }
             }
             Some(_) => {
-                return Err(McpStudioError::Configuration(format!(
+                return Err(McpStudioError::ConfigError(format!(
                     "Provider {} is not enabled",
                     provider_id
                 )));
             }
             None => {
-                return Err(McpStudioError::Configuration(format!(
+                return Err(McpStudioError::ConfigError(format!(
                     "Unknown provider: {}",
                     provider_id
                 )));
@@ -396,7 +396,7 @@ impl LLMConfigManager {
 
         // Get base URL for local provider
         let base_url = provider_config.base_url.as_ref().ok_or_else(|| {
-            McpStudioError::Configuration(format!(
+            McpStudioError::ConfigError(format!(
                 "Local provider {} requires base_url configuration",
                 provider_id
             ))
@@ -413,7 +413,7 @@ impl LLMConfigManager {
                         provider_config.timeout_seconds,
                     )
                     .map_err(|e| {
-                        McpStudioError::Configuration(format!(
+                        McpStudioError::ConfigError(format!(
                             "Failed to create Ollama client: {}",
                             e
                         ))
@@ -430,7 +430,7 @@ impl LLMConfigManager {
                         provider_config.timeout_seconds,
                     )
                     .map_err(|e| {
-                        McpStudioError::Configuration(format!(
+                        McpStudioError::ConfigError(format!(
                             "Failed to create LMStudio client: {}",
                             e
                         ))
@@ -441,7 +441,7 @@ impl LLMConfigManager {
             // Other local providers can be added here
             _ => {
                 error!("Unknown local provider: {}", provider_id);
-                return Err(McpStudioError::Configuration(format!(
+                return Err(McpStudioError::ConfigError(format!(
                     "Unknown local provider: {}",
                     provider_id
                 )));
@@ -496,7 +496,7 @@ impl LLMConfigManager {
                         provider_config.timeout_seconds,
                     )
                     .map_err(|e| {
-                        McpStudioError::Configuration(format!(
+                        McpStudioError::ConfigError(format!(
                             "Failed to create Anthropic client: {}",
                             e
                         ))
@@ -514,7 +514,7 @@ impl LLMConfigManager {
                         provider_config.timeout_seconds,
                     )
                     .map_err(|e| {
-                        McpStudioError::Configuration(format!(
+                        McpStudioError::ConfigError(format!(
                             "Failed to create Gemini client: {}",
                             e
                         ))
@@ -525,7 +525,7 @@ impl LLMConfigManager {
             // Unknown provider
             _ => {
                 error!("Unknown cloud provider: {}", provider_id);
-                return Err(McpStudioError::Configuration(format!(
+                return Err(McpStudioError::ConfigError(format!(
                     "Unknown cloud provider: {}",
                     provider_id
                 )));
@@ -664,7 +664,10 @@ impl LLMConfigManager {
         &self,
         request: turbomcp_protocol::types::CreateMessageRequest,
         provider_id: Option<String>,
-    ) -> Result<turbomcp_protocol::types::CreateMessageResult, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<
+        turbomcp_protocol::types::CreateMessageResult,
+        Box<dyn std::error::Error + Send + Sync>,
+    > {
         info!("🚀 invoke_llm_directly called");
 
         // Get the provider to use
@@ -672,7 +675,9 @@ impl LLMConfigManager {
             id
         } else {
             let config = self.config.read().await;
-            config.active_provider.clone()
+            config
+                .active_provider
+                .clone()
                 .ok_or("No active provider configured")?
         };
 
@@ -680,7 +685,9 @@ impl LLMConfigManager {
 
         // Get provider configuration
         let config = self.config.read().await;
-        let provider_config = config.providers.get(&provider_id)
+        let provider_config = config
+            .providers
+            .get(&provider_id)
             .ok_or_else(|| format!("Provider not found: {}", provider_id))?
             .clone();
 
@@ -694,15 +701,18 @@ impl LLMConfigManager {
         let llm_client: Arc<dyn LLMServerClient> = match provider_config.provider_type {
             crate::types::LLMProviderType::Local => {
                 info!("🔧 Creating local provider client for {}", provider_id);
-                self.create_local_llm_client(&provider_id, &provider_config).await?
+                self.create_local_llm_client(&provider_id, &provider_config)
+                    .await?
             }
             _ => {
                 info!("🔧 Creating cloud provider client for {}", provider_id);
                 // Get API key for cloud providers
-                let api_key = self.get_api_key(&provider_id).await
-                    .ok_or_else(|| format!("No API key configured for provider: {}", provider_id))?;
+                let api_key = self.get_api_key(&provider_id).await.ok_or_else(|| {
+                    format!("No API key configured for provider: {}", provider_id)
+                })?;
 
-                self.create_cloud_llm_client(&provider_id, &provider_config, &api_key).await?
+                self.create_cloud_llm_client(&provider_id, &provider_config, &api_key)
+                    .await?
             }
         };
 
@@ -720,28 +730,22 @@ impl LLMConfigManager {
         provider_id: &str,
         provider_config: &crate::types::LLMProviderConfig,
     ) -> Result<Arc<dyn LLMServerClient>, Box<dyn std::error::Error + Send + Sync>> {
-        let base_url = provider_config.base_url.as_ref()
+        let base_url = provider_config
+            .base_url
+            .as_ref()
             .ok_or_else(|| format!("Local provider {} requires base_url", provider_id))?;
 
         let client: Arc<dyn LLMServerClient> = match provider_id {
-            "ollama" => {
-                Arc::new(
-                    OpenAICompatibleClient::new_ollama(
-                        base_url.clone(),
-                        provider_config.default_model.clone(),
-                        provider_config.timeout_seconds,
-                    )?
-                )
-            }
-            "lmstudio" => {
-                Arc::new(
-                    OpenAICompatibleClient::new_lmstudio(
-                        base_url.clone(),
-                        provider_config.default_model.clone(),
-                        provider_config.timeout_seconds,
-                    )?
-                )
-            }
+            "ollama" => Arc::new(OpenAICompatibleClient::new_ollama(
+                base_url.clone(),
+                provider_config.default_model.clone(),
+                provider_config.timeout_seconds,
+            )?),
+            "lmstudio" => Arc::new(OpenAICompatibleClient::new_lmstudio(
+                base_url.clone(),
+                provider_config.default_model.clone(),
+                provider_config.timeout_seconds,
+            )?),
             _ => {
                 return Err(format!("Unknown local provider: {}", provider_id).into());
             }
@@ -758,31 +762,21 @@ impl LLMConfigManager {
         api_key: &str,
     ) -> Result<Arc<dyn LLMServerClient>, Box<dyn std::error::Error + Send + Sync>> {
         let client: Arc<dyn LLMServerClient> = match provider_id {
-            id if id.starts_with("openai") => {
-                Arc::new(OpenAILLMClient::new(
-                    api_key.to_string(),
-                    provider_config.default_model.clone(),
-                    provider_config.base_url.clone(),
-                ))
-            }
-            id if id.starts_with("claude-") => {
-                Arc::new(
-                    AnthropicLLMClient::new(
-                        api_key.to_string(),
-                        provider_config.default_model.clone(),
-                        provider_config.timeout_seconds,
-                    )?
-                )
-            }
-            "gemini" => {
-                Arc::new(
-                    GeminiLLMClient::new(
-                        api_key.to_string(),
-                        provider_config.default_model.clone(),
-                        provider_config.timeout_seconds,
-                    )?
-                )
-            }
+            id if id.starts_with("openai") => Arc::new(OpenAILLMClient::new(
+                api_key.to_string(),
+                provider_config.default_model.clone(),
+                provider_config.base_url.clone(),
+            )),
+            id if id.starts_with("claude-") => Arc::new(AnthropicLLMClient::new(
+                api_key.to_string(),
+                provider_config.default_model.clone(),
+                provider_config.timeout_seconds,
+            )?),
+            "gemini" => Arc::new(GeminiLLMClient::new(
+                api_key.to_string(),
+                provider_config.default_model.clone(),
+                provider_config.timeout_seconds,
+            )?),
             _ => {
                 return Err(format!("Unknown cloud provider: {}", provider_id).into());
             }

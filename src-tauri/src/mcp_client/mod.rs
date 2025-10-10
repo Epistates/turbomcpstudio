@@ -25,7 +25,7 @@
 //!
 //! ## Usage
 //!
-//! ```rust
+//! ```ignore
 //! use crate::mcp_client::McpClientManager;
 //!
 //! let (manager, event_receiver) = McpClientManager::new(app_handle);
@@ -38,13 +38,22 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 // Module declarations
+mod configuration;
 mod connection;
 mod elicitation;
 mod events;
+mod health_monitoring;
+mod initialization;
 pub mod manager;
+mod mcp_operations;
+mod message_history;
+mod misc_operations;
+mod monitoring_loop;
 mod process;
 mod sampling;
+mod sampling_logic;
 mod transport_client;
+mod transport_layer;
 
 // Re-export main types for convenient access
 pub use manager::McpClientManager;
@@ -58,9 +67,20 @@ pub use manager::McpClientManager;
 /// requests in multi-server scenarios.
 #[derive(Debug, Clone)]
 pub struct ServerContext {
+    /// Server UUID for identification
     pub server_id: Uuid,
+
+    /// Human-readable server name for display
     pub server_name: String,
+
+    /// Optional server description for UI display
+    /// Currently stored but not used - reserved for future Protocol Inspector enhancements
+    #[allow(dead_code)]
     pub server_description: Option<String>,
+
+    /// Timestamp when connection was established
+    /// Currently stored but not used - reserved for future session duration tracking
+    #[allow(dead_code)]
     pub connected_at: DateTime<Utc>,
 }
 

@@ -209,7 +209,7 @@ impl WorkflowEngine {
                     let duration = context
                         .execution
                         .completed_at
-                        .unwrap()
+                        .expect("completed_at must be set before calculating duration")
                         .signed_duration_since(context.execution.started_at)
                         .num_milliseconds() as u64;
                     context.execution.summary.total_duration_ms = duration as u32;
@@ -884,7 +884,8 @@ impl VariableStore {
 
     /// Advanced variable interpolation with security
     pub fn interpolate_string(&self, input: &str) -> McpResult<String> {
-        let re = Regex::new(r"\$\{([^}]+)\}").unwrap();
+        let re =
+            Regex::new(r"\$\{([^}]+)\}").expect("variable interpolation regex pattern is valid");
         let mut result = input.to_string();
 
         for captures in re.captures_iter(input) {

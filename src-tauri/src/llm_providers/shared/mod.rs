@@ -4,6 +4,4 @@ pub mod types;
 
 pub use errors::LLMProviderError;
 pub use http_client::HttpClientBuilder;
-pub use types::{
-    AnthropicRequest, AnthropicResponse, MessageConverter,
-};
+pub use types::{AnthropicRequest, AnthropicResponse, MessageConverter};

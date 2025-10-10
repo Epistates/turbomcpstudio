@@ -10,7 +10,7 @@
 //!
 //! ## Architecture
 //!
-//! ```
+//! ```text
 //! MCP Server → sampling/createMessage → StudioSamplingHandler
 //!                                           ↓
 //!                                   Emit Tauri event
@@ -26,13 +26,16 @@
 //!                                   Return to server
 //! ```
 
+use crate::database::Database;
 use crate::llm_config::LLMConfigManager;
 use crate::mcp_client::{ServerContext, CURRENT_SERVER_CONTEXT};
+use crate::types::{MessageDirection, MessageHistory};
 use async_trait::async_trait;
+use chrono::Utc;
 use dashmap::DashMap;
 use serde::Serialize;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::Emitter;
 use turbomcp_client::sampling::SamplingHandler;
 use turbomcp_protocol::types::{CreateMessageRequest, CreateMessageResult};
@@ -68,9 +71,11 @@ impl SamplingHandler for ContextAwareSamplingHandler {
         let context = self.context.clone();
         let inner = self.inner.clone();
 
-        CURRENT_SERVER_CONTEXT.scope(context, async move {
-            inner.handle_create_message(request).await
-        }).await
+        CURRENT_SERVER_CONTEXT
+            .scope(context, async move {
+                inner.handle_create_message(request).await
+            })
+            .await
     }
 }
 
@@ -99,23 +104,30 @@ pub struct StudioSamplingHandler {
     pending_requests: Arc<DashMap<String, PendingSamplingRequest>>,
 
     /// Response channels for async communication
-    response_channels:
-        Arc<DashMap<String, tokio::sync::oneshot::Sender<CreateMessageResult>>>,
+    response_channels: Arc<DashMap<String, tokio::sync::oneshot::Sender<CreateMessageResult>>>,
 
     /// LLM configuration manager for actual LLM calls
     llm_config: Arc<LLMConfigManager>,
+
+    /// Database for protocol message logging (initialized async)
+    db: Arc<tokio::sync::RwLock<Option<Arc<Database>>>>,
 }
 
 impl StudioSamplingHandler {
     /// Create a new sampling handler
-    pub fn new(app_handle: tauri::AppHandle, llm_config: Arc<LLMConfigManager>) -> Self {
-        tracing::info!("Initializing StudioSamplingHandler");
+    pub fn new(
+        app_handle: tauri::AppHandle,
+        llm_config: Arc<LLMConfigManager>,
+        db: Arc<tokio::sync::RwLock<Option<Arc<Database>>>>,
+    ) -> Self {
+        tracing::info!("Initializing StudioSamplingHandler with protocol logging");
 
         Self {
             app_handle,
             pending_requests: Arc::new(DashMap::new()),
             response_channels: Arc::new(DashMap::new()),
             llm_config,
+            db,
         }
     }
 
@@ -124,10 +136,13 @@ impl StudioSamplingHandler {
     /// This reads the server context that was set before the handler was invoked.
     /// Falls back to a default context if none is available (shouldn't happen in practice).
     fn get_server_context(&self) -> ServerContext {
-        CURRENT_SERVER_CONTEXT.try_with(|ctx| (**ctx).clone())
+        CURRENT_SERVER_CONTEXT
+            .try_with(|ctx| (**ctx).clone())
             .unwrap_or_else(|_| {
                 tracing::error!("⚠️ No server context in task-local storage!");
-                tracing::error!("This indicates the manager didn't set context before calling the handler");
+                tracing::error!(
+                    "This indicates the manager didn't set context before calling the handler"
+                );
                 ServerContext::default()
             })
     }
@@ -144,7 +159,7 @@ impl StudioSamplingHandler {
             })
             .sum();
 
-        let output_tokens = request.max_tokens as usize;  // MCP 2025-06-18: Always required
+        let output_tokens = request.max_tokens as usize; // MCP 2025-06-18: Always required
 
         // GPT-4 pricing (example - should be per-provider)
         let input_cost = (input_tokens as f64) * 0.00003; // $0.03 per 1K tokens
@@ -164,7 +179,7 @@ impl StudioSamplingHandler {
             })
             .sum();
 
-        Some(input_tokens + request.max_tokens)  // MCP 2025-06-18: Always required
+        Some(input_tokens + request.max_tokens) // MCP 2025-06-18: Always required
     }
 
     /// Submit approved request and call LLM
@@ -198,8 +213,11 @@ impl StudioSamplingHandler {
             match llm_config.invoke_llm_directly(approved_request, None).await {
                 Ok(result) => {
                     tracing::info!("✅ LLM call succeeded for request: {}", request_id);
-                    if let Err(_) = tx.send(result) {
-                        tracing::error!("❌ Failed to send LLM response (channel closed): {}", request_id);
+                    if tx.send(result).is_err() {
+                        tracing::error!(
+                            "❌ Failed to send LLM response (channel closed): {}",
+                            request_id
+                        );
                     }
                 }
                 Err(e) => {
@@ -212,11 +230,49 @@ impl StudioSamplingHandler {
         Ok(())
     }
 
+    /// Submit manual response (bypass LLM - for testing tool quick responses)
+    ///
+    /// Called from frontend when user provides a manual response via quick templates.
+    /// This directly sends the response without calling the LLM.
+    pub fn submit_manual_response(
+        &self,
+        request_id: String,
+        manual_response: CreateMessageResult,
+    ) -> Result<(), String> {
+        tracing::info!("User provided manual response for: {}", request_id);
+
+        // Remove from pending
+        self.pending_requests.remove(&request_id);
+
+        // Get response channel
+        let tx = self
+            .response_channels
+            .remove(&request_id)
+            .ok_or_else(|| format!("No pending channel for request: {}", request_id))?
+            .1;
+
+        // Send manual response directly through channel
+        if tx.send(manual_response).is_err() {
+            tracing::error!(
+                "❌ Failed to send manual response (channel closed): {}",
+                request_id
+            );
+            return Err("Channel closed".to_string());
+        }
+
+        tracing::info!("✅ Manual response sent for request: {}", request_id);
+        Ok(())
+    }
+
     /// Reject sampling request
     ///
     /// Called from frontend when user declines the request.
     pub fn reject_request(&self, request_id: String, reason: String) -> Result<(), String> {
-        tracing::info!("User rejected sampling request: {} - {}", request_id, reason);
+        tracing::info!(
+            "User rejected sampling request: {} - {}",
+            request_id,
+            reason
+        );
 
         // Remove from pending
         self.pending_requests.remove(&request_id);
@@ -234,6 +290,7 @@ impl SamplingHandler for StudioSamplingHandler {
         &self,
         request: CreateMessageRequest,
     ) -> Result<CreateMessageResult, Box<dyn std::error::Error + Send + Sync>> {
+        let start = Instant::now();
         let request_id = Uuid::new_v4().to_string();
 
         tracing::info!(
@@ -243,6 +300,32 @@ impl SamplingHandler for StudioSamplingHandler {
 
         // Get server context (workaround - see comments above)
         let server_context = self.get_server_context();
+
+        // Capture incoming request for protocol inspector
+        let protocol_msg_id = Uuid::new_v4();
+        if let Some(db) = self.db.read().await.as_ref() {
+            let request_json = serde_json::to_string(&request)
+                .unwrap_or_else(|_| "Failed to serialize request".to_string());
+            let size_bytes = request_json.len() as i64;
+
+            let message = MessageHistory {
+                id: protocol_msg_id,
+                server_id: server_context.server_id,
+                timestamp: Utc::now(),
+                direction: MessageDirection::ServerToClient,
+                content: request_json,
+                size_bytes,
+                processing_time_ms: None, // Will be updated when response is captured
+            };
+
+            if let Err(e) = db.save_message(&message).await {
+                tracing::warn!("Failed to save incoming sampling request: {}", e);
+            } else {
+                // Emit real-time event for UI
+                let _ = self.app_handle.emit("protocol_message", &protocol_msg_id);
+                tracing::debug!("📝 Captured incoming sampling request: {}", protocol_msg_id);
+            }
+        }
 
         // Create pending request
         let pending = PendingSamplingRequest {
@@ -266,6 +349,7 @@ impl SamplingHandler for StudioSamplingHandler {
         // Emit event to frontend for HITL approval
         let event_payload = serde_json::json!({
             "requestId": request_id,
+            "protocolMessageId": protocol_msg_id.to_string(),  // For Protocol Inspector correlation
             "serverId": server_context.server_id,
             "serverName": server_context.server_name,
             "request": {
@@ -300,6 +384,37 @@ impl SamplingHandler for StudioSamplingHandler {
             .map_err(|_| "Channel closed before receiving response - user likely rejected")?;
 
         tracing::info!("🎉 Sampling request completed: {}", request_id);
+
+        // Capture outgoing response for protocol inspector
+        let processing_time_ms = start.elapsed().as_millis() as i64;
+        if let Some(db) = self.db.read().await.as_ref() {
+            let msg_id = Uuid::new_v4();
+            let response_json = serde_json::to_string(&result)
+                .unwrap_or_else(|_| "Failed to serialize response".to_string());
+            let size_bytes = response_json.len() as i64;
+
+            let message = MessageHistory {
+                id: msg_id,
+                server_id: server_context.server_id,
+                timestamp: Utc::now(),
+                direction: MessageDirection::ClientToServer,
+                content: response_json,
+                size_bytes,
+                processing_time_ms: Some(processing_time_ms),
+            };
+
+            if let Err(e) = db.save_message(&message).await {
+                tracing::warn!("Failed to save outgoing sampling response: {}", e);
+            } else {
+                // Emit real-time event for UI
+                let _ = self.app_handle.emit("protocol_message", &msg_id);
+                tracing::debug!(
+                    "📝 Captured outgoing sampling response: {} ({}ms)",
+                    msg_id,
+                    processing_time_ms
+                );
+            }
+        }
 
         Ok(result)
     }

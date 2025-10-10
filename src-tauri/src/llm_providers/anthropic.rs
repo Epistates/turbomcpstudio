@@ -6,8 +6,7 @@ use turbomcp_client::sampling::{LLMServerClient, ServerInfo};
 use turbomcp_protocol::types::{CreateMessageRequest, CreateMessageResult};
 
 use super::shared::{
-    AnthropicRequest, AnthropicResponse, HttpClientBuilder, LLMProviderError,
-    MessageConverter,
+    AnthropicRequest, AnthropicResponse, HttpClientBuilder, LLMProviderError, MessageConverter,
 };
 use super::stop_reason_mapping::{map_stop_reason, LLMProvider};
 
@@ -40,6 +39,8 @@ impl AnthropicLLMClient {
     }
 
     /// Create client with custom base URL (for proxy/testing)
+    /// TODO(enterprise): Support self-hosted Anthropic-compatible endpoints
+    #[allow(dead_code)]
     pub fn with_base_url(
         api_key: String,
         default_model: String,
@@ -82,7 +83,8 @@ impl LLMServerClient for AnthropicLLMClient {
             .as_ref()
             .and_then(|prefs| prefs.hints.as_ref())
             .and_then(|hints| hints.first())
-            .and_then(|hint| hint.name.as_ref()).cloned()
+            .and_then(|hint| hint.name.as_ref())
+            .cloned()
             .unwrap_or_else(|| self.default_model.clone());
 
         debug!("Using Anthropic model: {}", model);
@@ -91,7 +93,7 @@ impl LLMServerClient for AnthropicLLMClient {
         let anthropic_request = AnthropicRequest {
             model,
             messages,
-            max_tokens: request.max_tokens,  // MCP 2025-06-18: Required field
+            max_tokens: request.max_tokens, // MCP 2025-06-18: Required field
             temperature: request.temperature,
             stop_sequences: request.stop_sequences,
         };
@@ -111,7 +113,10 @@ impl LLMServerClient for AnthropicLLMClient {
         // Check for HTTP errors
         let status = http_response.status();
         if !status.is_success() {
-            let error_body = http_response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_body = http_response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             error!("Anthropic API error ({}): {}", status, error_body);
 
             return Err(match status.as_u16() {

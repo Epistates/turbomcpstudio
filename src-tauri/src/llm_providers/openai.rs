@@ -15,16 +15,12 @@ use super::stop_reason_mapping::{map_stop_reason, LLMProvider};
 pub struct OpenAILLMClient {
     client: Arc<OpenAISDKClient<OpenAIConfig>>,
     default_model: String,
-    provider_id: String,
 }
 
 impl OpenAILLMClient {
     /// Create new OpenAI client with API key
     pub fn new(api_key: String, default_model: String, base_url: Option<String>) -> Self {
-        info!(
-            "Creating OpenAI client with model: {}",
-            default_model
-        );
+        info!("Creating OpenAI client with model: {}", default_model);
 
         let mut config = OpenAIConfig::new().with_api_key(api_key);
 
@@ -37,7 +33,6 @@ impl OpenAILLMClient {
         Self {
             client: Arc::new(OpenAISDKClient::with_config(config)),
             default_model,
-            provider_id: "openai".to_string(),
         }
     }
 }
@@ -48,7 +43,10 @@ impl LLMServerClient for OpenAILLMClient {
         &self,
         request: CreateMessageRequest,
     ) -> Result<CreateMessageResult, Box<dyn std::error::Error + Send + Sync>> {
-        debug!("OpenAI create_message called with {} messages", request.messages.len());
+        debug!(
+            "OpenAI create_message called with {} messages",
+            request.messages.len()
+        );
 
         // Convert MCP messages to OpenAI format
         let messages = MessageConverter::to_openai_messages(&request.messages);
@@ -59,7 +57,8 @@ impl LLMServerClient for OpenAILLMClient {
             .as_ref()
             .and_then(|prefs| prefs.hints.as_ref())
             .and_then(|hints| hints.first())
-            .and_then(|hint| hint.name.as_ref()).cloned()
+            .and_then(|hint| hint.name.as_ref())
+            .cloned()
             .unwrap_or_else(|| self.default_model.clone());
 
         debug!("Using OpenAI model: {}", model);
@@ -69,7 +68,7 @@ impl LLMServerClient for OpenAILLMClient {
         request_builder
             .model(&model)
             .messages(messages)
-            .max_tokens(request.max_tokens);  // MCP 2025-06-18: Always required
+            .max_tokens(request.max_tokens); // MCP 2025-06-18: Always required
 
         if let Some(temperature) = request.temperature {
             // OpenAI SDK expects f32, MCP uses f64
@@ -88,15 +87,10 @@ impl LLMServerClient for OpenAILLMClient {
 
         // Call OpenAI API
         debug!("Sending request to OpenAI API...");
-        let response = self
-            .client
-            .chat()
-            .create(chat_request)
-            .await
-            .map_err(|e| {
-                error!("OpenAI API error: {}", e);
-                LLMProviderError::ApiError(e.to_string())
-            })?;
+        let response = self.client.chat().create(chat_request).await.map_err(|e| {
+            error!("OpenAI API error: {}", e);
+            LLMProviderError::ApiError(e.to_string())
+        })?;
 
         debug!("Received response from OpenAI API");
 

@@ -357,7 +357,7 @@ impl HITLSamplingManager {
             .get_active_sampling_handler()
             .await
             .ok_or_else(|| {
-                McpStudioError::Configuration("No active LLM provider configured".to_string())
+                McpStudioError::ConfigError("No active LLM provider configured".to_string())
             })?;
 
         // Process with real LLM

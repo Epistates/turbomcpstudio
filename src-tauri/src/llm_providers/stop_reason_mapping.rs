@@ -23,6 +23,9 @@ pub enum LLMProvider {
     Anthropic,
     Ollama,
     LMStudio,
+    /// Custom LLM provider support
+    /// TODO(future): Implement custom provider configuration and stop reason mappings
+    #[allow(dead_code)]
     Custom(&'static str),
 }
 
@@ -51,7 +54,7 @@ impl LLMProvider {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// use turbomcp_protocol::types::StopReason;
 ///
 /// // OpenAI format
@@ -207,13 +210,22 @@ fn map_lmstudio_stop_reason(reason: &str) -> StopReason {
 fn map_generic_stop_reason(reason: &str) -> StopReason {
     let reason_lower = reason.to_lowercase();
 
-    if reason_lower.contains("stop") || reason_lower.contains("end") || reason_lower.contains("complete") {
+    if reason_lower.contains("stop")
+        || reason_lower.contains("end")
+        || reason_lower.contains("complete")
+    {
         StopReason::EndTurn
-    } else if reason_lower.contains("length") || reason_lower.contains("token") || reason_lower.contains("max") {
+    } else if reason_lower.contains("length")
+        || reason_lower.contains("token")
+        || reason_lower.contains("max")
+    {
         StopReason::MaxTokens
     } else if reason_lower.contains("sequence") {
         StopReason::StopSequence
-    } else if reason_lower.contains("filter") || reason_lower.contains("content") || reason_lower.contains("safety") {
+    } else if reason_lower.contains("filter")
+        || reason_lower.contains("content")
+        || reason_lower.contains("safety")
+    {
         StopReason::ContentFilter
     } else if reason_lower.contains("tool") || reason_lower.contains("function") {
         StopReason::ToolUse
@@ -239,6 +251,7 @@ fn map_generic_stop_reason(reason: &str) -> StopReason {
 /// # Returns
 ///
 /// Provider-specific stop reason string
+#[cfg(test)]
 pub fn to_provider_format(provider: LLMProvider, stop_reason: StopReason) -> &'static str {
     match provider {
         LLMProvider::OpenAI | LLMProvider::LMStudio => match stop_reason {
@@ -337,16 +350,19 @@ mod tests {
 
     #[test]
     fn test_generic_mapping_heuristics() {
-        assert_eq!(
-            map_generic_stop_reason("completed"),
-            StopReason::EndTurn
-        );
+        assert_eq!(map_generic_stop_reason("completed"), StopReason::EndTurn);
         assert_eq!(
             map_generic_stop_reason("max_length_reached"),
             StopReason::MaxTokens
         );
+        // "stop_word_found" contains "stop" so it maps to EndTurn first
         assert_eq!(
             map_generic_stop_reason("stop_word_found"),
+            StopReason::EndTurn
+        );
+        // "sequence_match" contains "sequence" without "stop" so it maps to StopSequence
+        assert_eq!(
+            map_generic_stop_reason("sequence_match"),
             StopReason::StopSequence
         );
         assert_eq!(

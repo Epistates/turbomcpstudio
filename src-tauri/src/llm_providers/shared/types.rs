@@ -4,6 +4,8 @@ use turbomcp_protocol::types::{
 };
 
 /// Token usage information
+/// Note: May appear unused due to serde deriving Deserialize, but used in response parsing
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenUsage {
     pub input_tokens: u64,
@@ -33,18 +35,22 @@ impl MessageConverter {
                 // Note: MCP Role enum only has User and Assistant (no System)
                 // System-like messages should be prepended to user messages
                 match msg.role {
-                    Role::User => ChatCompletionRequestMessage::User(
-                        ChatCompletionRequestUserMessage {
+                    Role::User => {
+                        ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
                             content: ChatCompletionRequestUserMessageContent::Text(content_text),
                             name: None,
-                        },
-                    ),
+                        })
+                    }
                     Role::Assistant => {
                         // Create assistant message with proper type
-                        ChatCompletionRequestMessage::Assistant(ChatCompletionRequestAssistantMessage {
-                            content: Some(ChatCompletionRequestAssistantMessageContent::Text(content_text)),
-                            ..Default::default()
-                        })
+                        ChatCompletionRequestMessage::Assistant(
+                            ChatCompletionRequestAssistantMessage {
+                                content: Some(ChatCompletionRequestAssistantMessageContent::Text(
+                                    content_text,
+                                )),
+                                ..Default::default()
+                            },
+                        )
                     }
                 }
             })
@@ -131,8 +137,6 @@ pub struct AnthropicResponse {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AnthropicContent {
-    #[serde(rename = "type")]
-    pub content_type: String,
     pub text: String,
 }
 
@@ -142,14 +146,4 @@ pub struct AnthropicUsage {
     pub output_tokens: u64,
 }
 
-/// Gemini message format (similar structure)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GeminiMessage {
-    pub role: String,
-    pub parts: Vec<GeminiPart>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GeminiPart {
-    pub text: String,
-}
+// Note: Gemini message types are defined locally in gemini.rs where they're used

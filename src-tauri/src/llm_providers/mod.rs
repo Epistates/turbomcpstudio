@@ -11,13 +11,13 @@
 //! - **ollama**: Ollama local model client (Phase 2)
 //! - **lmstudio**: LM Studio local model client (Phase 2)
 
-pub mod stop_reason_mapping;
 pub mod shared;
+pub mod stop_reason_mapping;
 
 // LLM Provider Clients - Phase 2 Implementation
-pub mod openai;
 pub mod anthropic;
 pub mod gemini;
+pub mod openai;
 pub mod openai_compatible; // Used by Ollama, LMStudio, and other OpenAI-compatible providers
 
 // Re-export commonly used types (only what's actually used)
@@ -25,7 +25,7 @@ pub mod openai_compatible; // Used by Ollama, LMStudio, and other OpenAI-compati
 // but don't need to be re-exported at the module level
 
 // Re-export client types
-pub use openai::OpenAILLMClient;
 pub use anthropic::AnthropicLLMClient;
 pub use gemini::GeminiLLMClient;
+pub use openai::OpenAILLMClient;
 pub use openai_compatible::OpenAICompatibleClient;
