@@ -132,6 +132,8 @@ pub struct ConnectionMetrics {
     /// Bytes sent/received
     pub bytes_sent: u64,
     pub bytes_received: u64,
+    /// Connection uptime in seconds
+    pub uptime_seconds: u64,
 }
 
 /// Process information for STDIO servers
@@ -216,6 +218,7 @@ impl Default for ConnectionMetrics {
             last_error: None,
             bytes_sent: 0,
             bytes_received: 0,
+            uptime_seconds: 0,
         }
     }
 }

@@ -118,6 +118,8 @@ pub struct AddServerToProfileRequest {
 }
 
 /// Profile export format (for sharing)
+/// TODO(phase-5): Implement profile export/import functionality with version handling
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProfileExport {
     pub profile: ServerProfile,
@@ -125,6 +127,8 @@ pub struct ProfileExport {
 }
 
 /// Profile template
+/// TODO(phase-5): Implement profile template system for quick workspace setup
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProfileTemplate {
     pub id: String,
@@ -136,6 +140,8 @@ pub struct ProfileTemplate {
 }
 
 /// Server definition in a template
+/// TODO(phase-5): Used by ProfileTemplate for pre-configured server setups
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemplateServer {
     pub name: String,

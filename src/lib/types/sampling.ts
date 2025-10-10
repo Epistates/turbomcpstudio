@@ -19,8 +19,8 @@ export interface SamplingMessage {
     text?: string;
     data?: string;
     mimeType?: string;
-    annotations?: any;
-    meta?: any;
+    annotations?: Record<string, unknown>;
+    meta?: Record<string, unknown>;
   };
 }
 
@@ -42,9 +42,21 @@ export interface SamplingResponse {
   };
 }
 
+export interface CreateMessageResult {
+  role: 'assistant';
+  content: {
+    type: 'text' | 'image';
+    text?: string;
+    data?: string;
+    mimeType?: string;
+  };
+  model: string;
+  stopReason: 'endTurn' | 'stopSequence' | 'maxTokens' | string;
+}
+
 export interface ToolContext {
   toolName: string;
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
   callId: string;
 }
 
@@ -161,13 +173,22 @@ export interface AdvancedLLMFeatures {
 // ELICITATION TYPES
 // ========================================
 
+// JSON Schema type for elicitation validation
+export interface JsonSchema {
+  type?: string;
+  properties?: Record<string, unknown>;
+  required?: string[];
+  items?: unknown;
+  [key: string]: unknown;
+}
+
 export interface ElicitationRequest {
   id: string;
   serverId: string;
   serverName?: string;
   samplingId: string;
   message: string;
-  requestedSchema: any;
+  requestedSchema: JsonSchema;
 }
 
 // ========================================

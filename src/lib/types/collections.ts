@@ -38,22 +38,24 @@ export interface Collection {
   run_count: number;
 }
 
+export type VariableValue = string | number | boolean | Record<string, unknown> | unknown[];
+
 export interface CollectionVariable {
   name: string;
   description?: string;
   type: 'string' | 'number' | 'boolean' | 'json' | 'secret';
-  default_value?: any;
+  default_value?: VariableValue;
   required: boolean;
 
   // For runtime values
-  current_value?: any;
+  current_value?: VariableValue;
 }
 
 export interface CollectionEnvironment {
   name: string;
   description?: string;
   servers: Record<string, string>; // alias -> server_id mapping
-  variables: Record<string, any>;
+  variables: Record<string, VariableValue>;
 }
 
 // =============================================================================
@@ -101,7 +103,7 @@ export interface ToolOperation {
   type: 'tool';
   server_alias: string; // References Collection.environment.servers
   tool_name: string;
-  parameters: Record<string, any>; // Supports variable interpolation: "${variable_name}"
+  parameters: Record<string, VariableValue>; // Supports variable interpolation: "${variable_name}"
 }
 
 export interface ResourceOperation {
@@ -249,7 +251,7 @@ export type AssertionType =
 
 export interface AssertionCondition {
   operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'regex_match' | 'json_schema';
-  expected_value: any;
+  expected_value: unknown;
   actual_path?: string; // JSONPath for complex response validation
 }
 
@@ -288,7 +290,7 @@ export interface WorkflowExecutionEvent {
   timestamp: string;
   step_id?: string;
   message?: string;
-  data?: any;
+  data?: unknown;
 }
 
 export interface StepResult {
@@ -307,8 +309,8 @@ export interface StepResult {
   duration_ms?: number;
 
   // Results
-  operation_result?: any;
-  result?: any;
+  operation_result?: unknown;
+  result?: unknown;
   extracted_variables: Record<string, any>;
   assertion_results: AssertionResult[];
 
@@ -321,8 +323,8 @@ export interface AssertionResult {
   assertion_id: string;
   passed: boolean;
   message: string;
-  expected?: any;
-  actual?: any;
+  expected?: unknown;
+  actual?: unknown;
 }
 
 export interface ExecutionSummary {
