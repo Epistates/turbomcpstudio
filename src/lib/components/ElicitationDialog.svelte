@@ -4,9 +4,12 @@
   import { invoke } from '@tauri-apps/api/core';
   import type { JsonSchema } from '$lib/utils/schemaValidation';
   import { validateElicitationSchema } from '$lib/utils/elicitationSchemaValidator';
+  import { uiStore } from '$lib/stores/uiStore';
+  import { ExternalLink } from 'lucide-svelte';
 
   interface ElicitationRequest {
     id: string;
+    protocolMessageId?: string;  // For Protocol Inspector correlation
     serverId: string;
     serverName?: string;
     message: string;
@@ -252,11 +255,26 @@
           </p>
         </div>
       </div>
-      <Button variant="ghost" onclick={handleCancel}>
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-      </Button>
+      <div class="flex items-center gap-3">
+        {#if request.protocolMessageId}
+          <button
+            onclick={() => {
+              uiStore.jumpToProtocolInspector(request.protocolMessageId);
+              handleCancel();
+            }}
+            class="px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-2"
+            title="View in Protocol Inspector"
+          >
+            <ExternalLink size={16} />
+            <span>View Protocol</span>
+          </button>
+        {/if}
+        <Button variant="ghost" onclick={handleCancel}>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </Button>
+      </div>
     </div>
 
     <div class="overflow-auto max-h-[calc(90vh-120px)]">
