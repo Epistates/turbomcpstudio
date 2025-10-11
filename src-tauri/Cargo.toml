@@ -68,6 +68,8 @@ dashmap = "6.1"
 
 # Secure storage
 keyring = "2.3"
+tauri-plugin-log = "2.7.0"
+log = "0.4.28"
 
 [features]
 default = ["stdio", "http", "websocket", "tcp", "unix", "plugins"]
