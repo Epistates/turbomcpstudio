@@ -4,6 +4,7 @@
  */
 
 import { trace, debug, info, warn, error } from '@tauri-apps/plugin-log';
+import { logStore } from '$lib/stores/logStore';
 
 /**
  * Log context for structured logging
@@ -47,23 +48,34 @@ export class ScopedLogger {
   }
 
   trace(message: string, ...data: unknown[]): void {
-    trace(this.formatMessage(message, ...data));
+    const formatted = this.formatMessage(message, ...data);
+    trace(formatted);
+    // Note: logStore doesn't have trace level, using debug instead
+    logStore.debug(this.scopeName, message, data);
   }
 
   debug(message: string, ...data: unknown[]): void {
-    debug(this.formatMessage(message, ...data));
+    const formatted = this.formatMessage(message, ...data);
+    debug(formatted);
+    logStore.debug(this.scopeName, message, data);
   }
 
   info(message: string, ...data: unknown[]): void {
-    info(this.formatMessage(message, ...data));
+    const formatted = this.formatMessage(message, ...data);
+    info(formatted);
+    logStore.info(this.scopeName, message, data);
   }
 
   warn(message: string, ...data: unknown[]): void {
-    warn(this.formatMessage(message, ...data));
+    const formatted = this.formatMessage(message, ...data);
+    warn(formatted);
+    logStore.warn(this.scopeName, message, data);
   }
 
   error(message: string, ...data: unknown[]): void {
-    error(this.formatMessage(message, ...data));
+    const formatted = this.formatMessage(message, ...data);
+    error(formatted);
+    logStore.error(this.scopeName, message, data);
   }
 
   /**

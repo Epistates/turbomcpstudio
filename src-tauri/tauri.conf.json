@@ -28,7 +28,10 @@
           "webviews": ["main"],
           "permissions": [
             "dialog:allow-open",
+            "dialog:allow-save",
             "dialog:default",
+            "fs:allow-write-text-file",
+            "fs:default",
             "core:event:allow-listen",
             "core:event:default",
             "http:allow-fetch",
