@@ -1,1 +1,0 @@
-{"name": "TurboMCP Hello World", "description": "Test server", "transport": {"Stdio": {"command": "01_hello_world", "args": [], "working_directory": "/Users/nickpaterno/work/turbomcp/target/release/examples"}}, "environment_variables": {"RUST_LOG": ""}}
