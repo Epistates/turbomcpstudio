@@ -181,13 +181,14 @@
 		</h4>
 		<div class="grid grid-cols-2 gap-3">
 			{#each templates as template}
+				{@const Icon = template.icon}
 				<button
 					onclick={() => handleTemplateClick(template.response)}
 					class="px-4 py-3 text-sm font-medium border rounded-lg transition-all flex items-center gap-2 {getColorClasses(
 						template.color
 					)}"
 				>
-					<svelte:component this={template.icon} size={18} />
+					<Icon size={18} />
 					<span>{template.label}</span>
 				</button>
 			{/each}

@@ -23,6 +23,7 @@ export interface PendingSamplingRequest {
 	estimatedCost?: number;
 	estimatedTokens?: number;
 	createdAt: string;
+	retryCount?: number;  // Retry detection from backend
 }
 
 export interface SamplingRequestDetails {
@@ -62,13 +63,49 @@ export interface ModelHint {
 export interface CompletedSamplingRequest extends PendingSamplingRequest {
 	status: 'approved' | 'rejected';
 	completedAt: string;
+
+	// Full response tracking
+	response?: {
+		mode: 'manual' | 'ai' | 'mock';
+		content: CreateMessageResult;
+	};
+
+	// Outcome tracking
+	outcome?: {
+		status: 'success' | 'error';
+		message?: string;
+	};
+
+	// Legacy fields
 	result?: any;
 	error?: string;
+}
+
+export interface CreateMessageResult {
+	role: 'assistant';
+	content: {
+		type: 'text' | 'image';
+		text?: string;
+		data?: string;
+		mimeType?: string;
+	};
+	model: string;
+	stopReason: 'endTurn' | 'stopSequence' | 'maxTokens';
+}
+
+export interface ReplayTemplate {
+	id: string;
+	name: string;
+	response: CreateMessageResult;
+	createdAt: string;
+	lastUsed?: string;
+	useCount: number;
 }
 
 interface SamplingStoreState {
 	pending: PendingSamplingRequest[];
 	history: CompletedSamplingRequest[];
+	replayTemplates: ReplayTemplate[];
 	loading: boolean;
 	error: string | null;
 }
@@ -80,12 +117,35 @@ interface SamplingStoreState {
 const initialState: SamplingStoreState = {
 	pending: [],
 	history: [],
+	replayTemplates: [],
 	loading: false,
 	error: null
 };
 
+// Load replay templates from localStorage
+function loadReplayTemplates(): ReplayTemplate[] {
+	try {
+		const stored = localStorage.getItem('sampling_replay_templates');
+		return stored ? JSON.parse(stored) : [];
+	} catch (e) {
+		console.error('Failed to load replay templates:', e);
+		return [];
+	}
+}
+
+function saveReplayTemplates(templates: ReplayTemplate[]): void {
+	try {
+		localStorage.setItem('sampling_replay_templates', JSON.stringify(templates));
+	} catch (e) {
+		console.error('Failed to save replay templates:', e);
+	}
+}
+
 function createSamplingStore() {
-	const { subscribe, set, update } = writable<SamplingStoreState>(initialState);
+	const { subscribe, set, update } = writable<SamplingStoreState>({
+		...initialState,
+		replayTemplates: loadReplayTemplates()
+	});
 	const logger = createLogger('SamplingStore');
 
 	// Initialize event listener immediately
@@ -238,9 +298,9 @@ function createSamplingStore() {
 		 * Bypasses LLM and provides a direct manual response
 		 *
 		 * @param requestId - Unique request identifier
-		 * @param manualResponse - The manual response to send back
+		 * @param manualResponse - The manual response to send back (CreateMessageResult format)
 		 */
-		async submitManual(requestId: string, manualResponse: any): Promise<void> {
+		async submitManual(requestId: string, manualResponse: CreateMessageResult): Promise<void> {
 			update((s) => ({ ...s, loading: true, error: null }));
 
 			try {
@@ -261,12 +321,20 @@ function createSamplingStore() {
 					manualResponse
 				});
 
-				// Move from pending to history
+				// Move from pending to history with full response tracking
 				const completed: CompletedSamplingRequest = {
 					...request,
 					status: 'approved',
 					completedAt: new Date().toISOString(),
-					result: manualResponse
+					response: {
+						mode: 'manual',
+						content: manualResponse
+					},
+					outcome: {
+						status: 'success',
+						message: 'Manual response provided'
+					},
+					result: manualResponse // legacy
 				};
 
 				update((state) => ({
@@ -295,10 +363,104 @@ function createSamplingStore() {
 		},
 
 		/**
+		 * Save a response as a replay template for quick reuse
+		 *
+		 * @param completedRequest - The completed request to save
+		 * @param name - Optional custom name for the template
+		 */
+		saveAsReplayTemplate(completedRequest: CompletedSamplingRequest, name?: string): void {
+			if (!completedRequest.response) {
+				throw new Error('Cannot save template: no response data');
+			}
+
+			const template: ReplayTemplate = {
+				id: `replay-${Date.now()}`,
+				name: name || `Response from ${completedRequest.serverName}`,
+				response: completedRequest.response.content,
+				createdAt: new Date().toISOString(),
+				useCount: 0
+			};
+
+			update((state) => {
+				const newTemplates = [template, ...state.replayTemplates];
+				saveReplayTemplates(newTemplates);
+				return { ...state, replayTemplates: newTemplates };
+			});
+		},
+
+		/**
+		 * Use a replay template to respond to a pending request
+		 *
+		 * @param requestId - The request to respond to
+		 * @param templateId - The template to use
+		 */
+		async useReplayTemplate(requestId: string, templateId: string): Promise<void> {
+			const state = await new Promise<SamplingStoreState>((resolve) => {
+				const unsub = subscribe(resolve);
+				unsub();
+			});
+
+			const template = state.replayTemplates.find((t) => t.id === templateId);
+			if (!template) {
+				throw new Error(`Template not found: ${templateId}`);
+			}
+
+			// Update template usage stats
+			update((s) => {
+				const updatedTemplates = s.replayTemplates.map((t) =>
+					t.id === templateId
+						? { ...t, lastUsed: new Date().toISOString(), useCount: t.useCount + 1 }
+						: t
+				);
+				saveReplayTemplates(updatedTemplates);
+				return { ...s, replayTemplates: updatedTemplates };
+			});
+
+			// Submit the template response
+			await this.submitManual(requestId, template.response);
+		},
+
+		/**
+		 * Delete a replay template
+		 */
+		deleteReplayTemplate(templateId: string): void {
+			update((state) => {
+				const newTemplates = state.replayTemplates.filter((t) => t.id !== templateId);
+				saveReplayTemplates(newTemplates);
+				return { ...state, replayTemplates: newTemplates };
+			});
+		},
+
+		/**
+		 * Get preview text for a sampling request (for UI display)
+		 */
+		getRequestPreview(request: PendingSamplingRequest | CompletedSamplingRequest): string {
+			const firstMessage = request.request.messages[0];
+			if (firstMessage && typeof firstMessage.content === 'object' && 'text' in firstMessage.content) {
+				const text = firstMessage.content.text || '';
+				return text.substring(0, 150) + (text.length > 150 ? '...' : '');
+			}
+			return 'No content';
+		},
+
+		/**
+		 * Get response preview text for display
+		 */
+		getResponsePreview(completed: CompletedSamplingRequest): string {
+			if (completed.response?.content) {
+				const content = completed.response.content.content;
+				if (content.type === 'text' && content.text) {
+					return content.text.substring(0, 150) + (content.text.length > 150 ? '...' : '');
+				}
+			}
+			return completed.status === 'approved' ? 'Approved' : 'Rejected';
+		},
+
+		/**
 		 * Reset store to initial state
 		 */
 		reset(): void {
-			set(initialState);
+			set({ ...initialState, replayTemplates: loadReplayTemplates() });
 		},
 
 		/**
@@ -332,3 +494,5 @@ export const hasPendingSamplingRequests = derived(
 export const isProcessingSampling = derived(samplingStore, ($store) => $store.loading);
 
 export const samplingError = derived(samplingStore, ($store) => $store.error);
+
+export const replayTemplates = derived(samplingStore, ($store) => $store.replayTemplates);

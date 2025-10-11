@@ -7,9 +7,8 @@
 <script lang="ts">
 	import { samplingStore, type PendingSamplingRequest } from '$lib/stores/samplingStore';
 	import { uiStore } from '$lib/stores/uiStore';
-	import QuickResponseTemplates from './sampling/QuickResponseTemplates.svelte';
 	import JsonViewer from './ui/JsonViewer.svelte';
-	import { X, Edit, Check, XCircle, AlertTriangle, DollarSign, Hash, Server, ExternalLink } from 'lucide-svelte';
+	import { X, AlertTriangle, Server, ExternalLink, Edit, Save, Check } from 'lucide-svelte';
 
 	// Props
 	const { request, onClose }: { request: PendingSamplingRequest; onClose: () => void } = $props();
@@ -17,9 +16,13 @@
 	// State
 	let isEditing = $state(false);
 	let modifiedRequest = $state({ ...request.request });
-	let rejectReason = $state('');
-	let showRejectDialog = $state(false);
 	let isProcessing = $state(false);
+
+	// Response composition state
+	let responseText = $state('');
+	let responseModel = $state('manual-response');
+	let responseStopReason = $state<'endTurn' | 'stopSequence' | 'maxTokens'>('endTurn');
+	let showAdvanced = $state(false);
 
 	// Computed
 	const hasModelPreferences = $derived(!!request.request.modelPreferences);
@@ -38,23 +41,30 @@
 	});
 
 	// Actions
-	async function handleApprove() {
-		if (isProcessing) return;
-		isProcessing = true;
-
-		try {
-			await samplingStore.approve(request.requestId, isEditing ? modifiedRequest : undefined);
-			onClose();
-		} catch (error) {
-			alert('Failed to approve sampling request: ' + error);
-		} finally {
-			isProcessing = false;
+	function toggleEdit() {
+		isEditing = !isEditing;
+		if (!isEditing) {
+			// Reset modifications on cancel
+			modifiedRequest = { ...request.request };
 		}
 	}
 
-	async function handleReject() {
-		if (!rejectReason.trim()) {
-			alert('Please provide a reason for rejection');
+	function saveEdits() {
+		// Validate and save edits
+		isEditing = false;
+		// modifiedRequest is now ready to be used in approval
+	}
+
+	// Populate response textarea with template
+	function useTemplate(text: string, model: string) {
+		responseText = text;
+		responseModel = model;
+	}
+
+	// Send the composed response
+	async function handleSendResponse() {
+		if (!responseText.trim()) {
+			alert('Please enter a response text');
 			return;
 		}
 
@@ -62,35 +72,52 @@
 		isProcessing = true;
 
 		try {
-			await samplingStore.reject(request.requestId, rejectReason);
-			onClose();
-		} catch (error) {
-			alert('Failed to reject sampling request: ' + error);
-		} finally {
-			isProcessing = false;
-		}
-	}
+			const response = {
+				role: 'assistant' as const,
+				content: {
+					type: 'text' as const,
+					text: responseText
+				},
+				model: responseModel,
+				stopReason: responseStopReason
+			};
 
-	function toggleEdit() {
-		isEditing = !isEditing;
-		if (!isEditing) {
-			// Reset modifications
-			modifiedRequest = { ...request.request };
-		}
-	}
-
-	// Handle quick response from templates
-	async function handleQuickResponse(response: any) {
-		if (isProcessing) return;
-		isProcessing = true;
-
-		try {
 			await samplingStore.submitManual(request.requestId, response);
 			onClose();
 		} catch (error) {
 			alert('Failed to submit manual response: ' + error);
 		} finally {
 			isProcessing = false;
+		}
+	}
+
+	// Reject the sampling request with a reason (sends JSON-RPC error)
+	async function handleReject(reason: string) {
+		if (isProcessing) return;
+		isProcessing = true;
+
+		try {
+			await samplingStore.reject(request.requestId, reason);
+			onClose();
+		} catch (error) {
+			alert('Failed to reject request: ' + error);
+		} finally {
+			isProcessing = false;
+		}
+	}
+
+	// Update message content
+	function updateMessageContent(index: number, newText: string) {
+		const messages = [...modifiedRequest.messages];
+		if (messages[index] && messages[index].content.type === 'text') {
+			messages[index] = {
+				...messages[index],
+				content: {
+					...messages[index].content,
+					text: newText
+				}
+			};
+			modifiedRequest = { ...modifiedRequest, messages };
 		}
 	}
 </script>
@@ -109,9 +136,16 @@
 					<Server size={24} class="text-blue-600 dark:text-blue-400" />
 				</div>
 				<div>
-					<h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-						Sampling Request
-					</h2>
+					<div class="flex items-center gap-2">
+						<h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
+							Sampling Request
+						</h2>
+						{#if request.retryCount && request.retryCount > 1}
+							<span class="px-2 py-0.5 text-xs font-semibold bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full border border-orange-300 dark:border-orange-700">
+								🔄 Retry #{request.retryCount}
+							</span>
+						{/if}
+					</div>
 					<p class="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
 						from <span class="font-medium">{request.serverName}</span>
 					</p>
@@ -143,47 +177,134 @@
 
 		<!-- Content -->
 		<div class="flex-1 overflow-y-auto p-6 space-y-6">
-			<!-- Quick Response Templates (Testing Tool Feature) -->
-			<QuickResponseTemplates onRespond={handleQuickResponse} showHistory={true} />
-
-			<!-- Warning Banner -->
-			<div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-start gap-3">
-				<AlertTriangle size={20} class="text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+			<!-- Info Banner -->
+			<div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex items-start gap-3">
+				<AlertTriangle size={20} class="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
 				<div class="flex-1">
-					<h3 class="text-sm font-semibold text-yellow-900 dark:text-yellow-100 mb-1">
-						Human-in-the-Loop Approval Required
+					<h3 class="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+						You Are Acting As The LLM
 					</h3>
-					<p class="text-sm text-yellow-800 dark:text-yellow-200">
-						This server is requesting LLM inference. Review the request carefully before approving.
-						Your configured LLM provider will be charged.
+					<p class="text-sm text-blue-800 dark:text-blue-200">
+						Compose the response the LLM would provide. Use quick templates below or write your own custom response.
 					</p>
 				</div>
 			</div>
 
-			<!-- Estimates -->
-			<div class="grid grid-cols-2 gap-4">
-				<div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-					<div class="flex items-center gap-2 mb-2">
-						<Hash size={16} class="text-blue-600 dark:text-blue-400" />
-						<div class="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">
-							Estimated Tokens
-						</div>
-					</div>
-					<div class="text-3xl font-bold text-blue-900 dark:text-blue-100">
-						{request.estimatedTokens?.toLocaleString() || '—'}
+			<!-- Response Composition Section -->
+			<div class="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border-2 border-purple-200 dark:border-purple-800 p-4">
+				<div class="flex items-center justify-between mb-3">
+					<h3 class="text-sm font-semibold text-purple-900 dark:text-purple-100">
+						💬 Compose LLM Response
+					</h3>
+					<label class="flex items-center gap-2 text-xs font-medium text-purple-700 dark:text-purple-300 cursor-pointer hover:text-purple-900 dark:hover:text-purple-100 transition-colors">
+						<input
+							type="checkbox"
+							bind:checked={showAdvanced}
+							class="w-3.5 h-3.5 text-purple-600 bg-white dark:bg-gray-800 border-purple-300 dark:border-purple-600 rounded focus:ring-2 focus:ring-purple-500"
+						/>
+						<span>Advanced Options</span>
+					</label>
+				</div>
+
+				<!-- Quick Response Templates (for manual LLM responses) -->
+				<div class="mb-3">
+					<p class="text-xs text-purple-700 dark:text-purple-300 mb-2">Response Templates (act as LLM):</p>
+					<div class="flex flex-wrap gap-2">
+						<button
+							onclick={() => useTemplate('Yes, I approve this action. Please proceed.', 'manual-approval')}
+							class="px-3 py-1 text-xs font-medium text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+						>
+							✅ Approve
+						</button>
+						<button
+							onclick={() => useTemplate('No, I cannot approve this action.', 'manual-response')}
+							class="px-3 py-1 text-xs font-medium text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors"
+						>
+							🚫 Deny (as LLM)
+						</button>
 					</div>
 				</div>
-				<div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10 rounded-lg p-4 border border-green-200 dark:border-green-800">
-					<div class="flex items-center gap-2 mb-2">
-						<DollarSign size={16} class="text-green-600 dark:text-green-400" />
-						<div class="text-xs font-medium text-green-600 dark:text-green-400 uppercase tracking-wide">
-							Estimated Cost
-						</div>
-					</div>
-					<div class="text-3xl font-bold text-green-900 dark:text-green-100">
-						${request.estimatedCost?.toFixed(4) || '—'}
+
+				<!-- Quick Reject Reasons (reject entire request with error) -->
+				<div class="mb-3">
+					<p class="text-xs text-red-700 dark:text-red-300 mb-2">Reject Request (sends error):</p>
+					<div class="flex flex-wrap gap-2">
+						<button
+							onclick={() => handleReject('User rejected sampling request')}
+							class="px-3 py-1 text-xs font-medium text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+							disabled={isProcessing}
+						>
+							❌ User Rejected
+						</button>
+						<button
+							onclick={() => handleReject('Request timeout - operation took too long')}
+							class="px-3 py-1 text-xs font-medium text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-colors"
+							disabled={isProcessing}
+						>
+							⏰ Timeout
+						</button>
+						<button
+							onclick={() => handleReject('Permission denied - insufficient privileges')}
+							class="px-3 py-1 text-xs font-medium text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+							disabled={isProcessing}
+						>
+							⚠️ Permission Denied
+						</button>
+						<button
+							onclick={() => handleReject('Resource not available')}
+							class="px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 rounded hover:bg-gray-100 dark:hover:bg-gray-900/30 transition-colors"
+							disabled={isProcessing}
+						>
+							🔒 Resource Unavailable
+						</button>
 					</div>
 				</div>
+
+				<!-- Response Text -->
+				<div class="mb-3">
+					<label for="responseText" class="block text-xs font-medium text-purple-700 dark:text-purple-300 mb-1">
+						Response Text:
+					</label>
+					<textarea
+						id="responseText"
+						bind:value={responseText}
+						class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border-2 border-purple-300 dark:border-purple-600 rounded-lg text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+						rows="4"
+						placeholder="Enter the response the LLM would provide..."
+					></textarea>
+				</div>
+
+				<!-- Advanced: Response Metadata -->
+				{#if showAdvanced}
+					<div class="grid grid-cols-2 gap-3">
+						<div>
+							<label for="responseModel" class="block text-xs font-medium text-purple-700 dark:text-purple-300 mb-1">
+								Model:
+							</label>
+							<input
+								id="responseModel"
+								type="text"
+								bind:value={responseModel}
+								class="w-full px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-purple-300 dark:border-purple-600 rounded text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
+								placeholder="manual-response"
+							/>
+						</div>
+						<div>
+							<label for="responseStopReason" class="block text-xs font-medium text-purple-700 dark:text-purple-300 mb-1">
+								Stop Reason:
+							</label>
+							<select
+								id="responseStopReason"
+								bind:value={responseStopReason}
+								class="w-full px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-purple-300 dark:border-purple-600 rounded text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
+							>
+								<option value="endTurn">End Turn</option>
+								<option value="stopSequence">Stop Sequence</option>
+								<option value="maxTokens">Max Tokens</option>
+							</select>
+						</div>
+					</div>
+				{/if}
 			</div>
 
 			<!-- Messages -->
@@ -191,11 +312,16 @@
 				<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
 					<span>Messages</span>
 					<span class="text-xs font-normal text-gray-500 dark:text-gray-400">
-						({request.request.messages.length})
+						({modifiedRequest.messages.length})
 					</span>
+					{#if isEditing}
+						<span class="text-xs font-medium text-blue-600 dark:text-blue-400">
+							(Editing Mode)
+						</span>
+					{/if}
 				</h3>
 				<div class="space-y-3">
-					{#each request.request.messages as message, i}
+					{#each modifiedRequest.messages as message, i}
 						<div
 							class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700"
 						>
@@ -210,10 +336,20 @@
 								</span>
 								<span class="text-xs text-gray-500 dark:text-gray-400">Message {i + 1}</span>
 							</div>
-							{#if message.content.type === 'text' && message.content.text}
-								<div class="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
-									{message.content.text}
-								</div>
+							{#if message.content.type === 'text' && message.content.text !== undefined}
+								{#if isEditing}
+									<textarea
+										value={message.content.text}
+										oninput={(e) => updateMessageContent(i, e.currentTarget.value)}
+										class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded-lg text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+										rows="4"
+										placeholder="Enter message text..."
+									></textarea>
+								{:else}
+									<div class="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+										{message.content.text}
+									</div>
+								{/if}
 							{:else}
 								<div class="text-xs text-gray-500 dark:text-gray-400 mb-2">
 									Content Type: {message.content.type}
@@ -228,18 +364,27 @@
 				</div>
 			</div>
 
-			<!-- System Prompt (if present) -->
-			{#if hasSystemPrompt}
+			<!-- System Prompt (if present or in edit mode) -->
+			{#if hasSystemPrompt || isEditing}
 				<div>
 					<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-						System Prompt
+						System Prompt {isEditing ? '(Optional)' : ''}
 					</h3>
 					<div
 						class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800"
 					>
-						<p class="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
-							{request.request.systemPrompt}
-						</p>
+						{#if isEditing}
+							<textarea
+								bind:value={modifiedRequest.systemPrompt}
+								class="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-purple-300 dark:border-purple-600 rounded-lg text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+								rows="3"
+								placeholder="Enter system prompt (optional)..."
+							></textarea>
+						{:else}
+							<p class="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+								{modifiedRequest.systemPrompt || '(None)'}
+							</p>
+						{/if}
 					</div>
 				</div>
 			{/if}
@@ -260,38 +405,74 @@
 				</div>
 			{/if}
 
-			<!-- Request Parameters -->
-			<div>
-				<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-					Request Parameters
-				</h3>
-				<div class="grid grid-cols-2 gap-3">
+			<!-- Request Parameters (Advanced Only) -->
+			{#if showAdvanced}
+				<div>
+					<h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+						Request Parameters
+					</h3>
+					<div class="grid grid-cols-2 gap-3">
 					<div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
 						<div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Include Context</div>
-						<div class="text-sm font-medium text-gray-900 dark:text-gray-100">
-							{includeContextLabel}
-						</div>
+						{#if isEditing}
+							<select
+								bind:value={modifiedRequest.includeContext}
+								class="w-full px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+							>
+								<option value="none">None (messages only)</option>
+								<option value="thisServer">This Server Only</option>
+								<option value="allServers">All Connected Servers</option>
+							</select>
+						{:else}
+							<div class="text-sm font-medium text-gray-900 dark:text-gray-100">
+								{includeContextLabel}
+							</div>
+						{/if}
 					</div>
 					<div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
 						<div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Temperature</div>
-						<div class="text-sm font-medium text-gray-900 dark:text-gray-100">
-							{request.request.temperature ?? 'Default'}
-						</div>
+						{#if isEditing}
+							<input
+								type="number"
+								bind:value={modifiedRequest.temperature}
+								min="0"
+								max="2"
+								step="0.1"
+								class="w-full px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+								placeholder="Default"
+							/>
+						{:else}
+							<div class="text-sm font-medium text-gray-900 dark:text-gray-100">
+								{modifiedRequest.temperature ?? 'Default'}
+							</div>
+						{/if}
 					</div>
 					<div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
 						<div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Max Tokens</div>
-						<div class="text-sm font-medium text-gray-900 dark:text-gray-100">
-							{request.request.maxTokens ?? 'Default'}
-						</div>
+						{#if isEditing}
+							<input
+								type="number"
+								bind:value={modifiedRequest.maxTokens}
+								min="1"
+								step="1"
+								class="w-full px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+								placeholder="Default"
+							/>
+						{:else}
+							<div class="text-sm font-medium text-gray-900 dark:text-gray-100">
+								{modifiedRequest.maxTokens ?? 'Default'}
+							</div>
+						{/if}
 					</div>
 					<div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
 						<div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Stop Sequences</div>
 						<div class="text-sm font-medium text-gray-900 dark:text-gray-100">
-							{request.request.stopSequences?.length || 'None'}
+							{modifiedRequest.stopSequences?.length || 'None'}
 						</div>
 					</div>
 				</div>
-			</div>
+				</div>
+			{/if}
 
 			<!-- Request Metadata -->
 			<div class="text-xs text-gray-500 dark:text-gray-400">
@@ -304,71 +485,53 @@
 		<div
 			class="p-6 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 bg-gray-50 dark:bg-gray-900"
 		>
-			<button
-				onclick={toggleEdit}
-				class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-				disabled={isProcessing}
-			>
-				<Edit size={16} />
-				{isEditing ? 'Cancel Edit' : 'Edit Request'}
-			</button>
-
-			<div class="flex gap-3">
-				<button
-					onclick={() => (showRejectDialog = true)}
-					class="px-5 py-2 text-sm font-medium text-red-700 dark:text-red-300 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2"
-					disabled={isProcessing}
-				>
-					<XCircle size={16} />
-					Reject
-				</button>
-				<button
-					onclick={handleApprove}
-					class="px-6 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors flex items-center gap-2 shadow-sm"
-					disabled={isProcessing}
-				>
-					<Check size={16} />
-					{isProcessing ? 'Processing...' : 'Approve & Send to LLM'}
-				</button>
+			<!-- Left side: Edit/Save controls -->
+			<div>
+				{#if isEditing}
+					<div class="flex gap-2">
+						<button
+							onclick={saveEdits}
+							class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors flex items-center gap-2"
+						>
+							<Save size={16} />
+							Save Changes
+						</button>
+						<button
+							onclick={toggleEdit}
+							class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+						>
+							Cancel
+						</button>
+					</div>
+				{:else}
+					<button
+						onclick={toggleEdit}
+						class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+						disabled={isProcessing}
+					>
+						<Edit size={16} />
+						Edit Request
+					</button>
+				{/if}
 			</div>
+
+			<!-- Right side: Send Response Button -->
+			{#if !isEditing}
+				<button
+					onclick={handleSendResponse}
+					class="px-6 py-2.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-purple-600 dark:disabled:hover:bg-purple-500"
+					disabled={isProcessing || !responseText.trim()}
+					title={!responseText.trim() ? 'Enter a response to enable' : ''}
+				>
+					{#if isProcessing}
+						<div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+						Sending...
+					{:else}
+						<Check size={16} />
+						Send Response
+					{/if}
+				</button>
+			{/if}
 		</div>
 	</div>
 </div>
-
-<!-- Reject Dialog -->
-{#if showRejectDialog}
-	<div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-		<div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-md w-full p-6">
-			<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-				Reject Sampling Request
-			</h3>
-			<p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-				Please provide a reason for rejecting this request. This will be logged for debugging.
-			</p>
-			<textarea
-				bind:value={rejectReason}
-				placeholder="e.g., Request violates policy, cost too high, etc."
-				class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 transition-all resize-none"
-				rows="3"
-			></textarea>
-			<div class="flex gap-3 mt-6">
-				<button
-					onclick={() => {
-						showRejectDialog = false;
-						rejectReason = '';
-					}}
-					class="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-				>
-					Cancel
-				</button>
-				<button
-					onclick={handleReject}
-					class="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 rounded-lg transition-colors"
-					disabled={!rejectReason.trim() || isProcessing}
-				>
-					{isProcessing ? 'Rejecting...' : 'Confirm Rejection'}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}

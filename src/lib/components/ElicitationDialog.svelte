@@ -1,10 +1,10 @@
 <script lang="ts">
   import Button from './ui/Button.svelte';
   import SchemaValidator from './ui/SchemaValidator.svelte';
-  import { invoke } from '@tauri-apps/api/core';
   import type { JsonSchema } from '$lib/utils/schemaValidation';
   import { validateElicitationSchema } from '$lib/utils/elicitationSchemaValidator';
   import { uiStore } from '$lib/stores/uiStore';
+  import { elicitationStore } from '$lib/stores/elicitationStore';
   import { ExternalLink } from 'lucide-svelte';
 
   interface ElicitationRequest {
@@ -169,7 +169,7 @@
   }
 
   async function handleSubmit() {
-    if (!validateForm()) {
+    if (!validateForm() || !request) {
       return;
     }
 
@@ -177,10 +177,8 @@
     error = null;
 
     try {
-      await onResponse({
-        action: 'accept',
-        content: formData
-      });
+      await elicitationStore.accept(request.id, formData);
+      uiStore.closeElicitationDialog();
       onClose();
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to submit response';
@@ -190,13 +188,14 @@
   }
 
   async function handleDecline() {
+    if (!request) return;
+
     submitting = true;
     error = null;
 
     try {
-      await onResponse({
-        action: 'decline'
-      });
+      await elicitationStore.decline(request.id);
+      uiStore.closeElicitationDialog();
       onClose();
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to decline request';
@@ -205,21 +204,6 @@
     }
   }
 
-  async function handleCancel() {
-    submitting = true;
-    error = null;
-
-    try {
-      await onResponse({
-        action: 'cancel'
-      });
-      onClose();
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to cancel request';
-    } finally {
-      submitting = false;
-    }
-  }
 
   function renderFormField(key: string, prop: any) {
     const hasError = validationErrors[key];
@@ -260,7 +244,7 @@
           <button
             onclick={() => {
               uiStore.jumpToProtocolInspector(request.protocolMessageId);
-              handleCancel();
+              handleDecline();
             }}
             class="px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-2"
             title="View in Protocol Inspector"
@@ -269,7 +253,7 @@
             <span>View Protocol</span>
           </button>
         {/if}
-        <Button variant="ghost" onclick={handleCancel}>
+        <Button variant="ghost" onclick={handleDecline}>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
@@ -441,15 +425,10 @@
     </div>
 
     <!-- Footer -->
-    <div class="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-      <div class="flex gap-2">
-        <Button variant="outline" onclick={handleDecline} disabled={submitting}>
-          Decline
-        </Button>
-        <Button variant="ghost" onclick={handleCancel} disabled={submitting}>
-          Cancel
-        </Button>
-      </div>
+    <div class="flex items-center justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+      <Button variant="outline" onclick={handleDecline} disabled={submitting}>
+        Decline
+      </Button>
 
       <Button
         variant="primary"
