@@ -212,27 +212,52 @@ function createProfileStore() {
       update((state) => ({ ...state, loading: true }));
 
       try {
-        const activation = await invoke<ProfileActivation>('activate_profile', { profileId });
+        // ✅ Add timeout to prevent indefinite hang (60 second timeout for profile activation)
+        const activationPromise = invoke<ProfileActivation>('activate_profile', { profileId });
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Profile activation timed out after 60 seconds')), 60000)
+        );
+
+        const activation = await Promise.race([activationPromise, timeoutPromise]);
 
         // Reload active profile state
         await this.loadActiveProfile();
 
-        const successMsg = `Profile activated: ${activation.success_count}/${activation.success_count + activation.failure_count} servers connected`;
-        uiStore.showSuccess(successMsg);
+        // ✅ Show success even if some servers failed (partial success is OK)
+        const total = activation.success_count + activation.failure_count;
+        const successMsg = `Profile activated: ${activation.success_count}/${total} servers connected`;
 
-        // Show errors if any
+        if (activation.success_count > 0) {
+          uiStore.showSuccess(successMsg);
+        } else if (total > 0) {
+          uiStore.showWarning(successMsg);
+        }
+
+        // ✅ Show errors in a more user-friendly way
         if (activation.errors && activation.errors.length > 0) {
+          const errorCount = activation.errors.length;
+          const errorSummary = errorCount === 1
+            ? '1 server failed to connect'
+            : `${errorCount} servers failed to connect`;
+
+          uiStore.showWarning(errorSummary);
+          logger.error('Profile activation errors:', activation.errors);
+
+          // Log individual errors without spamming the UI
           activation.errors.forEach((error) => {
-            uiStore.showError(`Server Connection Failed: ${error}`);
+            logger.error(`Server connection failed: ${error}`);
           });
         }
 
-        return true;
+        // ✅ Return true even if some servers failed (partial success)
+        return activation.success_count > 0;
       } catch (error) {
         const errorMessage = String(error);
+        logger.error('Failed to activate profile:', error);
         uiStore.showError(`Failed to activate profile: ${errorMessage}`);
         return false;
       } finally {
+        // ✅ Always clear loading state, no matter what happens
         update((state) => ({ ...state, loading: false }));
       }
     },

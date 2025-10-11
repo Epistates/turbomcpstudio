@@ -82,79 +82,71 @@
     elicitationRequest = null;
   }
 
-  // Set up event listeners synchronously to prevent race conditions
-  // Use Tauri's recommended synchronous pattern from docs
-
-  // Set up event listeners immediately and synchronously
-  listen('mcp-event', (event) => {
-    serverStore.handleMcpEvent(event.payload);
-  }).then((unlisten) => {
-    mcpUnlisten = unlisten;
-  });
-
-  listen('elicitation_requested', (event: any) => {
-    console.log('🔔 Received elicitation_requested event:', event.payload);
-    const payload = event.payload;
-    elicitationRequest = {
-      id: payload.id,
-      protocolMessageId: payload.protocolMessageId,
-      serverId: payload.serverId || 'unknown',
-      serverName: payload.serverName,
-      message: payload.message,
-      requestedSchema: payload.requestedSchema
-    };
-    elicitationDialogVisible = true;
-  }).then((unlisten) => {
-    elicitationUnlisten = unlisten;
-  });
-
-  listen('app-early-ready', (event) => {
-    appStore.setMcpManagerReady(true);
-  }).then(() => {
-  });
-
-  listen('app-ready', async (event) => {
-    if (appReadyReceived) {
-      return;
-    }
-    appReadyReceived = true;
-    appStore.setDatabaseReady(true);
-
-    try {
-      // Retry server initialization after database is ready
-      await serverStore.initialize();
-      appStore.markStepCompleted('servers');
-
-      // Load profiles and active profile state
-      await profileStore.loadProfiles();
-      await profileStore.loadActiveProfile();
-
-      appStore.completeInitialization();
-
-      const totalTime = Date.now() - initializationStartTime;
-    } catch (err) {
-      console.error('❌ FRONTEND: Failed to initialize servers after database ready:', err);
-      appStore.markStepError('servers', err instanceof Error ? err.message : 'Unknown error');
-      appStore.setInitializationError('Failed to load server configurations');
-    }
-  }).then(() => {
-  });
-
-  // Shorter timeout with aggressive fallback
-  setTimeout(() => {
-    if (!appReadyReceived) {
-      console.warn('⚠️ FRONTEND: No app-ready event received after 1 second, forcing completion');
-      appStore.setDatabaseReady(true);
-      appStore.setMcpManagerReady(true);
-      appStore.completeInitialization();
-    }
-  }, 1000);
+  // Set up event listeners in onMount to ensure they're registered before backend emits events
+  // This prevents race conditions where events are emitted before listeners are ready
 
   // Initialize app systems on DOM ready
   onMount(async () => {
-
     // Initialize theme system (fast, synchronous)
     themeStore.init();
+
+    // Set up all event listeners FIRST, before any backend operations
+    // This ensures listeners are registered before backend emits events
+    console.log('🎧 Setting up event listeners...');
+
+    mcpUnlisten = await listen('mcp-event', (event) => {
+      serverStore.handleMcpEvent(event.payload);
+    });
+
+    elicitationUnlisten = await listen('elicitation_requested', (event: any) => {
+      console.log('🔔 Received elicitation_requested event:', event.payload);
+      const payload = event.payload;
+      elicitationRequest = {
+        id: payload.id,
+        protocolMessageId: payload.protocolMessageId,
+        serverId: payload.serverId || 'unknown',
+        serverName: payload.serverName,
+        message: payload.message,
+        requestedSchema: payload.requestedSchema
+      };
+      elicitationDialogVisible = true;
+    });
+
+    await listen('app-early-ready', (event) => {
+      console.log('🟢 Received app-early-ready event');
+      appStore.setMcpManagerReady(true);
+    });
+
+    await listen('app-ready', async (event) => {
+      if (appReadyReceived) {
+        console.log('⏭️ app-ready already received, skipping');
+        return;
+      }
+      appReadyReceived = true;
+      console.log('✅ Received app-ready event, completing initialization');
+      appStore.setDatabaseReady(true);
+
+      try {
+        // Retry server initialization after database is ready
+        await serverStore.initialize();
+        appStore.markStepCompleted('servers');
+
+        // Load profiles and active profile state
+        await profileStore.loadProfiles();
+        await profileStore.loadActiveProfile();
+
+        appStore.completeInitialization();
+
+        const totalTime = Date.now() - initializationStartTime;
+        console.log(`🎉 Full initialization completed in ${totalTime}ms`);
+      } catch (err) {
+        console.error('❌ FRONTEND: Failed to initialize servers after database ready:', err);
+        appStore.markStepError('servers', err instanceof Error ? err.message : 'Unknown error');
+        appStore.setInitializationError('Failed to load server configurations');
+      }
+    });
+
+    console.log('✅ All event listeners registered');
 
     // Mark servers step as loading
     appStore.markStepLoading('servers');
@@ -172,6 +164,18 @@
     }).catch(err => {
       appStore.markStepError('servers', 'Database not ready yet');
     });
+
+    // Start timeout AFTER listeners are registered
+    // Increase timeout to 3 seconds for slower systems
+    setTimeout(() => {
+      if (!appReadyReceived) {
+        console.warn('⚠️ FRONTEND: No app-ready event received after 3 seconds, forcing completion');
+        console.warn('This may indicate slow database initialization or event system issues');
+        appStore.setDatabaseReady(true);
+        appStore.setMcpManagerReady(true);
+        appStore.completeInitialization();
+      }
+    }, 3000);
   });
 
   // Cleanup event listeners

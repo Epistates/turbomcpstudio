@@ -349,6 +349,26 @@
                         </span>
                       {/if}
                     </div>
+
+                    {#if server.capabilities}
+                      <div class="mcp-sidebar__server-capabilities">
+                        {#if server.capabilities.tools}
+                          <span class="capability-badge capability-badge--tools" title="Tools">T</span>
+                        {/if}
+                        {#if server.capabilities.resources}
+                          <span class="capability-badge capability-badge--resources" title="Resources">R</span>
+                        {/if}
+                        {#if server.capabilities.prompts}
+                          <span class="capability-badge capability-badge--prompts" title="Prompts">P</span>
+                        {/if}
+                        {#if server.capabilities.sampling}
+                          <span class="capability-badge capability-badge--sampling" title="Sampling">S</span>
+                        {/if}
+                        {#if server.capabilities.elicitation}
+                          <span class="capability-badge capability-badge--elicitation" title="Elicitation">E</span>
+                        {/if}
+                      </div>
+                    {/if}
                   </div>
                 </button>
 
@@ -817,6 +837,75 @@
   [data-theme="dark"] .mcp-sidebar__server-item:hover {
     background: rgba(12, 74, 110, 0.2); /* mcp-primary-900/20 */
     border-color: var(--mcp-primary-600);
+  }
+
+  /* Capability badges */
+  .mcp-sidebar__server-capabilities {
+    display: flex;
+    gap: 4px;
+    margin-top: var(--mcp-space-2);
+  }
+
+  .capability-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: var(--mcp-radius-sm);
+    font-size: 10px;
+    font-weight: var(--mcp-font-bold);
+    flex-shrink: 0;
+  }
+
+  .capability-badge--tools {
+    background: var(--mcp-primary-100);
+    color: var(--mcp-primary-700);
+  }
+
+  .capability-badge--resources {
+    background: var(--mcp-success-100);
+    color: var(--mcp-success-700);
+  }
+
+  .capability-badge--prompts {
+    background: rgb(243 232 255); /* purple-100 */
+    color: rgb(126 34 206); /* purple-700 */
+  }
+
+  .capability-badge--sampling {
+    background: rgb(255 237 213); /* orange-100 */
+    color: rgb(194 65 12); /* orange-700 */
+  }
+
+  .capability-badge--elicitation {
+    background: rgb(252 231 243); /* pink-100 */
+    color: rgb(190 24 93); /* pink-700 */
+  }
+
+  [data-theme="dark"] .capability-badge--tools {
+    background: rgba(59, 130, 246, 0.2);
+    color: rgb(147, 197, 253);
+  }
+
+  [data-theme="dark"] .capability-badge--resources {
+    background: rgba(34, 197, 94, 0.2);
+    color: rgb(134, 239, 172);
+  }
+
+  [data-theme="dark"] .capability-badge--prompts {
+    background: rgba(168, 85, 247, 0.2);
+    color: rgb(216, 180, 254);
+  }
+
+  [data-theme="dark"] .capability-badge--sampling {
+    background: rgba(249, 115, 22, 0.2);
+    color: rgb(253, 186, 116);
+  }
+
+  [data-theme="dark"] .capability-badge--elicitation {
+    background: rgba(236, 72, 153, 0.2);
+    color: rgb(249, 168, 212);
   }
 
 </style>

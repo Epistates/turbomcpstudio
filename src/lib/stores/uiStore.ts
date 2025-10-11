@@ -32,9 +32,12 @@ interface UiStoreState {
     toolCall: ModalState;
     profileEditor: ModalState;
     samplingApproval: ModalState;
+    elicitationDialog: ModalState;
   };
   // Sampling approval modal state
   pendingSamplingRequest?: any;
+  // Elicitation dialog state
+  pendingElicitationRequest?: any;
   // Profile editor state
   editingProfileId?: string | null;
   // Tool Explorer state persistence
@@ -66,8 +69,10 @@ const initialState: UiStoreState = {
     toolCall: createModalState(),
     profileEditor: createModalState(),
     samplingApproval: createModalState(),
+    elicitationDialog: createModalState(),
   },
   pendingSamplingRequest: undefined,
+  pendingElicitationRequest: undefined,
   editingProfileId: undefined,
   selectedTool: undefined,
 };
@@ -196,9 +201,11 @@ function createUiStore() {
           toolCall: createModalState(),
           profileEditor: createModalState(),
           samplingApproval: createModalState(),
+          elicitationDialog: createModalState(),
         },
         editingProfileId: undefined,
         pendingSamplingRequest: undefined,
+        pendingElicitationRequest: undefined,
       }));
     },
 
@@ -213,9 +220,11 @@ function createUiStore() {
           toolCall: createModalState(),
           profileEditor: createModalState(),
           samplingApproval: createModalState(),
+          elicitationDialog: createModalState(),
         },
         editingProfileId: undefined,
         pendingSamplingRequest: undefined,
+        pendingElicitationRequest: undefined,
         loading: false,
       }));
     },
@@ -224,6 +233,7 @@ function createUiStore() {
     showSamplingApproval(request: any) {
       update(state => ({
         ...state,
+        currentView: 'sampling', // Auto-navigate to sampling tab
         modals: {
           ...state.modals,
           samplingApproval: { open: true, loading: false, requestId: null },
@@ -240,6 +250,30 @@ function createUiStore() {
           samplingApproval: { open: false, loading: false, requestId: null },
         },
         pendingSamplingRequest: undefined,
+      }));
+    },
+
+    // Elicitation dialog management
+    showElicitationDialog(request: any) {
+      update(state => ({
+        ...state,
+        currentView: 'elicitation', // Auto-navigate to elicitation tab
+        modals: {
+          ...state.modals,
+          elicitationDialog: { open: true, loading: false, requestId: null },
+        },
+        pendingElicitationRequest: request,
+      }));
+    },
+
+    closeElicitationDialog() {
+      update(state => ({
+        ...state,
+        modals: {
+          ...state.modals,
+          elicitationDialog: { open: false, loading: false, requestId: null },
+        },
+        pendingElicitationRequest: undefined,
       }));
     },
 

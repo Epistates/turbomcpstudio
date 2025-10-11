@@ -24,7 +24,8 @@
     Clock,
     Edit,
     Plus,
-    Minus
+    Minus,
+    Copy
   } from 'lucide-svelte';
 
   // ✅ NEW: Use uiStore for modal state (single source of truth)
@@ -235,6 +236,64 @@
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
+
+  // Convert server config to standard MCP JSON format
+  function serverToMcpJson(server: ServerInfo): string {
+    const config = server.config;
+    const mcpConfig: any = {};
+
+    if (config.transport_config?.type === 'stdio') {
+      mcpConfig.command = config.transport_config.command;
+      if (config.transport_config.args && config.transport_config.args.length > 0) {
+        mcpConfig.args = config.transport_config.args;
+      }
+      if (config.environment_variables && Object.keys(config.environment_variables).length > 0) {
+        mcpConfig.env = config.environment_variables;
+      }
+    } else if (config.transport_config?.type === 'http') {
+      mcpConfig.url = config.transport_config.url;
+      mcpConfig.transport = 'http';
+      if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
+        mcpConfig.headers = config.transport_config.headers;
+      }
+    } else if (config.transport_config?.type === 'websocket') {
+      mcpConfig.url = config.transport_config.url;
+      mcpConfig.transport = 'websocket';
+      if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
+        mcpConfig.headers = config.transport_config.headers;
+      }
+    } else if (config.transport_config?.type === 'tcp') {
+      mcpConfig.host = config.transport_config.host;
+      mcpConfig.port = config.transport_config.port;
+      mcpConfig.transport = 'tcp';
+    } else if (config.transport_config?.type === 'unix') {
+      mcpConfig.path = config.transport_config.path;
+      mcpConfig.transport = 'unix';
+    }
+
+    // Wrap in mcpServers format
+    const fullConfig = {
+      mcpServers: {
+        [config.name]: mcpConfig
+      }
+    };
+
+    return JSON.stringify(fullConfig, null, 2);
+  }
+
+  async function handleCopyServerJson() {
+    if (!selectedServer) return;
+
+    try {
+      const jsonConfig = serverToMcpJson(selectedServer);
+      await navigator.clipboard.writeText(jsonConfig);
+      uiStore.showSuccess(`Copied "${selectedServer.config.name}" configuration to clipboard`);
+      logger.debug('📋 Copied MCP config:', jsonConfig);
+    } catch (error) {
+      logger.error('Failed to copy to clipboard:', error);
+      uiStore.showError('Failed to copy to clipboard');
+    }
+  }
 </script>
 
 {#if showModal && selectedServer}
@@ -273,8 +332,8 @@
             <h2 id="server-config-modal-title" class="text-xl font-semibold text-gray-900">
               {editMode ? 'Edit Server Configuration' : selectedServer.config.name}
             </h2>
-            <div class="flex items-center mt-1">
-              <span class="text-sm text-gray-600 mr-3">
+            <div class="flex flex-wrap items-center gap-2 mt-1">
+              <span class="text-sm text-gray-600">
                 {selectedServer.config.transport_config?.type?.toUpperCase() || 'UNKNOWN'} Transport
               </span>
               <div class="flex items-center px-2 py-1 rounded-full text-xs font-medium {getStatusColor(selectedServer.status)}">
@@ -289,6 +348,34 @@
                 {/if}
                 {selectedServer.status}
               </div>
+              <!-- Capability Tags -->
+              {#if selectedServer.capabilities}
+                {#if selectedServer.capabilities.tools}
+                  <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+                    Tools
+                  </span>
+                {/if}
+                {#if selectedServer.capabilities.resources}
+                  <span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                    Resources
+                  </span>
+                {/if}
+                {#if selectedServer.capabilities.prompts}
+                  <span class="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
+                    Prompts
+                  </span>
+                {/if}
+                {#if selectedServer.capabilities.sampling}
+                  <span class="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded">
+                    Sampling
+                  </span>
+                {/if}
+                {#if selectedServer.capabilities.elicitation}
+                  <span class="text-xs px-2 py-0.5 bg-pink-100 text-pink-700 rounded">
+                    Elicitation
+                  </span>
+                {/if}
+              {/if}
             </div>
           </div>
         </div>
@@ -626,8 +713,16 @@
 
       <!-- Footer -->
       <div class="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-        <div>
+        <div class="flex items-center space-x-2">
           {#if !editMode}
+            <button
+              onclick={handleCopyServerJson}
+              class="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Copy MCP JSON configuration to clipboard"
+            >
+              <Copy size={16} class="mr-2" />
+              Copy Config JSON
+            </button>
             <button
               onclick={confirmDeleteServer}
               class="flex items-center px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"

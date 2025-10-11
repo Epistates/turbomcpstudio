@@ -8,6 +8,8 @@
   import Header from './Header.svelte';
   import Sidebar from './Sidebar.svelte';
   import MainContent from './MainContent.svelte';
+  import StatusBar from '$lib/components/StatusBar.svelte';
+  import DeveloperConsole from '$lib/components/DeveloperConsole.svelte';
   import { uiStore } from '$lib/stores/uiStore';
 
   // Layout state
@@ -15,12 +17,18 @@
   let isResizing = $state(false);
   let isSidebarCollapsed = $state(false);
   let isMobileMenuOpen = $state(false);
-  
+  let isConsoleOpen = $state(false);
+
   // Responsive breakpoints
   let innerWidth = $state(0);
   const isMobile = $derived(innerWidth < 768);
   const isTablet = $derived(innerWidth >= 768 && innerWidth < 1024);
   const isDesktop = $derived(innerWidth >= 1024);
+
+  // Toggle developer console
+  function toggleConsole() {
+    isConsoleOpen = !isConsoleOpen;
+  }
 
   // Sidebar state management
   $effect(() => {
@@ -86,13 +94,15 @@
     --sidebar-width: ${isSidebarCollapsed ? '0px' : `${sidebarWidth}px`};
     --sidebar-collapsed: ${isSidebarCollapsed ? '1' : '0'};
     --header-height: 64px;
+    --status-bar-height: 32px;
+    --console-height: ${isConsoleOpen ? '400px' : '0px'};
   `);
 </script>
 
 <svelte:window bind:innerWidth onkeydown={handleKeydown} />
 
 <!-- Main application shell -->
-<div 
+<div
   class="mcp-layout h-screen overflow-hidden bg-mcp-surface-primary"
   style={layoutStyles}
   data-mobile={isMobile}
@@ -134,10 +144,16 @@
     {/if}
 
     <!-- Main Content -->
-    <main class="mcp-main">
+    <main class="mcp-main" style:padding-bottom={isConsoleOpen ? '400px' : '0px'}>
       <MainContent />
     </main>
   </div>
+
+  <!-- Status Bar (Fixed at bottom) -->
+  <StatusBar ontoggleconsole={toggleConsole} />
+
+  <!-- Developer Console (Collapsible from bottom) -->
+  <DeveloperConsole isopen={isConsoleOpen} onclose={() => (isConsoleOpen = false)} />
 
   <!-- Mobile Menu Overlay -->
   {#if isMobile && isMobileMenuOpen}
@@ -154,10 +170,11 @@
   /* Master Layout Grid */
   .mcp-layout {
     display: grid;
-    grid-template-rows: var(--header-height) 1fr;
-    grid-template-areas: 
+    grid-template-rows: var(--header-height) 1fr var(--status-bar-height);
+    grid-template-areas:
       "header"
-      "content";
+      "content"
+      "statusbar";
   }
 
   /* Content Wrapper - Houses sidebar and main */

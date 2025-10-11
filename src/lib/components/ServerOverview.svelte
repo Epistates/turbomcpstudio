@@ -58,11 +58,6 @@
     }
   }
 
-  function selectServer() {
-    serverStore.selectServer(server.id);
-    uiStore.setView('tools');
-  }
-
   function openServerConfig() {
     serverStore.selectServer(server.id);
     uiStore.openModal('serverConfig');
@@ -105,16 +100,7 @@
 </script>
 
 <div
-  onclick={selectServer}
-  role="button"
-  tabindex="0"
-  onkeydown={(e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      selectServer();
-    }
-  }}
-  class="block w-full border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white cursor-pointer"
+  class="block w-full border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white"
 >
   <!-- Header -->
   <div class="flex items-start justify-between mb-3">

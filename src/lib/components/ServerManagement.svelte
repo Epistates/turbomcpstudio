@@ -238,6 +238,14 @@
         'Delete operation timed out'
       );
 
+      // ✅ NEW: Reload profiles and relationships to update server counts
+      logger.debug('🔄 Reloading profiles and relationships after deletion...');
+      await Promise.all([
+        profileStore.loadProfiles(),
+        profileStore.loadActiveProfile(),
+        loadAllProfileServerRelationships(),
+      ]);
+
       uiStore.showSuccess(`Server "${serverName}" deleted successfully`);
     } catch (error) {
       logger.error('❌ Failed to delete server:', error);
@@ -548,6 +556,26 @@
       default: return '⚪';
     }
   }
+
+  // Extract just the executable name from a stdio path
+  function getExecutableName(path: string): string {
+    const parts = path.split('/');
+    return parts[parts.length - 1] || path;
+  }
+
+  // Get display path for server (truncated for stdio, full for URLs)
+  function getServerDisplayPath(server: ServerInfo): string {
+    if (server.config.transport_config?.type === 'stdio') {
+      // For stdio, show just the executable name
+      return getExecutableName(server.config.transport_config.command);
+    } else if (server.config.transport_config?.type === 'http') {
+      return server.config.transport_config.url;
+    } else if (server.config.transport_config?.type === 'websocket') {
+      return server.config.transport_config.url;
+    } else {
+      return getTransportLabel(server);
+    }
+  }
 </script>
 
 <div class="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
@@ -752,18 +780,10 @@
                       <h3 class="font-semibold text-gray-900 dark:text-white truncate">
                         {server.config.name}
                       </h3>
-                      <p class="text-sm text-gray-600 dark:text-gray-400 font-mono truncate">
-                        {#if server.config.transport_config?.type === 'stdio'}
-                          {server.config.transport_config.command}
-                        {:else if server.config.transport_config?.type === 'http'}
-                          {server.config.transport_config.url}
-                        {:else if server.config.transport_config?.type === 'websocket'}
-                          {server.config.transport_config.url}
-                        {:else}
-                          {getTransportLabel(server)}
-                        {/if}
+                      <p class="text-sm text-gray-600 dark:text-gray-400 font-mono truncate" title={server.config.transport_config?.type === 'stdio' ? server.config.transport_config.command : undefined}>
+                        {getServerDisplayPath(server)}
                       </p>
-                      <div class="flex items-center gap-2 mt-1">
+                      <div class="flex flex-wrap items-center gap-2 mt-1">
                         <span class="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded">
                           {getTransportLabel(server)}
                         </span>
@@ -779,6 +799,34 @@
                           <span class="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded">
                             Not in any profile
                           </span>
+                        {/if}
+                        <!-- Capability Tags -->
+                        {#if server.capabilities}
+                          {#if server.capabilities.tools}
+                            <span class="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                              Tools
+                            </span>
+                          {/if}
+                          {#if server.capabilities.resources}
+                            <span class="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
+                              Resources
+                            </span>
+                          {/if}
+                          {#if server.capabilities.prompts}
+                            <span class="text-xs px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
+                              Prompts
+                            </span>
+                          {/if}
+                          {#if server.capabilities.sampling}
+                            <span class="text-xs px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded">
+                              Sampling
+                            </span>
+                          {/if}
+                          {#if server.capabilities.elicitation}
+                            <span class="text-xs px-2 py-0.5 bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 rounded">
+                              Elicitation
+                            </span>
+                          {/if}
                         {/if}
                       </div>
                     </div>
@@ -951,7 +999,7 @@
 
                 <!-- Server Name & Details -->
                 <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2">
+                  <div class="flex flex-wrap items-center gap-1.5">
                     <h3 class="font-medium text-sm text-gray-900 dark:text-white truncate">
                       {server.config.name}
                     </h3>
@@ -966,6 +1014,34 @@
                       <span class="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
                         {serverProfiles[0].name}
                       </span>
+                    {/if}
+                    <!-- Capability Tags -->
+                    {#if server.capabilities}
+                      {#if server.capabilities.tools}
+                        <span class="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                          T
+                        </span>
+                      {/if}
+                      {#if server.capabilities.resources}
+                        <span class="text-xs px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
+                          R
+                        </span>
+                      {/if}
+                      {#if server.capabilities.prompts}
+                        <span class="text-xs px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
+                          P
+                        </span>
+                      {/if}
+                      {#if server.capabilities.sampling}
+                        <span class="text-xs px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded">
+                          S
+                        </span>
+                      {/if}
+                      {#if server.capabilities.elicitation}
+                        <span class="text-xs px-1.5 py-0.5 bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 rounded">
+                          E
+                        </span>
+                      {/if}
                     {/if}
                   </div>
                 </div>

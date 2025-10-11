@@ -47,7 +47,7 @@
   let clipboardDetected = $state(false);
   let detectedServerName = $state('');
   let detectedServerCount = $state(0);
-  let showClipboardBanner = $state(false);
+  let clipboardAutoProcessed = $state(false); // Track if we've already auto-processed clipboard
 
   // Form data
   let formData = $state({
@@ -167,9 +167,9 @@
     }
   });
 
-  // Check clipboard for MCP config when modal opens
+  // Check clipboard for MCP config when modal opens and auto-process if valid
   $effect(() => {
-    if (showModal && currentStep === 1) {
+    if (showModal && currentStep === 1 && !clipboardAutoProcessed) {
       checkClipboardForConfig();
     }
   });
@@ -196,6 +196,12 @@
   // ✅ NEW: Use uiStore to close (single source of truth)
   function closeModal() {
     uiStore.closeModal('addServer');
+    // Reset state for next open
+    clipboardAutoProcessed = false;
+    clipboardDetected = false;
+    jsonConfig = '';
+    currentStep = 1; // Reset to first step
+    showJsonImport = false; // Close JSON import if open
   }
 
   function nextStep() {
@@ -403,7 +409,7 @@
     }
   }
 
-  // Clipboard detection for MCP config
+  // Clipboard detection for MCP config with auto-processing
   async function checkClipboardForConfig() {
     try {
       // Use browser's native clipboard API (available in Tauri)
@@ -414,22 +420,25 @@
 
       if (detected.valid) {
         clipboardDetected = true;
+        clipboardAutoProcessed = true; // Mark as processed to avoid re-processing
         detectedServerCount = detected.servers.length;
         jsonConfig = clipboardText; // Store for both single and multiple
 
-        if (detected.servers.length === 1) {
-          // Single server: pre-fill form and show banner
-          detectedServerName = detected.servers[0].name;
-          showClipboardBanner = true;
-        } else if (detected.servers.length > 1) {
-          // Multiple servers: show JSON import with all servers
-          detectedServerName = `${detected.servers.length} servers`;
-          showClipboardBanner = true;
-        }
+        logger.info(`📋 Detected ${detected.servers.length} MCP server(s) in clipboard`);
+
+        // For ANY valid JSON config (single or multiple), open JSON editor
+        // This is the most consistent UX - if they have JSON, they likely want to edit JSON
+        detectedServerName = detected.servers.length === 1
+          ? detected.servers[0].name
+          : `${detected.servers.length} servers`;
+
+        logger.info(`✨ Auto-opening JSON editor for ${detectedServerName}`);
+        showJsonImport = true;
       }
     } catch (error) {
       // Silently fail - clipboard might be empty, inaccessible, or not text
       // This is expected behavior, not an error condition
+      logger.debug('Clipboard check failed (expected if empty):', error);
     }
   }
 
@@ -447,24 +456,8 @@
     return { valid: false, servers: [] };
   }
 
-  function useDetectedConfig() {
-    if (detectedServerCount === 1) {
-      // Single server: import and jump to step 3
-      importFromJson();
-      showClipboardBanner = false;
-    } else {
-      // Multiple servers: open JSON editor
-      showJsonImport = true;
-      showClipboardBanner = false;
-    }
-  }
 
-  function dismissDetection() {
-    showClipboardBanner = false;
-    clipboardDetected = false;
-  }
-
-  function importFromJson() {
+  async function importFromJson() {
     try {
       jsonError = '';
       const config = JSON.parse(jsonConfig);
@@ -479,79 +472,22 @@
         throw new Error('Invalid config: no servers defined in "mcpServers"');
       }
 
-      // Handle single vs multiple servers
-      if (serverNames.length === 1) {
-        // Single server: use existing logic (import to form)
-        importSingleServer(serverNames[0], config.mcpServers[serverNames[0]]);
-      } else {
-        // Multiple servers: import all and connect
-        importMultipleServers(config.mcpServers);
-      }
+      // ✅ NEW: Both single and multiple servers go through the same flow
+      // Import and connect all servers directly (no form navigation)
+      await importAndConnectServers(config.mcpServers);
     } catch (error) {
       jsonError = `Failed to import config: ${error}`;
     }
   }
 
-  function importSingleServer(serverName: string, serverConfig: any) {
-    // Import basic fields
-    formData.name = serverName;
-    formData.description = serverConfig.description || '';
+  async function importAndConnectServers(serversConfig: Record<string, any>) {
+    // ✅ NEW: Set loading state for the import button
+    uiStore.setModalLoading('addServer', true);
 
-    // Determine transport type based on config properties
-    if (serverConfig.command) {
-      // STDIO transport
-      formData.transportType = 'stdio';
-      formData.stdio.command = serverConfig.command;
-      formData.stdio.args = serverConfig.args || [];
-      formData.stdio.workingDirectory = serverConfig.cwd || '';
-      argsInput = (serverConfig.args || []).join(' ');
-
-      // Import environment variables
-      formData.environmentVariables = serverConfig.env || {};
-    } else if (serverConfig.url) {
-      // Determine if it's HTTP or WebSocket based on URL scheme
-      const url = serverConfig.url.toLowerCase();
-      if (url.startsWith('ws://') || url.startsWith('wss://')) {
-        formData.transportType = 'websocket';
-        formData.websocket.url = serverConfig.url;
-        formData.websocket.headers = serverConfig.headers || {};
-        headerPairs = Object.entries(formData.websocket.headers).map(([key, value]) => ({ key, value }));
-      } else {
-        formData.transportType = 'http';
-        formData.http.url = serverConfig.url;
-        formData.http.headers = serverConfig.headers || {};
-        headerPairs = Object.entries(formData.http.headers).map(([key, value]) => ({ key, value }));
-      }
-      formData.environmentVariables = {};
-    } else if (serverConfig.host && serverConfig.port) {
-      // TCP transport
-      formData.transportType = 'tcp';
-      formData.tcp.host = serverConfig.host;
-      formData.tcp.port = serverConfig.port;
-      formData.environmentVariables = {};
-    } else if (serverConfig.path) {
-      // Unix socket transport
-      formData.transportType = 'unix';
-      formData.unix.path = serverConfig.path;
-      formData.environmentVariables = {};
-    } else {
-      throw new Error('Unable to determine transport type from configuration');
-    }
-
-    // Ensure header and env pairs have at least one empty entry
-    if (headerPairs.length === 0) headerPairs = [{ key: '', value: '' }];
-
-    envPairs = Object.entries(formData.environmentVariables).map(([key, value]) => ({ key, value }));
-    if (envPairs.length === 0) envPairs = [{ key: '', value: '' }];
-
-    // Jump to final step
-    currentStep = 3;
-    showJsonImport = false;
-  }
-
-  async function importMultipleServers(serversConfig: Record<string, any>) {
     try {
       const serverNames = Object.keys(serversConfig);
+      logger.info(`🚀 Importing and connecting ${serverNames.length} server(s)...`);
+
       const importPromises = serverNames.map(async (name) => {
         const serverConfig = serversConfig[name];
 
@@ -565,17 +501,28 @@
       const failed = results.filter(r => r.status === 'rejected').length;
 
       if (successful > 0) {
-        uiStore.showSuccess(`Successfully imported and connected ${successful}/${serverNames.length} server(s)`);
+        const message = serverNames.length === 1
+          ? `Successfully connected to ${serverNames[0]}`
+          : `Successfully imported and connected ${successful}/${serverNames.length} server(s)`;
+        uiStore.showSuccess(message);
       }
       if (failed > 0) {
-        uiStore.showError(`Failed to import ${failed} server(s)`);
+        const message = serverNames.length === 1
+          ? `Failed to connect to ${serverNames[0]}`
+          : `Failed to import ${failed} server(s)`;
+        uiStore.showError(message);
       }
 
-      // Close modals on success
-      showJsonImport = false;
-      closeModal();
+      // Close modals on success (even partial success)
+      if (successful > 0) {
+        showJsonImport = false;
+        closeModal();
+      }
     } catch (error) {
       jsonError = `Failed to import servers: ${error}`;
+      logger.error('❌ Import failed:', error);
+    } finally {
+      uiStore.setModalLoading('addServer', false);
     }
   }
 
@@ -788,36 +735,6 @@
         {#if currentStep === 1}
           <!-- Step 1: Choose Transport Type -->
           <div class="space-y-4">
-            <!-- Clipboard Detection Banner -->
-            {#if showClipboardBanner}
-              <div class="clipboard-banner">
-                <div class="flex items-start">
-                  <div class="clipboard-banner-icon">
-                    <Check size={20} />
-                  </div>
-                  <div class="flex-1">
-                    <h4 class="clipboard-banner-title">
-                      Configuration Detected
-                    </h4>
-                    <p class="clipboard-banner-text">
-                      Found <strong>{detectedServerName}</strong> in clipboard
-                      {#if detectedServerCount > 1}
-                        - {detectedServerCount} servers ready to import
-                      {/if}
-                    </p>
-                  </div>
-                  <div class="flex items-center space-x-2">
-                    <button onclick={useDetectedConfig} class="btn-primary text-sm">
-                      Use {detectedServerCount > 1 ? 'These' : 'This'}
-                    </button>
-                    <button onclick={dismissDetection} class="btn-ghost text-sm">
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              </div>
-            {/if}
-
             <div class="text-center mb-6">
               <h3 class="text-lg font-medium mb-2 text-primary">Choose Transport Type</h3>
               <p class="text-secondary">Select how you want to connect to your MCP server</p>
@@ -1222,53 +1139,98 @@
 
 <!-- JSON Import Modal -->
 {#if showJsonImport}
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden">
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
       <!-- Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <h2 class="text-xl font-semibold text-gray-900">Import JSON Configuration</h2>
+      <div class="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-lg sm:text-xl font-semibold text-gray-900">Import JSON Configuration</h2>
         <button onclick={() => showJsonImport = false} class="text-gray-400 hover:text-gray-600">
           <X size={24} />
         </button>
       </div>
 
-      <!-- Content -->
-      <div class="p-6">
-        <div class="mb-4">
-          <label class="form-label">JSON Configuration</label>
-          <textarea
-            bind:value={jsonConfig}
-            placeholder='Paste your MCP server configuration JSON here...'
-            class="form-input h-64 font-mono text-sm"
-            rows="12"
-          ></textarea>
-          <p class="text-xs text-gray-500 mt-1">
-            Paste a valid MCP server configuration in JSON format. The configuration will be parsed and applied to the form.
-          </p>
-        </div>
-
-        {#if jsonError}
-          <div class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200">
-            <div class="flex items-center">
-              <AlertCircle size={16} class="text-red-600 mr-2" />
-              <span class="text-red-700 text-sm">{jsonError}</span>
+      <!-- Content - Flexible with scroll -->
+      <div class="flex-1 flex flex-col p-4 sm:p-6 overflow-hidden min-h-0">
+        <!-- Clipboard Detection Notice -->
+        {#if clipboardDetected}
+          <div class="mb-3 p-3 rounded-lg bg-blue-50 border border-blue-200 flex-shrink-0">
+            <div class="flex items-start">
+              <div class="p-2 rounded-lg bg-blue-500 text-white mr-3 flex-shrink-0">
+                <Check size={20} />
+              </div>
+              <div class="flex-1 min-w-0">
+                <h4 class="font-semibold text-blue-900 mb-1 text-sm sm:text-base">Configuration Auto-Detected</h4>
+                <p class="text-xs sm:text-sm text-blue-800">
+                  Found <strong>{detectedServerName}</strong> in your clipboard. You can edit the configuration below before importing.
+                </p>
+              </div>
             </div>
           </div>
         {/if}
 
-        <div class="flex justify-between">
-          <button onclick={exportToJson} class="btn-secondary">
-            <Download size={16} class="mr-2" />
-            Export Current Config
-          </button>
+        <!-- Textarea Container - Takes remaining space -->
+        <div class="flex-1 flex flex-col min-h-0 mb-3">
+          <label class="form-label mb-2 flex-shrink-0">JSON Configuration</label>
+          <textarea
+            bind:value={jsonConfig}
+            placeholder='Paste your MCP server configuration JSON here...'
+            class="form-input font-mono text-xs sm:text-sm flex-1 min-h-[200px] resize-none"
+          ></textarea>
+          <p class="text-xs text-gray-500 mt-2 flex-shrink-0">
+            {#if detectedServerCount > 1}
+              Multiple servers detected. All {detectedServerCount} servers will be imported and connected automatically.
+            {:else if detectedServerCount === 1}
+              Single server configuration detected. You can edit before importing.
+            {:else}
+              Paste a valid MCP server configuration in JSON format using the <code>mcpServers</code> schema.
+            {/if}
+          </p>
+        </div>
 
-          <div class="flex space-x-3">
-            <button onclick={() => showJsonImport = false} class="btn-secondary">
+        {#if jsonError}
+          <div class="mb-3 p-3 rounded-lg bg-red-50 border border-red-200 flex-shrink-0">
+            <div class="flex items-center">
+              <AlertCircle size={16} class="text-red-600 mr-2" />
+              <span class="text-red-700 text-xs sm:text-sm">{jsonError}</span>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Footer Buttons - Fixed at bottom -->
+        <div class="flex flex-col sm:flex-row justify-between gap-3 flex-shrink-0">
+          {#if !clipboardDetected}
+            <button onclick={exportToJson} class="btn-secondary text-sm">
+              <Download size={16} class="mr-2" />
+              <span class="hidden sm:inline">Export Current Config</span>
+              <span class="sm:hidden">Export</span>
+            </button>
+          {:else}
+            <div></div>
+          {/if}
+
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <button
+              onclick={() => { showJsonImport = false; clipboardDetected = false; }}
+              class="btn-secondary text-sm order-2 sm:order-1"
+            >
               Cancel
             </button>
-            <button onclick={importFromJson} class="btn-primary" disabled={!jsonConfig.trim()}>
-              <Upload size={16} class="mr-2" />
-              Import Configuration
+            <button
+              onclick={importFromJson}
+              disabled={!jsonConfig.trim() || modalLoading}
+              class="btn-primary text-sm order-1 sm:order-2 {modalLoading ? 'opacity-50 cursor-not-allowed' : ''}"
+            >
+              {#if modalLoading}
+                <div class="flex items-center justify-center">
+                  <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                  <span class="hidden sm:inline">Importing...</span>
+                  <span class="sm:hidden">Importing...</span>
+                </div>
+              {:else}
+                <Play size={16} class="mr-2" />
+                <span class="hidden sm:inline">{detectedServerCount > 1 ? 'Import & Connect All' : 'Import Configuration'}</span>
+                <span class="sm:hidden">{detectedServerCount > 1 ? 'Connect All' : 'Import'}</span>
+              {/if}
             </button>
           </div>
         </div>
@@ -1384,26 +1346,5 @@
   .json-import-subtitle {
     font-size: var(--mcp-text-sm);
     color: var(--mcp-text-secondary);
-  }
-
-  /* Clipboard Detection Banner */
-  .clipboard-banner {
-    @apply mb-6 p-4 border rounded-lg;
-    background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
-    border-color: #3b82f6;
-  }
-
-  .clipboard-banner-icon {
-    @apply p-2 rounded-lg mr-3 flex-shrink-0;
-    background-color: #3b82f6;
-    color: white;
-  }
-
-  .clipboard-banner-title {
-    @apply font-semibold text-blue-900 mb-1;
-  }
-
-  .clipboard-banner-text {
-    @apply text-sm text-blue-800;
   }
 </style>

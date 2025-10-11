@@ -10,7 +10,7 @@
   import Button from '../ui/Button.svelte';
   import {
     Menu,
-    X,
+    PanelLeftClose,
     Sun,
     Moon,
     Monitor,
@@ -42,13 +42,13 @@
   // Store subscriptions
   const theme = $themeStore;
   const ui = $uiStore;
-  const servers = $serverStore;
+  const serverState = $derived($serverStore);
 
   // Connection status
-  // ✅ FIXED: Convert Map to array for counting
+  // ✅ FIXED: Convert Map to array for counting with reactive subscription
   const serverList = $derived(
-    servers.servers instanceof Map
-      ? Array.from(servers.servers.values())
+    serverState.servers instanceof Map
+      ? Array.from(serverState.servers.values())
       : []
   );
   const connectedServers = $derived(serverList.filter((s: any) => getServerStatus(s) === 'connected').length);
@@ -171,7 +171,7 @@
         type="button"
         class="mcp-header__menu-toggle"
         class:mcp-header__menu-toggle--active={isMobile ? isMobileMenuOpen : !isSidebarCollapsed}
-        aria-label={isMobile ? (isMobileMenuOpen ? 'Close menu' : 'Open menu') : (isSidebarCollapsed ? 'Open sidebar' : 'Close sidebar')}
+        aria-label={isMobile ? (isMobileMenuOpen ? 'Close menu' : 'Open menu') : (isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar')}
         onclick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -179,7 +179,7 @@
         }}
       >
         {#if isMobile ? isMobileMenuOpen : !isSidebarCollapsed}
-          <X size={20} />
+          <PanelLeftClose size={20} />
         {:else}
           <Menu size={20} />
         {/if}

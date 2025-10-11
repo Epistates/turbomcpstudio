@@ -105,6 +105,51 @@
     };
   });
 
+  // Dismissed cards state (persisted in localStorage)
+  let dismissedCards = $state<Set<string>>(new Set());
+
+  // Load dismissed cards from localStorage on mount
+  $effect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('mcp-studio-dismissed-cards');
+      if (stored) {
+        try {
+          dismissedCards = new Set(JSON.parse(stored));
+        } catch (e) {
+          console.error('Failed to parse dismissed cards:', e);
+        }
+      }
+    }
+  });
+
+  function dismissCard(cardId: string) {
+    dismissedCards.add(cardId);
+    dismissedCards = new Set(dismissedCards); // Trigger reactivity
+
+    // Persist to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('mcp-studio-dismissed-cards', JSON.stringify(Array.from(dismissedCards)));
+    }
+  }
+
+  // Recent servers (last 3 used/connected)
+  const recentServers = $derived(() => {
+    return servers
+      .filter(s => s.last_seen)
+      .sort((a, b) => {
+        const aTime = a.last_seen ? new Date(a.last_seen).getTime() : 0;
+        const bTime = b.last_seen ? new Date(b.last_seen).getTime() : 0;
+        return bTime - aTime;
+      })
+      .slice(0, 3);
+  });
+
+  // Recent activity from tool executions
+  const recentActivity = $derived(() => {
+    const executions = serverState.toolExecutions || [];
+    return executions.slice(0, 5);
+  });
+
   // Time ago helper
   function getTimeAgo(date: Date): string {
     const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
@@ -125,6 +170,10 @@
 
   function dismissError() {
     uiStore.clearError();
+  }
+
+  function selectServer(serverId: string) {
+    serverStore.selectServer(serverId);
   }
 </script>
 
@@ -325,47 +374,67 @@
         </div>
       </div>
 
-      <!-- Quick Start Cards (when NO profile active) -->
-      {#if !shouldShowProfileView && servers.length > 0}
+      <!-- Quick Start Cards (when NO profile active and not dismissed) -->
+      {#if !shouldShowProfileView}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <!-- Activate Profile Card -->
-          <div class="card bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
-            <Zap size={32} class="text-blue-600 dark:text-blue-400 mb-3" />
-            <h3 class="text-lg font-semibold mb-2 text-primary">🚀 Activate a Profile</h3>
-            <p class="text-sm text-secondary mb-4">
-              Group your servers and start them with one click. Perfect for switching between dev, test, and production environments.
-            </p>
-            <div class="flex gap-2">
+          {#if !dismissedCards.has('activate-profile') && profileState.profiles.length > 0}
+            <div class="card bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800 relative">
               <button
-                onclick={() => uiStore.setView('servers')}
-                class="btn-primary text-sm"
+                onclick={() => dismissCard('activate-profile')}
+                class="absolute top-3 right-3 p-1 rounded-md hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors text-blue-600 dark:text-blue-400"
+                title="Dismiss this tip"
+                aria-label="Dismiss"
               >
-                <FolderOpen size={14} class="mr-2" />
-                Browse Profiles
+                ×
               </button>
+              <Zap size={32} class="text-blue-600 dark:text-blue-400 mb-3" />
+              <h3 class="text-lg font-semibold mb-2 text-primary">🚀 Activate a Profile</h3>
+              <p class="text-sm text-secondary mb-4">
+                Group your servers and start them with one click. Perfect for switching between dev, test, and production environments.
+              </p>
+              <div class="flex gap-2">
+                <button
+                  onclick={() => uiStore.setView('servers')}
+                  class="btn-primary text-sm"
+                >
+                  <FolderOpen size={14} class="mr-2" />
+                  Browse Profiles
+                </button>
+              </div>
             </div>
-          </div>
+          {/if}
 
           <!-- Add Server Card -->
-          <div class="card bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
-            <Plus size={32} class="text-green-600 dark:text-green-400 mb-3" />
-            <h3 class="text-lg font-semibold mb-2 text-primary">➕ Add Your First Server</h3>
-            <p class="text-sm text-secondary mb-4">
-              Connect to an MCP server via STDIO, HTTP, WebSocket, TCP, or Unix socket. Instantly access tools, resources, and prompts.
-            </p>
-            <button
-              onclick={openAddServer}
-              class="btn-primary text-sm"
-            >
-              <Plus size={14} class="mr-2" />
-              Add Server
-            </button>
-          </div>
+          {#if !dismissedCards.has('add-server')}
+            <div class="card bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800 relative">
+              <button
+                onclick={() => dismissCard('add-server')}
+                class="absolute top-3 right-3 p-1 rounded-md hover:bg-green-200 dark:hover:bg-green-800 transition-colors text-green-600 dark:text-green-400"
+                title="Dismiss this tip"
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+              <Plus size={32} class="text-green-600 dark:text-green-400 mb-3" />
+              <h3 class="text-lg font-semibold mb-2 text-primary">➕ Add Your First Server</h3>
+              <p class="text-sm text-secondary mb-4">
+                Connect to an MCP server via STDIO, HTTP, WebSocket, TCP, or Unix socket. Instantly access tools, resources, and prompts.
+              </p>
+              <button
+                onclick={openAddServer}
+                class="btn-primary text-sm"
+              >
+                <Plus size={14} class="mr-2" />
+                Add Server
+              </button>
+            </div>
+          {/if}
         </div>
       {/if}
 
       <!-- Main Content -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <!-- Server List -->
         <div class="lg:col-span-2">
           <div class="card">
@@ -374,20 +443,30 @@
                 {#if shouldShowProfileView && activeProfile}
                   Profile Servers
                 {:else}
-                  All Servers
+                  Recent Servers
                 {/if}
               </h2>
-              {#if !shouldShowProfileView}
-                <button
-                  onclick={openAddServer}
-                  class="text-sm text-mcp-primary-600 hover:text-mcp-primary-700"
-                >
-                  Add Server
-                </button>
-              {/if}
+              <div class="flex items-center gap-3">
+                {#if !shouldShowProfileView && recentServers().length > 0}
+                  <button
+                    onclick={() => uiStore.setView('servers')}
+                    class="text-sm text-mcp-primary-600 hover:text-mcp-primary-700"
+                  >
+                    View All →
+                  </button>
+                {/if}
+                {#if !shouldShowProfileView}
+                  <button
+                    onclick={openAddServer}
+                    class="text-sm text-mcp-primary-600 hover:text-mcp-primary-700"
+                  >
+                    Add Server
+                  </button>
+                {/if}
+              </div>
             </div>
 
-            {#if displayServers().length === 0}
+            {#if (!shouldShowProfileView && recentServers().length === 0) || (shouldShowProfileView && displayServers().length === 0)}
               {#if shouldShowProfileView}
                 <div class="text-center py-12">
                   <Database size={48} class="mx-auto text-gray-400 mb-4" />
@@ -417,7 +496,7 @@
               {/if}
             {:else}
               <div class="space-y-3">
-                {#each displayServers() as server}
+                {#each (shouldShowProfileView ? displayServers() : recentServers()) as server}
                   <ServerOverview {server} />
                 {/each}
               </div>
@@ -471,39 +550,44 @@
               </button>
             </div>
           </div>
-
-          <!-- Selected Server Details -->
-          {#if selectedServer}
-            <div class="card">
-              <h3 class="text-lg font-semibold mb-4 text-primary">
-                {selectedServer?.config.name || 'Unknown Server'}
-              </h3>
-              <div class="space-y-3 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-secondary">Status</span>
-                  <span class="status-{selectedServer?.status || 'unknown'} capitalize">
-                    {selectedServer?.status || 'unknown'}
-                  </span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-secondary">Transport</span>
-                  <span class="capitalize">{selectedServer.config.transport_config?.type || 'unknown'}</span>
-                </div>
-                {#if selectedServer.metrics}
-                  <div class="flex justify-between">
-                    <span class="text-secondary">Messages</span>
-                    <span>{(selectedServer?.metrics?.requests_sent || 0) + (selectedServer?.metrics?.responses_received || 0)}</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-secondary">Avg Response</span>
-                    <span>{Math.round(selectedServer?.metrics?.avg_response_time_ms || 0)}ms</span>
-                  </div>
-                {/if}
-              </div>
-            </div>
-          {/if}
         </div>
       </div>
+
+      <!-- Recent Activity (Full Width) -->
+      {#if recentActivity().length > 0}
+        <div class="card">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-primary">Recent Activity</h2>
+            <button
+              onclick={() => uiStore.setView('protocol')}
+              class="text-sm text-mcp-primary-600 hover:text-mcp-primary-700 font-medium"
+            >
+              View All →
+            </button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {#each recentActivity() as activity}
+              <div class="flex items-start gap-2 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                <div class="activity-status-indicator {activity.status}">
+                  {activity.status === 'success' ? '✓' : '✗'}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium text-primary truncate">{activity.tool}</div>
+                  <div class="text-xs text-secondary truncate">
+                    {activity.serverName}
+                  </div>
+                  <div class="text-xs text-tertiary">
+                    {getTimeAgo(new Date(activity.timestamp))}
+                    {#if activity.duration}
+                      • {activity.duration}ms
+                    {/if}
+                  </div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
     </div>
   </div>
 
@@ -515,3 +599,65 @@
 {#if modals.serverConfig.open}
   <ServerConfigModal />
 {/if}
+
+<style>
+  /* Status dot styles */
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .status-dot.status-connected {
+    background: var(--mcp-success-500);
+  }
+
+  .status-dot.status-connecting {
+    background: var(--mcp-warning-500);
+  }
+
+  .status-dot.status-error {
+    background: var(--mcp-error-500);
+  }
+
+  .status-dot.status-disconnected {
+    background: var(--mcp-gray-400);
+  }
+
+  /* Capability badge styles */
+  .capability-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--mcp-radius-sm);
+    font-size: 10px;
+    font-weight: var(--mcp-font-bold);
+    flex-shrink: 0;
+  }
+
+  /* Activity status indicator */
+  .activity-status-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: var(--mcp-font-bold);
+    flex-shrink: 0;
+  }
+
+  .activity-status-indicator.success {
+    background: var(--mcp-success-100);
+    color: var(--mcp-success-700);
+  }
+
+  .activity-status-indicator.error {
+    background: var(--mcp-error-100);
+    color: var(--mcp-error-700);
+  }
+</style>
