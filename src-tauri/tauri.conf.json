@@ -33,6 +33,8 @@
             "core:event:default",
             "http:allow-fetch",
             "http:default",
+            "log:allow-log",
+            "log:default",
             {
               "identifier": "http:allow-fetch",
               "allow": [
