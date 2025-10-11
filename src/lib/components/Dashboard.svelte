@@ -26,7 +26,12 @@
   const uiState = $derived($uiStore);
   const profileState = $derived($profileStore);
 
-  const servers = $derived(serverState.servers || []);
+  // ✅ FIXED: Convert Map to array for UI compatibility
+  const servers = $derived(
+    serverState.servers instanceof Map
+      ? Array.from(serverState.servers.values())
+      : []
+  );
   const selectedServerId = $derived(serverState.selectedServerId);
   const modals = $derived(uiState.modals);
   const error = $derived(uiState.error);
@@ -503,10 +508,10 @@
   </div>
 
 <!-- Modals -->
-{#if modals.addServer}
+{#if modals.addServer.open}
   <AddServerModal />
 {/if}
 
-{#if modals.serverConfig}
+{#if modals.serverConfig.open}
   <ServerConfigModal />
 {/if}

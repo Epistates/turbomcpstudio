@@ -4,6 +4,9 @@
   import { profileStore } from '$lib/stores/profileStore';
   import { serverStore, getServerStatus, type ServerInfo } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
+  import { withTimeout } from '$lib/utils/asyncHelpers';
+  import { createLogger } from '$lib/utils/logger';
+  import { TIMEOUTS } from '$lib/constants/timeouts';
   import Button from './ui/Button.svelte';
   import ProfileEditor from './ProfileEditor.svelte';
   import {
@@ -24,6 +27,9 @@
     List,
   } from 'lucide-svelte';
 
+  // Initialize scoped logger
+  const logger = createLogger('ServerManagement');
+
   // Reactive store subscriptions
   const profileState = $derived($profileStore);
   const serverState = $derived($serverStore);
@@ -32,9 +38,14 @@
   const activeProfile = $derived(profileState.activeProfile);
   const profiles = $derived(profileState.profiles);
   const loading = $derived(profileState.loading);
-  const servers = $derived(serverState.servers || []);
+  // ✅ FIXED: Convert Map to array for UI compatibility
+  const servers = $derived(
+    serverState.servers instanceof Map
+      ? Array.from(serverState.servers.values())
+      : []
+  );
 
-  const showProfileEditor = $derived(uiState.modals.profileEditor);
+  const showProfileEditor = $derived(uiState.modals.profileEditor.open);
   const editingProfile = $derived(uiState.editingProfileId);
 
   // Selection state for highlighting
@@ -46,6 +57,9 @@
 
   // View mode: 'card' or 'list' (compact)
   let viewMode = $state<'card' | 'list'>('card');
+
+  // ✅ NEW: Track delete operations to prevent concurrent deletes
+  let deletingServers = $state<Set<string>>(new Set());
 
   onMount(async () => {
     await Promise.all([
@@ -155,7 +169,7 @@
           uiStore.showError('Failed to delete profile');
         }
       } catch (error) {
-        console.error('Failed to delete profile:', error);
+        logger.error('Failed to delete profile:', error);
         uiStore.showError(`Failed to delete profile: ${error}`);
       }
     }
@@ -178,40 +192,60 @@
     uiStore.openModal('serverConfig');
   }
 
+  // ✅ FIXED: Delete with timeout, loading state, and proper cleanup
   async function handleDeleteServer(serverId: string, serverName: string) {
+    // Prevent concurrent deletes on same server
+    if (deletingServers.has(serverId)) {
+      logger.warn('⚠️ Delete already in progress for:', serverName);
+      return;
+    }
+
     if (!confirm(`Are you sure you want to delete server "${serverName}"? This action cannot be undone.`)) {
       return;
     }
 
+    // Add to deleting set
+    deletingServers = new Set(deletingServers).add(serverId);
+
     try {
-      console.log('🗑️ Deleting server:', serverId, serverName);
+      logger.debug('🗑️ Deleting server:', serverId, serverName);
 
-      // Find the server to check its status
-      const server = servers.find(s => s.id === serverId);
-      if (!server) {
-        throw new Error('Server not found');
-      }
+      // ✅ NEW: Wrap entire operation in timeout
+      await withTimeout(
+        async () => {
+          // Find the server to check its status
+          const server = servers.find(s => s.id === serverId);
+          if (!server) {
+            throw new Error('Server not found');
+          }
 
-      // If server is connected, disconnect it first
-      const status = getServerStatus(server);
-      if (status === 'connected' || status === 'connecting') {
-        console.log('🔌 Disconnecting server before deletion...');
-        try {
-          await serverStore.disconnectServer(serverId);
-        } catch (disconnectError) {
-          console.warn('Failed to disconnect server, continuing with deletion:', disconnectError);
-        }
-      }
+          // If server is connected, disconnect it first
+          const status = getServerStatus(server);
+          if (status === 'connected' || status === 'connecting') {
+            logger.debug('🔌 Disconnecting server before deletion...');
+            try {
+              await serverStore.disconnectServer(serverId);
+            } catch (disconnectError) {
+              logger.warn('⚠️ Failed to disconnect server, continuing with deletion:', disconnectError);
+            }
+          }
 
-      console.log('🗑️ Calling deleteServerConfig...');
-      await serverStore.deleteServerConfig(serverId);
-      console.log('✅ Server deleted successfully');
+          logger.debug('🗑️ Calling deleteServerConfig...');
+          await serverStore.deleteServerConfig(serverId);
+          logger.debug('✅ Server deleted successfully');
+        },
+        TIMEOUTS.DEFAULT_OPERATION,
+        'Delete operation timed out'
+      );
 
       uiStore.showSuccess(`Server "${serverName}" deleted successfully`);
     } catch (error) {
-      console.error('❌ Failed to delete server:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
+      logger.error('❌ Failed to delete server:', error);
+      logger.error('Error details:', JSON.stringify(error, null, 2));
       uiStore.showError(`Failed to delete server: ${error}`);
+    } finally {
+      // ✅ NEW: Always cleanup, even on error
+      deletingServers = new Set(Array.from(deletingServers).filter(id => id !== serverId));
     }
   }
 
@@ -221,7 +255,7 @@
   // Load all profile-server relationships from backend
   async function loadAllProfileServerRelationships() {
     try {
-      console.log('📊 Loading ALL profile-server relationships...');
+      logger.debug('📊 Loading ALL profile-server relationships...');
       const relationships: Record<string, string[]> = await invoke('get_all_profile_server_relationships');
 
       // Convert to Map<profileId, Set<serverId>>
@@ -232,7 +266,7 @@
 
       localProfileServerMap = newMap;
 
-      console.log('✅ Loaded relationships for', newMap.size, 'profiles:', {
+      logger.debug('✅ Loaded relationships for', newMap.size, 'profiles:', {
         profiles: Array.from(newMap.entries()).map(([pid, sids]) => ({
           profileId: pid,
           serverCount: sids.size,
@@ -240,7 +274,7 @@
         }))
       });
     } catch (error) {
-      console.error('❌ Failed to load profile-server relationships:', error);
+      logger.error('❌ Failed to load profile-server relationships:', error);
     }
   }
 
@@ -250,7 +284,7 @@
       const profileId = activeProfile.profile.id;
       const serverIds = new Set(activeProfile.servers.map(ps => ps.server_id));
 
-      console.log('🔄 Syncing active profile to local map:', {
+      logger.debug('🔄 Syncing active profile to local map:', {
         profileId,
         profileName: activeProfile.profile.name,
         serverCount: serverIds.size,
@@ -279,7 +313,7 @@
         !Array.from(serverIds).every(id => existing.has(id));
 
       if (changed) {
-        console.log('🔄 Active profile data changed, syncing to local map');
+        logger.debug('🔄 Active profile data changed, syncing to local map');
         const newMap = new Map(localProfileServerMap);
         newMap.set(profileId, serverIds);
         localProfileServerMap = newMap;
@@ -343,7 +377,7 @@
         loadAllProfileServerRelationships(), // Reload ALL relationships
       ]);
     } catch (error) {
-      console.error('Failed to add server to profile:', error);
+      logger.error('Failed to add server to profile:', error);
       throw error;
     }
   }
@@ -363,7 +397,7 @@
         loadAllProfileServerRelationships(), // Reload ALL relationships
       ]);
     } catch (error) {
-      console.error('Failed to remove server from profile:', error);
+      logger.error('Failed to remove server from profile:', error);
       throw error;
     }
   }
@@ -373,11 +407,11 @@
     const server = servers.find(s => s.id === serverId);
 
     if (!profile || !server) {
-      console.error('❌ Profile or server not found:', { profileId, serverId, profile, server });
+      logger.error('❌ Profile or server not found:', { profileId, serverId, profile, server });
       return;
     }
 
-    console.log('🔄 Toggling server profile:', {
+    logger.debug('🔄 Toggling server profile:', {
       serverId,
       serverName: server.config.name,
       profileId,
@@ -393,24 +427,24 @@
 
     try {
       if (currentlyInProfile) {
-        console.log('🗑️ Removing server from profile...');
+        logger.debug('🗑️ Removing server from profile...');
         await handleRemoveServerFromProfile(serverId, profileId);
-        console.log('✅ Removed successfully');
+        logger.debug('✅ Removed successfully');
         uiStore.showSuccess(`Removed "${server.config.name}" from "${profile.name}"`);
       } else {
-        console.log('➕ Adding server to profile...');
+        logger.debug('➕ Adding server to profile...');
         await handleAddServerToProfile(serverId, profileId);
-        console.log('✅ Added successfully');
+        logger.debug('✅ Added successfully');
         uiStore.showSuccess(`Added "${server.config.name}" to "${profile.name}"`);
       }
 
       // Verify local map update
-      console.log('📊 Local map state:', {
+      logger.debug('📊 Local map state:', {
         profileId,
         servers: Array.from(localProfileServerMap.get(profileId) || [])
       });
     } catch (error) {
-      console.error('❌ Failed to toggle:', error);
+      logger.error('❌ Failed to toggle:', error);
       // Revert optimistic update on error
       updateLocalProfileServerMap(serverId, profileId, currentlyInProfile);
       uiStore.showError(`Failed to ${currentlyInProfile ? 'remove from' : 'add to'} profile: ${error}`);
@@ -479,9 +513,9 @@
       const jsonConfig = serverToMcpJson(server);
       await navigator.clipboard.writeText(jsonConfig);
       uiStore.showSuccess(`Copied "${server.config.name}" configuration to clipboard`);
-      console.log('📋 Copied MCP config:', jsonConfig);
+      logger.debug('📋 Copied MCP config:', jsonConfig);
     } catch (error) {
-      console.error('Failed to copy to clipboard:', error);
+      logger.error('Failed to copy to clipboard:', error);
       uiStore.showError('Failed to copy to clipboard');
     }
   }
@@ -787,10 +821,18 @@
                   </button>
                   <button
                     onclick={() => handleDeleteServer(server.id, server.config.name)}
-                    class="text-sm py-2 px-3 bg-white dark:bg-gray-700 text-red-600 dark:text-red-400 border border-gray-300 dark:border-gray-600 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                    disabled={deletingServers.has(server.id)}
+                    class="text-sm py-2 px-3 bg-white dark:bg-gray-700 text-red-600 dark:text-red-400 border border-gray-300 dark:border-gray-600 rounded hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Trash2 size={14} class="inline mr-1" />
-                    Delete
+                    {#if deletingServers.has(server.id)}
+                      <div class="flex items-center">
+                        <div class="animate-spin h-3 w-3 border-2 border-red-600 border-t-transparent rounded-full mr-1"></div>
+                        Deleting...
+                      </div>
+                    {:else}
+                      <Trash2 size={14} class="inline mr-1" />
+                      Delete
+                    {/if}
                   </button>
                   <!-- Manage Profiles Dropdown (Always visible) -->
                   <div class="relative">
@@ -1035,10 +1077,15 @@
 
                   <button
                     onclick={() => handleDeleteServer(server.id, server.config.name)}
-                    class="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                    title="Delete"
+                    disabled={deletingServers.has(server.id)}
+                    class="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={deletingServers.has(server.id) ? 'Deleting...' : 'Delete'}
                   >
-                    <Trash2 size={14} />
+                    {#if deletingServers.has(server.id)}
+                      <div class="animate-spin h-3 w-3 border-2 border-red-600 border-t-transparent rounded-full"></div>
+                    {:else}
+                      <Trash2 size={14} />
+                    {/if}
                   </button>
                 </div>
               </div>

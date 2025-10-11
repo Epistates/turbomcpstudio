@@ -6,10 +6,14 @@
 -->
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import { createLogger } from '$lib/utils/logger';
   import DynamicForm from '$lib/components/ui/DynamicForm.svelte';
   import type { ServerInfo } from '$lib/stores/serverStore';
   import type { PromptOperation } from '$lib/types/collections';
   import { AlertCircle, Loader } from 'lucide-svelte';
+
+  // Initialize scoped logger
+  const logger = createLogger('PromptStepConfig');
 
   interface PromptTemplate {
     name: string;
@@ -60,7 +64,7 @@
         selectedPromptDef = prompts.find(p => p.name === operation.prompt_name) || null;
       }
     } catch (err) {
-      console.error('Failed to load prompts:', err);
+      logger.error('Failed to load prompts:', err);
       error = `Failed to load prompts: ${err}`;
       availablePrompts = [];
       selectedPromptDef = null;

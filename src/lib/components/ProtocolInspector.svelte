@@ -1,10 +1,15 @@
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api/core';
+	import { createLogger } from '$lib/utils/logger';
 	import { listen } from '@tauri-apps/api/event';
 	import { onMount } from 'svelte';
 	import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
 	import { Search, Download, Trash2, Filter, ChevronRight, ChevronDown, Clock, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-svelte';
 	import JsonViewer from './ui/JsonViewer.svelte';
+
+	// Initialize scoped logger
+	const logger = createLogger('ProtocolInspector');
+
 
 	interface MessageHistory {
 		id: string;
@@ -32,7 +37,10 @@
 	// Subscribe to serverStore to get selected server
 	$effect(() => {
 		const unsubscribe = serverStore.subscribe((state: any) => {
-			servers = state.servers;
+			// ✅ FIXED: Convert Map to array
+			servers = state.servers instanceof Map
+				? Array.from(state.servers.values())
+				: [];
 			const globalSelectedId = state.selectedServerId;
 
 			// Sync with global selection
@@ -40,9 +48,11 @@
 				selectedServerId = globalSelectedId;
 			}
 			// Auto-select first connected server if none selected
-			else if (!selectedServerId && state.servers.length > 0) {
-				const connected = state.servers.filter((s: any) => s.status === 'connected');
-				selectedServerId = connected.length > 0 ? connected[0].id : state.servers[0].id;
+			else if (!selectedServerId && state.servers instanceof Map && state.servers.size > 0) {
+				// ✅ FIXED: Convert Map to array with explicit type
+				const serverList: ServerInfo[] = Array.from(state.servers.values());
+				const connected = serverList.filter((s: any) => s.status === 'connected');
+				selectedServerId = connected.length > 0 ? connected[0].id : serverList[0].id;
 			}
 		});
 
@@ -81,7 +91,7 @@
 			messages = result;
 		} catch (e) {
 			error = String(e);
-			console.error('Failed to load message history:', e);
+			logger.error('Failed to load message history:', e);
 		} finally {
 			loading = false;
 		}
@@ -96,7 +106,7 @@
 			messages = [];
 		} catch (e) {
 			error = String(e);
-			console.error('Failed to clear history:', e);
+			logger.error('Failed to clear history:', e);
 		}
 	}
 

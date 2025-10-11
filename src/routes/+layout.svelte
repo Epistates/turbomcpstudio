@@ -2,14 +2,30 @@
   import '../app.css';
   import { onMount, onDestroy } from 'svelte';
   import { listen, once } from '@tauri-apps/api/event';
+  import { invoke } from '@tauri-apps/api/core';
   import { themeStore } from '$lib/stores/themeStore';
   import { serverStore } from '$lib/stores/serverStore';
   import { profileStore } from '$lib/stores/profileStore';
   import { appStore, appStoreIsReady, appStoreState, type AppState } from '$lib/stores/appStore';
   import AppLoadingScreen from '$lib/components/AppLoadingScreen.svelte';
+  import ElicitationDialog from '$lib/components/ElicitationDialog.svelte';
+  import type { JsonSchema } from '$lib/utils/schemaValidation';
 
   // Svelte 5 snippet props
   const { children } = $props();
+
+  // Elicitation state
+  interface ElicitationRequest {
+    id: string;
+    protocolMessageId?: string;
+    serverId: string;
+    serverName?: string;
+    message: string;
+    requestedSchema: JsonSchema;
+  }
+
+  let elicitationDialogVisible = $state(false);
+  let elicitationRequest = $state<ElicitationRequest | null>(null);
 
   // Reactive state using Svelte 5 runes - access store values directly
   let isAppReady = $state(false);
@@ -38,8 +54,33 @@
 
   // Track cleanup functions
   let mcpUnlisten: (() => void) | null = null;
+  let elicitationUnlisten: (() => void) | null = null;
   let appReadyReceived = false;
   let initializationStartTime = Date.now();
+
+  // Elicitation event handlers
+  async function handleElicitationResponse(data: any) {
+    if (!elicitationRequest) return;
+
+    try {
+      await invoke('send_elicitation_response', {
+        serverId: elicitationRequest.serverId,
+        requestId: elicitationRequest.id,
+        responseData: data
+      });
+      console.log('✅ Elicitation response sent successfully');
+    } catch (err) {
+      console.error('❌ Failed to send elicitation response:', err);
+    } finally {
+      elicitationDialogVisible = false;
+      elicitationRequest = null;
+    }
+  }
+
+  function handleElicitationClose() {
+    elicitationDialogVisible = false;
+    elicitationRequest = null;
+  }
 
   // Set up event listeners synchronously to prevent race conditions
   // Use Tauri's recommended synchronous pattern from docs
@@ -49,6 +90,22 @@
     serverStore.handleMcpEvent(event.payload);
   }).then((unlisten) => {
     mcpUnlisten = unlisten;
+  });
+
+  listen('elicitation_requested', (event: any) => {
+    console.log('🔔 Received elicitation_requested event:', event.payload);
+    const payload = event.payload;
+    elicitationRequest = {
+      id: payload.id,
+      protocolMessageId: payload.protocolMessageId,
+      serverId: payload.serverId || 'unknown',
+      serverName: payload.serverName,
+      message: payload.message,
+      requestedSchema: payload.requestedSchema
+    };
+    elicitationDialogVisible = true;
+  }).then((unlisten) => {
+    elicitationUnlisten = unlisten;
   });
 
   listen('app-early-ready', (event) => {
@@ -123,6 +180,10 @@
       mcpUnlisten();
       mcpUnlisten = null;
     }
+    if (elicitationUnlisten) {
+      elicitationUnlisten();
+      elicitationUnlisten = null;
+    }
   });
 </script>
 
@@ -137,6 +198,14 @@
     {@render children()}
   </div>
 {/if}
+
+<!-- Elicitation Dialog (Global) -->
+<ElicitationDialog
+  visible={elicitationDialogVisible}
+  request={elicitationRequest}
+  onResponse={handleElicitationResponse}
+  onClose={handleElicitationClose}
+/>
 
 <style>
   .mcp-app {

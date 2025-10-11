@@ -22,7 +22,13 @@
   // Reactive store access
   const profiles = $derived($profileStore.profiles);
   const activeProfile = $derived($profileStore.activeProfile);
-  const servers = $derived($serverStore.servers);
+  // ✅ FIXED: Convert Map to array for UI compatibility
+  const serverState = $derived($serverStore);
+  const servers = $derived(
+    serverState.servers instanceof Map
+      ? Array.from(serverState.servers.values())
+      : []
+  );
 
   // Derived state for active profile display
   const activeProfileDisplay = $derived(() => {

@@ -8,8 +8,14 @@
   - Response history (reuse previous)
 -->
 <script lang="ts">
+	import { createLogger } from '$lib/utils/logger';
 	import { Check, XCircle, Clock, Lock, AlertCircle, History } from 'lucide-svelte';
+
 	import type { CreateMessageResult } from '$lib/types/sampling';
+
+
+	// Initialize scoped logger
+	const logger = createLogger('QuickResponseTemplates');
 
 	// Props
 	const {
@@ -32,7 +38,7 @@
 				previousResponses = JSON.parse(stored);
 			}
 		} catch (e) {
-			console.error('Failed to load response history:', e);
+			logger.error('Failed to load response history:', e);
 		}
 	});
 
@@ -133,7 +139,7 @@
 			previousResponses = updated;
 			localStorage.setItem('sampling_response_history', JSON.stringify(updated));
 		} catch (e) {
-			console.error('Failed to save response to history:', e);
+			logger.error('Failed to save response to history:', e);
 		}
 	}
 

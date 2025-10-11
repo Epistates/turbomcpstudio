@@ -11,18 +11,28 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { createLogger } from '$lib/utils/logger';
   import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
+
   import ExecutionMonitor from './ExecutionMonitor.svelte';
+
 
   // NEW: Composed components for operation configuration
   import ToolStepConfig from './collections/ToolStepConfig.svelte';
+
   import ResourceStepConfig from './collections/ResourceStepConfig.svelte';
+
   import PromptStepConfig from './collections/PromptStepConfig.svelte';
+
   import SamplingStepConfig from './collections/SamplingStepConfig.svelte';
+
   import ElicitationStepConfig from './collections/ElicitationStepConfig.svelte';
+
   import VariableExtractor from './collections/VariableExtractor.svelte';
+
   import AssertionEditor from './collections/AssertionEditor.svelte';
+
   import type {
     Collection,
     WorkflowStep,
@@ -58,6 +68,9 @@
     Share2
   } from 'lucide-svelte';
 
+  // Initialize scoped logger
+  const logger = createLogger('CollectionsManager');
+
   // State management
   let collections: Collection[] = $state([]);
   let selectedCollection: Collection | null = $state(null);
@@ -79,7 +92,11 @@
   // Subscribe to stores
   $effect(() => {
     const unsubscribeServers = serverStore.subscribe((state: any) => {
-      servers = state.servers.filter((s: any) => s.status?.toLowerCase() === 'connected');
+      // ✅ FIXED: Convert Map to array and filter with explicit type
+      const allServers: ServerInfo[] = state.servers instanceof Map
+        ? Array.from(state.servers.values())
+        : [];
+      servers = allServers.filter((s: any) => s.status?.toLowerCase() === 'connected');
     });
 
     return () => {
@@ -98,7 +115,7 @@
       const result = await invoke('list_collections');
       collections = Array.isArray(result) ? result : [];
     } catch (error) {
-      console.error('Failed to load collections:', error);
+      logger.error('Failed to load collections:', error);
       uiStore.showError(`Failed to load collections: ${error}`);
     } finally {
       loading = false;
@@ -142,7 +159,7 @@
       uiStore.showSuccess('Collection saved successfully');
       isEditing = false;
     } catch (error) {
-      console.error('Failed to save collection:', error);
+      logger.error('Failed to save collection:', error);
       uiStore.showError(`Failed to save collection: ${error}`);
     } finally {
       saving = false;
@@ -161,7 +178,7 @@
       }
       uiStore.showSuccess('Collection deleted successfully');
     } catch (error) {
-      console.error('Failed to delete collection:', error);
+      logger.error('Failed to delete collection:', error);
       uiStore.showError(`Failed to delete collection: ${error}`);
     }
   }
@@ -180,7 +197,7 @@
       viewMode = 'execution';
       uiStore.showSuccess('Workflow execution started');
     } catch (error) {
-      console.error('Failed to start workflow execution:', error);
+      logger.error('Failed to start workflow execution:', error);
       uiStore.showError(`Failed to start workflow: ${error}`);
     }
   }
@@ -303,7 +320,7 @@
 
       uiStore.showSuccess('Collection exported successfully');
     } catch (error) {
-      console.error('Export failed:', error);
+      logger.error('Export failed:', error);
       uiStore.showError(`Export failed: ${error}`);
     }
   }
@@ -325,7 +342,7 @@
       importData = '';
       uiStore.showSuccess('Collection imported successfully');
     } catch (error) {
-      console.error('Import failed:', error);
+      logger.error('Import failed:', error);
       uiStore.showError(`Import failed: ${error}`);
     }
   }
@@ -334,7 +351,7 @@
     try {
       templates = await invoke('get_collection_templates');
     } catch (error) {
-      console.error('Failed to load templates:', error);
+      logger.error('Failed to load templates:', error);
       uiStore.showError(`Failed to load templates: ${error}`);
     }
   }
@@ -359,7 +376,7 @@
       templateVariables = {};
       uiStore.showSuccess('Collection created from template');
     } catch (error) {
-      console.error('Template creation failed:', error);
+      logger.error('Template creation failed:', error);
       uiStore.showError(`Template creation failed: ${error}`);
     }
   }

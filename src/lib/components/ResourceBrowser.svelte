@@ -4,8 +4,14 @@
   import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
   import { createCapabilityStore } from '$lib/utils/serverStore';
+  import { createLogger } from '$lib/utils/logger';
+
+  // Initialize scoped logger
+  const logger = createLogger('ResourceBrowser');
+
   import EmptyCapabilityState from '$lib/components/ui/EmptyCapabilityState.svelte';
   import JsonViewer from '$lib/components/ui/JsonViewer.svelte';
+
 
   interface ResourceExecution {
     id: string;
@@ -99,16 +105,21 @@
     const data = serverData;
     if (!data) return;
 
+    // ✅ FIXED: Convert Map to array for server selection
+    const serverList = data.servers instanceof Map
+      ? Array.from(data.servers.values())
+      : [];
+
     // Only update selectedServerId if current selection is no longer valid
-    if (selectedServerId && !data.servers.find((s: ServerInfo) => s.id === selectedServerId)) {
+    if (selectedServerId && !serverList.find((s: ServerInfo) => s.id === selectedServerId)) {
       // Current selection is invalid, pick first available
-      selectedServerId = data.servers.length > 0 ? data.servers[0].id : undefined;
+      selectedServerId = serverList.length > 0 ? serverList[0].id : undefined;
       if (selectedServerId) {
         loadResources();
       }
-    } else if (!selectedServerId && data.servers.length > 0) {
+    } else if (!selectedServerId && serverList.length > 0) {
       // No selection and servers available, auto-select first
-      selectedServerId = data.servers[0].id;
+      selectedServerId = serverList[0].id;
       if (selectedServerId) {
         loadResources();
       }
@@ -178,7 +189,7 @@
 
       uiStore.showSuccess(`Loaded ${resources.length} resources`);
     } catch (error) {
-      console.error('Failed to load resources:', error);
+      logger.error('Failed to load resources:', error);
       const errorStr = String(error);
 
       if (errorStr.includes('Method not found') || errorStr.includes('-32601')) {
@@ -266,7 +277,7 @@
       executionHistory = [execution, ...executionHistory.slice(0, 49)];
       uiStore.showSuccess(`Loaded content for ${selectedResource.name || actualUri}`);
     } catch (error) {
-      console.error('Failed to load resource content:', error);
+      logger.error('Failed to load resource content:', error);
       const errorMessage = `Error loading content: ${error}`;
       resourceContent = errorMessage;
 
@@ -328,7 +339,7 @@
       executionHistory = [execution, ...executionHistory.slice(0, 49)];
       uiStore.showSuccess(`Loaded content for ${resource.name || resource.uri}`);
     } catch (error) {
-      console.error('Failed to load resource content:', error);
+      logger.error('Failed to load resource content:', error);
       const errorMessage = `Error loading content: ${error}`;
       resourceContent = errorMessage;
 

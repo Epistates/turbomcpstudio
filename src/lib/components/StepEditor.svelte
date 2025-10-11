@@ -4,10 +4,16 @@
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { createLogger } from '$lib/utils/logger';
+
   import { invoke } from '@tauri-apps/api/core';
+
   import type { WorkflowStep, McpOperation, VariableExtract, Assertion } from '$lib/types/collections';
+
   import type { ServerInfo, ToolDefinition } from '$lib/stores/serverStore';
+
   import { serverStore } from '$lib/stores/serverStore';
+
   import {
     Save,
     X,
@@ -22,6 +28,9 @@
     CheckCircle,
     AlertCircle
   } from 'lucide-svelte';
+
+  // Initialize scoped logger
+  const logger = createLogger('StepEditor');
 
   // Props
   const {
@@ -78,7 +87,7 @@
     try {
       availableTools = await serverStore.listTools(serverId);
     } catch (error) {
-      console.error('Failed to load tools:', error);
+      logger.error('Failed to load tools:', error);
       availableTools = [];
     } finally {
       loadingTools = false;
@@ -90,7 +99,7 @@
     try {
       availablePrompts = await invoke<any[]>('list_prompts', { serverId });
     } catch (error) {
-      console.error('Failed to load prompts:', error);
+      logger.error('Failed to load prompts:', error);
       availablePrompts = [];
     } finally {
       loadingPrompts = false;

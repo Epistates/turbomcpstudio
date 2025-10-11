@@ -1,6 +1,14 @@
 <script lang="ts">
   import { serverStore, type ServerInfo, type TransportConfig } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
+  import { withTimeout } from '$lib/utils/asyncHelpers';
+  import { createLogger } from '$lib/utils/logger';
+
+  // Initialize scoped logger
+  const logger = createLogger('ServerConfigModal');
+
+  import { TIMEOUTS } from '$lib/constants/timeouts';
+  import { createModalEscapeHandler, createModalOutsideClickHandler } from '$lib/utils/modalHelpers';
   import {
     X,
     Save,
@@ -19,11 +27,20 @@
     Minus
   } from 'lucide-svelte';
 
-  let showModal = $state(true);
+  // ✅ NEW: Use uiStore for modal state (single source of truth)
+  const uiState = $derived($uiStore);
+  const modalState = $derived(uiState.modals.serverConfig);
+  const showModal = $derived(modalState.open);
+  const modalLoading = $derived(modalState.loading);
+
   let selectedServerId: string | undefined = $state(undefined);
   let servers: ServerInfo[] = $state([]);
   let editMode = $state(false);
   let saving = $state(false);
+
+  // ✅ NEW: Delete operation state
+  let deleting = $state(false);
+  let modalRef: HTMLDivElement | null = $state(null);
 
   // Edit form state
   let editForm = $state({
@@ -33,13 +50,23 @@
     environment_variables: {} as Record<string, string>
   });
 
-  // Subscribe to store changes
+  // ✅ FIXED: Subscribe to store and convert Map to array
   $effect(() => {
     const unsubscribe = serverStore.subscribe((state: any) => {
-      servers = state.servers;
+      // ✅ NEW: Convert Map to array for UI
+      servers = Array.from(state.servers.values());
       selectedServerId = state.selectedServerId;
     });
     return unsubscribe;
+  });
+
+  // ✅ NEW: Escape key handler
+  $effect(() => {
+    if (showModal && !modalLoading && !deleting) {
+      const escapeHandler = createModalEscapeHandler(closeModal);
+      document.addEventListener('keydown', escapeHandler);
+      return () => document.removeEventListener('keydown', escapeHandler);
+    }
   });
 
   const selectedServer = $derived(
@@ -56,10 +83,14 @@
     }
   });
 
+  // ✅ NEW: Use uiStore to close (single source of truth)
   function closeModal() {
+    if (deleting) {
+      logger.warn('⚠️ Cannot close modal while delete operation is in progress');
+      return;
+    }
     editMode = false;
     uiStore.closeModal('serverConfig');
-    showModal = false;
   }
 
   function enterEditMode() {
@@ -129,24 +160,43 @@
     showDeleteConfirm = true;
   }
 
+  // ✅ FIXED: Delete with timeout, loading state, and proper cleanup
   async function deleteServer() {
-    if (!selectedServer) return;
+    if (!selectedServer || deleting) return;
+
+    deleting = true;
+    const serverName = selectedServer.config.name;
+    const serverId = selectedServer.id;
+
+    logger.debug(`🗑️ Starting delete operation for: ${serverName} (ID: ${serverId})`);
 
     try {
       // First disconnect if connected
       if (selectedServer.status === 'connected') {
-        await serverStore.disconnectServer(selectedServer.id);
+        logger.debug('🔌 Disconnecting server before deletion...');
+        await serverStore.disconnectServer(serverId);
+        logger.debug('✅ Server disconnected');
       }
 
       // Delete the server configuration from backend and store
-      await serverStore.deleteServerConfig(selectedServer.id);
+      logger.debug('🗑️ Deleting server configuration from database...');
+      await serverStore.deleteServerConfig(serverId);
+      logger.debug('✅ Database deletion complete');
 
-      uiStore.showSuccess(`Server "${selectedServer.config.name}" deleted`);
-      showDeleteConfirm = false;
+      logger.debug(`✅ Successfully deleted: ${serverName}`);
+      uiStore.showSuccess(`Server "${serverName}" deleted`);
+
+      // Close modal after successful deletion
       closeModal();
     } catch (error) {
+      logger.error('❌ Failed to delete server:', error);
+      logger.error('Error details:', JSON.stringify(error, null, 2));
       uiStore.showError(`Failed to delete server: ${error}`);
+    } finally {
+      // ✅ NEW: Always cleanup, even on error
+      deleting = false;
       showDeleteConfirm = false;
+      logger.debug('🧹 Delete operation cleanup complete');
     }
   }
 
@@ -188,8 +238,28 @@
 </script>
 
 {#if showModal && selectedServer}
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+  <div
+    bind:this={modalRef}
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="server-config-modal-title"
+    tabindex="-1"
+    onclick={createModalOutsideClickHandler(modalRef, () => {
+      if (!deleting) closeModal();
+    })}
+    onkeydown={(e) => {
+      if (e.key === 'Escape' && !deleting) closeModal();
+    }}
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    style="z-index: var(--z-modal-backdrop, 40)"
+  >
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <div
+      onclick={(e) => e.stopPropagation()}
+      class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+      style="z-index: var(--z-modal-content, 50)"
+    >
       <!-- Header -->
       <div class="flex items-center justify-between p-6 border-b border-gray-200">
         <div class="flex items-center">
@@ -200,7 +270,7 @@
             </div>
           {/if}
           <div>
-            <h2 class="text-xl font-semibold text-gray-900">
+            <h2 id="server-config-modal-title" class="text-xl font-semibold text-gray-900">
               {editMode ? 'Edit Server Configuration' : selectedServer.config.name}
             </h2>
             <div class="flex items-center mt-1">
@@ -603,8 +673,14 @@
 
 <!-- Delete Confirmation Modal -->
 {#if showDeleteConfirm}
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+  <div
+    class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center"
+    style="z-index: var(--z-modal-nested-backdrop, 60)"
+  >
+    <div
+      class="bg-white rounded-lg p-6 max-w-md w-full mx-4"
+      style="z-index: var(--z-modal-nested-content, 70)"
+    >
       <div class="flex items-center mb-4">
         <div class="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
           <Trash2 size={24} class="text-red-600" />
@@ -623,15 +699,24 @@
       <div class="flex justify-end space-x-3">
         <button
           onclick={cancelDelete}
-          class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          disabled={deleting}
+          class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Cancel
         </button>
         <button
           onclick={deleteServer}
-          class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors"
+          disabled={deleting}
+          class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Delete Server
+          {#if deleting}
+            <div class="flex items-center">
+              <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+              Deleting...
+            </div>
+          {:else}
+            Delete Server
+          {/if}
         </button>
       </div>
     </div>

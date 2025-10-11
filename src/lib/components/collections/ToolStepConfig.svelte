@@ -10,10 +10,14 @@
 -->
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import { createLogger } from '$lib/utils/logger';
   import DynamicForm from '$lib/components/ui/DynamicForm.svelte';
   import type { ServerInfo, ToolDefinition } from '$lib/stores/serverStore';
   import type { ToolOperation } from '$lib/types/collections';
   import { AlertCircle, Loader } from 'lucide-svelte';
+
+  // Initialize scoped logger
+  const logger = createLogger('ToolStepConfig');
 
   interface Props {
     operation: ToolOperation;
@@ -50,7 +54,7 @@
         selectedToolDef = tools.find(t => t.name === operation.tool_name) || null;
       }
     } catch (err) {
-      console.error('Failed to load tools:', err);
+      logger.error('Failed to load tools:', err);
       error = `Failed to load tools: ${err}`;
       availableTools = [];
       selectedToolDef = null;

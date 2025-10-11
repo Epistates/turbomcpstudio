@@ -1,6 +1,12 @@
 <script lang="ts">
   import { serverStore, type ServerConfig, type TransportConfig } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
+  import { createModalEscapeHandler, createModalOutsideClickHandler, globalModalManager } from '$lib/utils/modalHelpers';
+  import { createLogger } from '$lib/utils/logger';
+
+  // Initialize scoped logger
+  const logger = createLogger('AddServerModal');
+
   import {
     X,
     Database,
@@ -20,14 +26,22 @@
   } from 'lucide-svelte';
   import { open } from '@tauri-apps/plugin-dialog';
 
-  let showModal = $state(true);
+
+  // ✅ NEW: Use uiStore for modal state (single source of truth)
+  const uiState = $derived($uiStore);
+  const modalState = $derived(uiState.modals.addServer);
+  const showModal = $derived(modalState.open);
+  const modalLoading = $derived(modalState.loading);
+
   let currentStep = $state(1);
-  let loading = $state(false);
   let testResult = $state<{ success: boolean; message?: string } | null>(null);
   let templates: ServerConfig[] = $state([]);
   let showJsonImport = $state(false);
   let jsonConfig = $state('');
   let jsonError = $state('');
+
+  // ✅ NEW: Modal ref for escape handlers
+  let modalRef: HTMLDivElement | null = $state(null);
 
   // Clipboard detection state
   let clipboardDetected = $state(false);
@@ -118,8 +132,39 @@
     },
   ];
 
+  // ✅ NEW: Proper lifecycle management with cleanup
+  let templateUnsubscribe: (() => void) | null = null;
+
   $effect(() => {
     loadTemplates();
+
+    // Register modal with global manager
+    if (showModal && modalRef) {
+      globalModalManager.register('addServer', modalRef, {
+        lockScroll: true,
+        trapFocus: true
+      });
+    }
+
+    // Cleanup on unmount or modal close
+    return () => {
+      if (templateUnsubscribe) {
+        templateUnsubscribe();
+        templateUnsubscribe = null;
+      }
+      if (showModal) {
+        globalModalManager.unregister('addServer');
+      }
+    };
+  });
+
+  // ✅ NEW: Escape key handler
+  $effect(() => {
+    if (showModal && !modalLoading) {
+      const escapeHandler = createModalEscapeHandler(closeModal);
+      document.addEventListener('keydown', escapeHandler);
+      return () => document.removeEventListener('keydown', escapeHandler);
+    }
   });
 
   // Check clipboard for MCP config when modal opens
@@ -129,21 +174,28 @@
     }
   });
 
+  // ✅ FIXED: Properly manage subscription lifecycle
   async function loadTemplates() {
     try {
       await serverStore.loadTemplates();
-      const state = serverStore.subscribe((s: any) => {
+
+      // Clean up old subscription if exists
+      if (templateUnsubscribe) {
+        templateUnsubscribe();
+      }
+
+      // Create new subscription with cleanup
+      templateUnsubscribe = serverStore.subscribe((s: any) => {
         templates = s.templates;
       });
-      return state;
     } catch (error) {
-      console.error('Failed to load templates:', error);
+      logger.error('❌ Failed to load templates:', error);
     }
   }
 
+  // ✅ NEW: Use uiStore to close (single source of truth)
   function closeModal() {
     uiStore.closeModal('addServer');
-    showModal = false;
   }
 
   function nextStep() {
@@ -250,9 +302,8 @@
   // Directory picker for STDIO transport
   async function selectDirectory() {
     try {
-      // Temporarily hide modal to prevent z-index interference
-      const originalShow = showModal;
-      showModal = false;
+      // ✅ FIXED: Close modal using uiStore (showModal is derived, can't assign)
+      uiStore.closeModal('addServer');
 
       // Small delay to ensure modal is hidden
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -263,25 +314,24 @@
         title: 'Select Working Directory'
       });
 
-      // Restore modal
-      showModal = originalShow;
+      // ✅ FIXED: Restore modal using uiStore
+      uiStore.openModal('addServer');
 
       if (result && typeof result === 'string') {
         formData.stdio.workingDirectory = result;
       }
     } catch (error) {
-      console.error('Failed to select directory:', error);
-      // Ensure modal is restored even on error
-      showModal = true;
+      logger.error('Failed to select directory:', error);
+      // ✅ FIXED: Restore modal using uiStore
+      uiStore.openModal('addServer');
     }
   }
 
   // File picker for executable selection
   async function selectExecutable() {
     try {
-      // Temporarily hide modal to prevent z-index interference
-      const originalShow = showModal;
-      showModal = false;
+      // ✅ FIXED: Close modal using uiStore (showModal is derived, can't assign)
+      uiStore.closeModal('addServer');
 
       // Small delay to ensure modal is hidden
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -293,16 +343,16 @@
         // No filters - allow all files including extensionless executables
       });
 
-      // Restore modal
-      showModal = originalShow;
+      // ✅ FIXED: Restore modal using uiStore
+      uiStore.openModal('addServer');
 
       if (result && typeof result === 'string') {
         formData.stdio.command = result;
       }
     } catch (error) {
-      console.error('Failed to select executable:', error);
-      // Ensure modal is restored even on error
-      showModal = true;
+      logger.error('Failed to select executable:', error);
+      // ✅ FIXED: Restore modal using uiStore
+      uiStore.openModal('addServer');
     }
   }
 
@@ -577,28 +627,32 @@
     );
   }
 
+  // ✅ FIXED: Test configuration with proper loading state
   async function testConfiguration() {
-    loading = true;
+    if (modalLoading) return;
+
+    uiStore.setModalLoading('addServer', true);
     testResult = null;
 
     try {
-      const config = await buildConfig();
+      const config = buildConfig();
       const result = await serverStore.testServerConfig(config);
       testResult = { success: result, message: result ? 'Configuration is valid' : 'Configuration test failed' };
     } catch (error) {
       testResult = { success: false, message: `Test failed: ${error}` };
     } finally {
-      loading = false;
+      uiStore.setModalLoading('addServer', false);
     }
   }
 
-  async function buildConfig(): Promise<ServerConfig> {
+  // ✅ FIXED: Build config WITHOUT saving to database (prevents duplicate creation)
+  function buildConfig(): ServerConfig {
     updateArgs();
     updateHeaders();
     updateEnvironmentVariables();
 
     let transport: TransportConfig;
-    
+
     switch (formData.transportType) {
       case 'stdio':
         // Use explicit working directory if provided, otherwise derive from absolute path
@@ -643,40 +697,79 @@
         break;
     }
 
-    return await serverStore.createServerConfig(
-      formData.name,
-      formData.description || undefined,
-      transport,
-      formData.environmentVariables
-    );
+    // ✅ NEW: Just build the config object, don't save yet
+    // connectServer() will handle both creation and connection
+    return {
+      id: crypto.randomUUID(), // Temporary client-side ID
+      name: formData.name,
+      description: formData.description || undefined,
+      transport_config: transport,
+      environment_variables: formData.environmentVariables,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
   }
 
+  // ✅ FIXED: Save and connect with proper loading state management
   async function saveAndConnect() {
-    loading = true;
-    
+    // ✅ NEW: Prevent concurrent calls
+    if (modalLoading) {
+      logger.warn('⚠️ Connection already in progress, ignoring duplicate click');
+      return;
+    }
+
+    const requestId = crypto.randomUUID();
+    uiStore.setModalLoading('addServer', true, requestId);
+
     try {
-      const config = await buildConfig();
+      // ✅ NEW: Build config WITHOUT saving (no database call)
+      const config = buildConfig();
+
+      logger.debug(`🔌 Connecting to server: ${config.name}`);
+
+      // ✅ NEW: connectServer() handles BOTH creation and connection atomically
       await serverStore.connectServer(config);
+
+      logger.debug(`✅ Successfully connected to: ${config.name}`);
       uiStore.showSuccess(`Connected to ${config.name}`);
       closeModal();
     } catch (error) {
+      logger.error('❌ Failed to connect:', error);
       uiStore.showError(`Failed to connect: ${error}`);
     } finally {
-      loading = false;
+      uiStore.setModalLoading('addServer', false);
     }
   }
 </script>
 
 {#if showModal}
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+  <div
+    bind:this={modalRef}
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="add-server-modal-title"
+    tabindex="-1"
+    onclick={createModalOutsideClickHandler(modalRef, () => {
+      if (!modalLoading) closeModal();
+    })}
+    onkeydown={(e) => {
+      if (e.key === 'Escape' && !modalLoading) closeModal();
+    }}
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+  >
+    <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <div
+      onclick={(e) => e.stopPropagation()}
+      class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
+    >
       <!-- Header -->
       <div class="flex items-center justify-between p-6 border-b border-gray-200">
         <div>
-          <h2 class="text-xl font-semibold text-gray-900">Add MCP Server</h2>
+          <h2 id="add-server-modal-title" class="text-xl font-semibold text-gray-900">Add MCP Server</h2>
           <p class="text-sm text-gray-600 mt-1">Step {currentStep} of 3</p>
         </div>
-        <button onclick={closeModal} class="text-gray-400 hover:text-gray-600">
+        <button onclick={closeModal} class="text-gray-400 hover:text-gray-600" aria-label="Close modal">
           <X size={24} />
         </button>
       </div>
@@ -1055,11 +1148,11 @@
                 <h4 class="text-sm font-medium text-gray-900">Test Configuration</h4>
                 <button
                   onclick={testConfiguration}
-                  disabled={loading}
-                  class="btn-secondary {loading ? 'opacity-50' : ''}"
+                  disabled={modalLoading}
+                  class="btn-secondary {modalLoading ? 'opacity-50' : ''}"
                 >
                   <TestTube size={16} class="mr-2" />
-                  {loading ? 'Testing...' : 'Test'}
+                  {modalLoading ? 'Testing...' : 'Test'}
                 </button>
               </div>
 
@@ -1107,11 +1200,18 @@
           {:else}
             <button
               onclick={saveAndConnect}
-              disabled={loading}
-              class="btn-primary {loading ? 'opacity-50' : ''}"
+              disabled={modalLoading}
+              class="btn-primary {modalLoading ? 'opacity-50 cursor-not-allowed' : ''}"
             >
-              <Play size={16} class="mr-2" />
-              {loading ? 'Connecting...' : 'Connect'}
+              {#if modalLoading}
+                <div class="flex items-center">
+                  <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                  Connecting...
+                </div>
+              {:else}
+                <Play size={16} class="mr-2" />
+                Connect
+              {/if}
             </button>
           {/if}
         </div>

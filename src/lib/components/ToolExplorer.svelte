@@ -6,7 +6,13 @@
   import DynamicForm from '$lib/components/ui/DynamicForm.svelte';
   import JsonViewer from '$lib/components/ui/JsonViewer.svelte';
   import { validateToolParameters, generateDefaultParameters } from '$lib/utils/schemaValidation';
+  import { createLogger } from '$lib/utils/logger';
+
+  // Initialize scoped logger
+  const logger = createLogger('ToolExplorer');
+
   import { filterServersByCapability } from '$lib/utils/serverCapabilities';
+
 
   interface ValidationResult {
     isValid: boolean;
@@ -51,8 +57,12 @@
   // Subscribe to stores
   $effect(() => {
     const unsubscribeServers = serverStore.subscribe((state: any) => {
+      // ✅ FIXED: Convert Map to array before filtering with explicit type
+      const allServers: ServerInfo[] = state.servers instanceof Map
+        ? Array.from(state.servers.values())
+        : [];
       // Filter to only show connected servers that support tools
-      const connectedServers = filterServersByCapability(state.servers, 'tools');
+      const connectedServers = filterServersByCapability(allServers, 'tools');
       servers = connectedServers;
 
       // Sync with global server selection if it's valid for tools
@@ -152,7 +162,7 @@
     try {
       tools = await serverStore.listTools(selectedServerId);
     } catch (error) {
-      console.error('Failed to load tools:', error);
+      logger.error('Failed to load tools:', error);
       uiStore.showError(`Failed to load tools: ${error}`);
       tools = [];
     } finally {
@@ -230,7 +240,7 @@
 
       uiStore.showSuccess(`Tool "${selectedTool.name}" executed successfully`);
     } catch (error) {
-      console.error('Tool execution failed:', error);
+      logger.error('Tool execution failed:', error);
       const errorResult = { error: String(error) };
       toolResult = errorResult;
       isHistoricalResult = false;
@@ -329,7 +339,7 @@
       uiStore.showSuccess(`Saved "${selectedTool.name}" to new collection`);
       uiStore.setView('collections');
     } catch (error) {
-      console.error('Failed to save to collection:', error);
+      logger.error('Failed to save to collection:', error);
       uiStore.showError(`Failed to save to collection: ${error}`);
     }
   }

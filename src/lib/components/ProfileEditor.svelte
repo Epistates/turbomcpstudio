@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { createLogger } from '$lib/utils/logger';
   import { profileStore, type CreateProfileRequest, type ProfileServer, type ServerProfile } from '$lib/stores/profileStore';
   import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
   import Button from './ui/Button.svelte';
@@ -12,6 +13,9 @@
     Settings as SettingsIcon,
     Check,
   } from 'lucide-svelte';
+
+  // Initialize scoped logger
+  const logger = createLogger('ProfileEditor');
 
   // Props
   const {
@@ -60,9 +64,11 @@
   onMount(async () => {
     loading = true;
 
-    // Load available servers
+    // ✅ FIXED: Load available servers from Map
     const serverState = $serverStore;
-    availableServers = serverState.servers;
+    availableServers = serverState.servers instanceof Map
+      ? Array.from(serverState.servers.values())
+      : [];
 
     // If editing, load profile data
     if (isEditMode && profileId) {
@@ -82,7 +88,7 @@
         // Load profile servers
         profileServers = await profileStore.getProfileServers(profileId);
       } catch (error) {
-        console.error('Failed to load profile:', error);
+        logger.error('Failed to load profile:', error);
       }
     }
 
@@ -158,7 +164,7 @@
 
       onClose();
     } catch (error) {
-      console.error('Failed to save profile:', error);
+      logger.error('Failed to save profile:', error);
     } finally {
       saving = false;
     }

@@ -19,7 +19,10 @@
   // Subscribe to stores
   $effect(() => {
     const unsubscribeServers = serverStore.subscribe((state: any) => {
-      servers = state.servers;
+      // ✅ FIXED: Convert Map to array
+      servers = state.servers instanceof Map
+        ? Array.from(state.servers.values())
+        : [];
     });
 
     const unsubscribeUi = uiStore.subscribe((state: any) => {

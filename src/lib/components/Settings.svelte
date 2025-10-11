@@ -4,9 +4,16 @@
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { createLogger } from '$lib/utils/logger';
+
   import { invoke } from '@tauri-apps/api/core';
+
   import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+
   import Button from './ui/Button.svelte';
+
+  // Initialize scoped logger
+  const logger = createLogger('Settings');
 
   interface LLMModelsResponse {
     data: Array<{
@@ -221,7 +228,7 @@
       });
 
     } catch (error) {
-      console.error('Failed to load providers:', error);
+      logger.error('Failed to load providers:', error);
     } finally {
       loading = false;
     }
@@ -333,7 +340,7 @@
               defaultModel = 'local-model';
             }
           } catch (error) {
-            console.warn('Failed to fetch models from local provider:', error);
+            logger.warn('Failed to fetch models from local provider:', error);
             availableModels = ['local-model'];
             defaultModel = 'local-model';
           }
@@ -438,7 +445,7 @@
       await invoke('remove_llm_api_key', { providerId: providerId });
       await loadProviders();
     } catch (error) {
-      console.error('Failed to remove provider:', error);
+      logger.error('Failed to remove provider:', error);
     }
   }
 
@@ -447,7 +454,7 @@
       await invoke('set_active_llm_provider', { providerId: providerId });
       await loadProviders();
     } catch (error) {
-      console.error('Failed to set active provider:', error);
+      logger.error('Failed to set active provider:', error);
     }
   }
 

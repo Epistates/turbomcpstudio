@@ -11,10 +11,10 @@
   import { uiStore } from '$lib/stores/uiStore';
 
   // Layout state
-  let sidebarWidth = 280;
-  let isResizing = false;
-  let isSidebarCollapsed = false;
-  let isMobileMenuOpen = false;
+  let sidebarWidth = $state(280);
+  let isResizing = $state(false);
+  let isSidebarCollapsed = $state(false);
+  let isMobileMenuOpen = $state(false);
   
   // Responsive breakpoints
   let innerWidth = $state(0);
@@ -99,8 +99,8 @@
   data-sidebar-collapsed={isSidebarCollapsed}
 >
   <!-- Header Bar -->
-  <Header 
-    on:toggle-sidebar={toggleSidebar}
+  <Header
+    ontoggleSidebar={toggleSidebar}
     {isMobile}
     {isSidebarCollapsed}
     {isMobileMenuOpen}
@@ -109,11 +109,11 @@
   <!-- Main Content Area -->
   <div class="mcp-content-wrapper">
     <!-- Sidebar -->
-    <aside 
+    <aside
       class="mcp-sidebar"
       class:mcp-sidebar--collapsed={isSidebarCollapsed}
       class:mcp-sidebar--mobile-open={isMobileMenuOpen}
-      style="width: var(--sidebar-width)"
+      style:width={isSidebarCollapsed ? '0px' : `${sidebarWidth}px`}
     >
       <Sidebar {isMobile} {isSidebarCollapsed} />
     </aside>

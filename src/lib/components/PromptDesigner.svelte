@@ -4,6 +4,7 @@
   import { serverStore, type ServerInfo, type ToolExecution } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
   import { filterServersByCapability } from '$lib/utils/serverCapabilities';
+  import { createLogger } from '$lib/utils/logger';
   import {
     FileText,
     Play,
@@ -26,6 +27,9 @@
     Bookmark,
     History
   } from 'lucide-svelte';
+
+  // Initialize scoped logger
+  const logger = createLogger('PromptDesigner');
 
   interface PromptTemplate {
     name: string;
@@ -86,8 +90,12 @@
   // Subscribe to stores
   $effect(() => {
     const unsubscribeServers = serverStore.subscribe((state: any) => {
+      // ✅ FIXED: Convert Map to array before filtering with explicit type
+      const allServers: ServerInfo[] = state.servers instanceof Map
+        ? Array.from(state.servers.values())
+        : [];
       // Filter to only show connected servers that support prompts
-      const connectedServers = filterServersByCapability(state.servers, 'prompts');
+      const connectedServers = filterServersByCapability(allServers, 'prompts');
       servers = connectedServers;
       serverStoreState = state; // Update reactive state for execution history
 
@@ -160,7 +168,7 @@
 
       uiStore.showSuccess(`Loaded ${prompts.length} prompts`);
     } catch (error) {
-      console.error('Failed to load prompts:', error);
+      logger.error('Failed to load prompts:', error);
       const errorStr = String(error);
 
       if (errorStr.includes('Method not found') || errorStr.includes('-32601')) {
@@ -227,7 +235,7 @@
 
       uiStore.showSuccess(`Prompt "${selectedPrompt.title || selectedPrompt.name}" executed successfully`);
     } catch (error) {
-      console.error('Prompt execution failed:', error);
+      logger.error('Prompt execution failed:', error);
       executionStatus = 'error';
       executionError = String(error);
       uiStore.showError(`Failed to execute prompt: ${error}`);

@@ -3,7 +3,7 @@
   Enterprise application header with navigation and controls
 -->
 <script lang="ts">
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { themeStore } from '$lib/stores/themeStore';
   import { uiStore } from '$lib/stores/uiStore';
   import { serverStore, getServerStatus } from '$lib/stores/serverStore';
@@ -27,11 +27,17 @@
   import ProfileContextBar from './ProfileContextBar.svelte';
 
   // Props using Svelte 5 runes
-  const { isMobile = false, isSidebarCollapsed = false, isMobileMenuOpen = false } = $props();
-
-  const dispatch = createEventDispatcher<{
-    'toggle-sidebar': void;
-  }>();
+  const {
+    isMobile = false,
+    isSidebarCollapsed = false,
+    isMobileMenuOpen = false,
+    ontoggleSidebar
+  }: {
+    isMobile?: boolean;
+    isSidebarCollapsed?: boolean;
+    isMobileMenuOpen?: boolean;
+    ontoggleSidebar?: () => void;
+  } = $props();
 
   // Store subscriptions
   const theme = $themeStore;
@@ -39,8 +45,14 @@
   const servers = $serverStore;
 
   // Connection status
-  const connectedServers = $derived(servers.servers.filter((s: any) => getServerStatus(s) === 'connected').length);
-  const totalServers = $derived(servers.servers.length);
+  // ✅ FIXED: Convert Map to array for counting
+  const serverList = $derived(
+    servers.servers instanceof Map
+      ? Array.from(servers.servers.values())
+      : []
+  );
+  const connectedServers = $derived(serverList.filter((s: any) => getServerStatus(s) === 'connected').length);
+  const totalServers = $derived(serverList.length);
   const connectionStatus = $derived(connectedServers === 0 ? 'disconnected' :
                       connectedServers === totalServers ? 'connected' : 'partial');
 
@@ -156,12 +168,17 @@
     <!-- Left Section: Logo & Menu Toggle -->
     <div class="mcp-header__left">
       <button
+        type="button"
         class="mcp-header__menu-toggle"
-        class:mcp-header__menu-toggle--active={isMobileMenuOpen}
-        aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
-        onclick={() => dispatch('toggle-sidebar')}
+        class:mcp-header__menu-toggle--active={isMobile ? isMobileMenuOpen : !isSidebarCollapsed}
+        aria-label={isMobile ? (isMobileMenuOpen ? 'Close menu' : 'Open menu') : (isSidebarCollapsed ? 'Open sidebar' : 'Close sidebar')}
+        onclick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          ontoggleSidebar?.();
+        }}
       >
-        {#if isMobileMenuOpen}
+        {#if isMobile ? isMobileMenuOpen : !isSidebarCollapsed}
           <X size={20} />
         {:else}
           <Menu size={20} />

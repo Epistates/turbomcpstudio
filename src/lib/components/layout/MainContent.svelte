@@ -24,11 +24,6 @@
   const modals = $derived($uiStore.modals);
   const pendingSamplingRequest = $derived($uiStore.pendingSamplingRequest);
 
-  // Debug logging
-  $effect(() => {
-    console.log('🟣 MainContent: currentView changed to:', currentView);
-  });
-
   // Check if current view should show mode indicator (testing-related views)
   const showModeIndicator = $derived(
     currentView === 'sampling' || currentView === 'elicitation' || currentView === 'protocol'
@@ -91,29 +86,24 @@
 </div>
 
 <!-- Modal System -->
-{#if modals.addServer}
-  <div class="mcp-modal-overlay" role="dialog" aria-modal="true">
-    <AddServerModal />
-  </div>
+<!-- Note: Each modal component renders its own backdrop, no wrapper needed -->
+{#if modals.addServer.open}
+  <AddServerModal />
 {/if}
 
-{#if modals.samplingApproval && pendingSamplingRequest}
-  <div class="mcp-modal-overlay" role="dialog" aria-modal="true">
-    {#await import('../SamplingApprovalModal.svelte')}
-      <div class="loading">Loading...</div>
-    {:then { default: SamplingApprovalModal }}
-      <SamplingApprovalModal
-        request={pendingSamplingRequest}
-        onClose={() => uiStore.closeSamplingApproval()}
-      />
-    {/await}
-  </div>
+{#if modals.samplingApproval.open && pendingSamplingRequest}
+  {#await import('../SamplingApprovalModal.svelte')}
+    <div class="loading">Loading...</div>
+  {:then { default: SamplingApprovalModal }}
+    <SamplingApprovalModal
+      request={pendingSamplingRequest}
+      onClose={() => uiStore.closeSamplingApproval()}
+    />
+  {/await}
 {/if}
 
-{#if modals.serverConfig}
-  <div class="mcp-modal-overlay" role="dialog" aria-modal="true">
-    <ServerConfigModal />
-  </div>
+{#if modals.serverConfig.open}
+  <ServerConfigModal />
 {/if}
 
 <style>

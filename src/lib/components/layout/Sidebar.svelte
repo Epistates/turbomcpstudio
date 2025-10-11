@@ -34,17 +34,17 @@
   const uiState = $derived($uiStore);
   const profileState = $derived($profileStore);
 
-  const servers = $derived(serverState.servers);
+  // ✅ FIXED: Convert Map to array for UI compatibility
+  const servers = $derived(
+    serverState.servers instanceof Map
+      ? Array.from(serverState.servers.values())
+      : []
+  );
   const selectedServerId = $derived(serverState.selectedServerId);
   const currentView = $derived(uiState.currentView);
   const activeProfile = $derived(profileState.activeProfile);
 
   let expandedSections = $state(new Set(['navigation', 'servers']));
-
-  // Debug logging
-  $effect(() => {
-    console.log('🔵 Sidebar: currentView changed to:', currentView);
-  });
 
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Monitor },
@@ -59,10 +59,7 @@
   ];
 
   function navigateTo(view: View) {
-    console.log('🔵 Sidebar: navigateTo called with view:', view);
-    console.log('🔵 Sidebar: currentView before:', currentView);
     uiStore.setView(view);
-    console.log('🔵 Sidebar: setView called');
   }
 
   // Map views to their required capabilities

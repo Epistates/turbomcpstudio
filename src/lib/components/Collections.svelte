@@ -97,7 +97,11 @@
   // Subscribe to stores
   $effect(() => {
     const unsubscribeServers = serverStore.subscribe((state: any) => {
-      const connectedServers = state.servers.filter((s: any) => s.status?.toLowerCase() === 'connected');
+      // ✅ FIXED: Convert Map to array before filtering with explicit type
+      const allServers: ServerInfo[] = state.servers instanceof Map
+        ? Array.from(state.servers.values())
+        : [];
+      const connectedServers = allServers.filter((s: any) => s.status?.toLowerCase() === 'connected');
       servers = connectedServers;
 
       if (selectedServerId !== state.selectedServerId) {

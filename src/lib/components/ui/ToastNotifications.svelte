@@ -1,8 +1,15 @@
 <script lang="ts">
+  import { createLogger } from '$lib/utils/logger';
   import { uiStore } from '$lib/stores/uiStore';
+
   import { TIMEOUTS } from '$lib/constants';
+
   import { CheckCircle, AlertCircle, Info, X, Copy, Check } from 'lucide-svelte';
+
   import { onMount } from 'svelte';
+
+  // Initialize scoped logger
+  const logger = createLogger('ToastNotifications');
 
   // Subscribe to UI store
   const ui = $derived($uiStore);
@@ -20,7 +27,7 @@
       copied = true;
       setTimeout(() => copied = false, TIMEOUTS.TOAST_DURATION);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      logger.error('Failed to copy:', err);
     }
   }
 

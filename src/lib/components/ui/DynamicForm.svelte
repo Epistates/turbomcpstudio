@@ -1,5 +1,9 @@
 <script lang="ts">
+  import { createLogger } from '$lib/utils/logger';
   import { AlertCircle, Info } from 'lucide-svelte';
+
+  // Initialize scoped logger
+  const logger = createLogger('DynamicForm');
 
   interface ValidationResult {
     isValid: boolean;
@@ -340,7 +344,7 @@
               errors.push(`${fieldName} format is invalid`);
             }
           } catch (e) {
-            console.warn('Invalid regex pattern in schema:', fieldSchema.pattern);
+            logger.warn('Invalid regex pattern in schema:', fieldSchema.pattern);
           }
         }
 

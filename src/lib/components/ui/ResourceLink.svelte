@@ -1,6 +1,10 @@
 <script lang="ts">
+  import { createLogger } from '$lib/utils/logger';
   import { ExternalLink, FileText, Image, File, Loader2, AlertCircle } from 'lucide-svelte';
   import { invoke } from '@tauri-apps/api/core';
+
+  // Initialize scoped logger
+  const logger = createLogger('ResourceLink');
 
   /**
    * ResourceLink Component - June 2025 MCP Spec
@@ -85,7 +89,7 @@
       }
     } catch (e) {
       error = String(e);
-      console.error('Failed to load resource:', e);
+      logger.error('Failed to load resource:', e);
     } finally {
       loading = false;
     }
@@ -94,7 +98,7 @@
   function openExternal() {
     // For web URLs, open in browser
     if (uri.startsWith('http://') || uri.startsWith('https://')) {
-      invoke('open_url', { url: uri }).catch(console.error);
+      invoke('open_url', { url: uri }).catch(e => logger.error('Failed to open URL', e));
     }
   }
 </script>
