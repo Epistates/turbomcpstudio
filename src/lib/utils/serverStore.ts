@@ -14,7 +14,10 @@ import type { ServerInfo } from '$lib/stores/serverStore';
  */
 export function createCapabilityStore(capability: McpCapability) {
   return derived(serverStore, ($serverStore) => {
-    const allServers = $serverStore.servers;
+    // ✅ FIXED: Convert Map to array before passing to helper functions
+    const allServers = $serverStore.servers instanceof Map
+      ? Array.from($serverStore.servers.values())
+      : [];
     const connectedServers = getConnectedServers(allServers);
     const capableServers = filterServersByCapability(allServers, capability);
 
@@ -33,7 +36,10 @@ export function createCapabilityStore(capability: McpCapability) {
  * Reactive store for all connected servers (no capability filtering)
  */
 export const connectedServersStore = derived(serverStore, ($serverStore) => {
-  const allServers = $serverStore.servers;
+  // ✅ FIXED: Convert Map to array before passing to helper functions
+  const allServers = $serverStore.servers instanceof Map
+    ? Array.from($serverStore.servers.values())
+    : [];
   const connectedServers = getConnectedServers(allServers);
 
   return {
@@ -49,7 +55,10 @@ export const connectedServersStore = derived(serverStore, ($serverStore) => {
  * Reactive store for server statistics across all capabilities
  */
 export const serverStatsStore = derived(serverStore, ($serverStore) => {
-  const allServers = $serverStore.servers;
+  // ✅ FIXED: Convert Map to array before passing to helper functions
+  const allServers = $serverStore.servers instanceof Map
+    ? Array.from($serverStore.servers.values())
+    : [];
   const connectedServers = getConnectedServers(allServers);
 
   const capabilityStats = {

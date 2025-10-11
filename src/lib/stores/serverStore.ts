@@ -1,5 +1,7 @@
 import { writable } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
+import { withTimeout, globalRequestManager } from '$lib/utils/asyncHelpers';
+import { createLogger } from '$lib/utils/logger';
 
 export interface ServerConfig {
   id: string;
@@ -77,8 +79,12 @@ export interface ToolExecution {
   error?: string;
 }
 
+/**
+ * ✅ NEW: Server store state with Map-based storage for O(1) operations
+ */
 interface ServerStoreState {
-  servers: ServerInfo[];
+  // ✅ NEW: Map instead of array for O(1) lookups
+  servers: Map<string, ServerInfo>;
   selectedServerId?: string;
   templates: ServerConfig[];
   loading: boolean;
@@ -88,7 +94,8 @@ interface ServerStoreState {
 }
 
 const initialState: ServerStoreState = {
-  servers: [],
+  // ✅ NEW: Initialize with Map
+  servers: new Map(),
   selectedServerId: undefined,
   templates: [],
   loading: false,
@@ -99,18 +106,52 @@ const initialState: ServerStoreState = {
 
 function createServerStore() {
   const { subscribe, set, update } = writable<ServerStoreState>(initialState);
+  const logger = createLogger('ServerStore');
+
+  // ✅ NEW: Helper to convert Map to array for UI compatibility
+  const getServersArray = (): ServerInfo[] => {
+    let serversArray: ServerInfo[] = [];
+    subscribe(state => {
+      serversArray = Array.from(state.servers.values());
+    })();
+    return serversArray;
+  };
+
+  // ✅ NEW: Helper to get a single server by ID
+  const getServer = (serverId: string): ServerInfo | undefined => {
+    let server: ServerInfo | undefined;
+    subscribe(state => {
+      server = state.servers.get(serverId);
+    })();
+    return server;
+  };
 
   return {
     subscribe,
+
+    // Export helper for UI
+    getServersArray,
+    getServer,
 
     // Load servers from backend
     async loadServers() {
       update(state => ({ ...state, loading: true, error: undefined }));
       try {
-        const servers: ServerInfo[] = await invoke('list_servers');
-        update(state => ({ ...state, servers, loading: false }));
+        const serversArray: ServerInfo[] = await withTimeout(
+          invoke('list_servers'),
+          10000,
+          'Failed to load servers: timeout'
+        );
+
+        // ✅ NEW: Convert array to Map
+        const serversMap = new Map<string, ServerInfo>();
+        serversArray.forEach(server => {
+          serversMap.set(server.id, server);
+        });
+
+        update(state => ({ ...state, servers: serversMap, loading: false }));
       } catch (error) {
-        console.error('Failed to load servers:', error);
+        logger.error('Failed to load servers:', error);
         update(state => ({
           ...state,
           loading: false,
@@ -119,7 +160,7 @@ function createServerStore() {
       }
     },
 
-    // Load saved server configurations from database on startup
+    // ✅ FIXED: Load saved server configurations from database (with Map)
     async loadSavedConfigurations() {
       try {
         const savedConfigs: ServerConfig[] = await invoke('load_server_configs');
@@ -142,22 +183,25 @@ function createServerStore() {
           },
         }));
 
+        // ✅ NEW: Merge into Map, avoiding duplicates
         update(state => {
-          // Merge saved servers with existing ones, avoiding duplicates
-          const existingServerIds = new Set(state.servers.map(s => s.id));
-          const newServers = savedServers.filter(server => !existingServerIds.has(server.id));
+          const newServers = new Map(state.servers);
 
-          return {
-            ...state,
-            servers: [...state.servers, ...newServers]
-          };
+          // Add saved servers that don't already exist
+          savedServers.forEach(server => {
+            if (!newServers.has(server.id)) {
+              newServers.set(server.id, server);
+            }
+          });
+
+          return { ...state, servers: newServers };
         });
       } catch (error) {
         // If database isn't ready yet, just log and continue
-        // The app-ready event will trigger another attempt
         if (typeof error === 'string' && error.includes('Database not yet initialized')) {
+          // Silent - expected during initialization
         } else {
-          console.error('Failed to load saved configurations:', error);
+          logger.error('❌ Failed to load saved configurations:', error);
         }
       }
     },
@@ -173,7 +217,7 @@ function createServerStore() {
         const templates: ServerConfig[] = await invoke('get_server_templates');
         update(state => ({ ...state, templates }));
       } catch (error) {
-        console.error('Failed to load templates:', error);
+        logger.error('Failed to load templates:', error);
         update(state => ({ 
           ...state, 
           error: `Failed to load templates: ${error}` 
@@ -181,66 +225,165 @@ function createServerStore() {
       }
     },
 
-    // Connect to a server
+    // ✅ FIXED: Connect to a server (handles both new server creation and reconnection)
     async connectServer(config: ServerConfig) {
-      update(state => ({ ...state, loading: true, error: undefined }));
+      // ✅ NEW: Use request manager to prevent duplicate connections
+      return globalRequestManager.execute(
+        `connect-server-${config.name}`,
+        async () => {
+          update(state => ({ ...state, loading: true, error: undefined }));
 
-      // Immediately set connecting status to prevent UI freezing
-      update(state => ({
-        ...state,
-        servers: state.servers.map(s =>
-          s.config.name === config.name ? { ...s, status: 'connecting' as const } : s
-        )
-      }));
+          try {
+            // Check if server already exists in database by name
+            let serverConfig: ServerConfig;
+            const existingServer = getServer(config.id);
 
-      try {
-        const serverInfo: ServerInfo = await invoke('connect_server', { serverConfig: config });
-        update(state => ({
-          ...state,
-          servers: [...state.servers.filter(s => s.id !== serverInfo.id), serverInfo],
-          loading: false,
-          selectedServerId: serverInfo.id,
-        }));
-        return serverInfo;
-      } catch (error) {
-        console.error('Failed to connect server:', error);
+            if (existingServer) {
+              // ✅ Server exists, reconnect to it
+              console.log(`♻️ Reconnecting to existing server: ${config.name}`);
+              serverConfig = existingServer.config;
 
-        // Set error status on failure to prevent UI freezing
-        // Find the server by config name and update its status to error
-        update(state => ({
-          ...state,
-          servers: state.servers.map(s =>
-            s.config.name === config.name ? { ...s, status: 'error' as const } : s
-          ),
-          loading: false,
-          error: `Failed to connect: ${error}`
-        }));
-        throw error;
-      }
+              // Update status to connecting
+              update(state => {
+                const newServers = new Map(state.servers);
+                newServers.set(existingServer.id, {
+                  ...existingServer,
+                  status: 'connecting' as const
+                });
+                return { ...state, servers: newServers };
+              });
+            } else {
+              // ✅ NEW: New server - create config in database first
+              console.log(`✨ Creating new server: ${config.name}`);
+
+              serverConfig = await withTimeout(
+                invoke('create_server_config', {
+                  request: {
+                    name: config.name,
+                    description: config.description,
+                    transport: config.transport_config,
+                    environment_variables: config.environment_variables,
+                  }
+                }),
+                30000,
+                'Server creation timed out'
+              );
+
+              // Add to store as connecting (before actual connection)
+              const newServerInfo: ServerInfo = {
+                id: serverConfig.id,
+                config: serverConfig,
+                status: 'connecting' as const,
+                metrics: {
+                  requests_sent: 0,
+                  responses_received: 0,
+                  avg_response_time_ms: 0,
+                  error_count: 0,
+                  bytes_sent: 0,
+                  bytes_received: 0,
+                  uptime_seconds: 0,
+                },
+              };
+
+              update(state => {
+                const newServers = new Map(state.servers);
+                newServers.set(serverConfig.id, newServerInfo);
+                return { ...state, servers: newServers };
+              });
+            }
+
+            // ✅ Now connect to the server (both new and existing go through here)
+            console.log(`🔌 Connecting to server: ${serverConfig.name}`);
+            const serverInfo: ServerInfo = await withTimeout(
+              invoke('connect_server', { serverConfig }),
+              30000,
+              'Server connection timed out'
+            );
+
+            // ✅ Single update - replace the server with connected info
+            update(state => {
+              const newServers = new Map(state.servers);
+              newServers.set(serverInfo.id, serverInfo);
+              return {
+                ...state,
+                servers: newServers,
+                loading: false,
+                selectedServerId: serverInfo.id,
+              };
+            });
+
+            console.log(`✅ Successfully connected to: ${serverConfig.name}`);
+            return serverInfo;
+          } catch (error) {
+            logger.error('❌ Failed to connect server:', error);
+
+            // ✅ Update the server to error status (by ID if possible, name as fallback)
+            update(state => {
+              const newServers = new Map(state.servers);
+              // Try to find by ID first
+              const serverId = config.id || Array.from(state.servers.values()).find(s => s.config.name === config.name)?.id;
+
+              if (serverId) {
+                const server = newServers.get(serverId);
+                if (server) {
+                  newServers.set(serverId, {
+                    ...server,
+                    status: 'error' as const
+                  });
+                }
+              }
+
+              return {
+                ...state,
+                servers: newServers,
+                loading: false,
+                error: `Failed to connect: ${error}`
+              };
+            });
+
+            throw error;
+          }
+        },
+        30000 // 30 second timeout for entire operation
+      );
     },
 
-    // Disconnect from a server
+    // ✅ FIXED: Disconnect from a server with timeout
     async disconnectServer(serverId: string) {
       try {
-        await invoke('disconnect_server', { serverId });
+        await withTimeout(
+          invoke('disconnect_server', { serverId }),
+          15000,
+          'Disconnect timed out'
+        );
+
+        // ✅ NEW: Update Map
+        update(state => {
+          const newServers = new Map(state.servers);
+          const server = newServers.get(serverId);
+          if (server) {
+            newServers.set(serverId, {
+              ...server,
+              status: 'disconnected' as const
+            });
+          }
+          return {
+            ...state,
+            servers: newServers,
+            selectedServerId: state.selectedServerId === serverId ? undefined : state.selectedServerId,
+          };
+        });
+      } catch (error) {
+        logger.error('❌ Failed to disconnect server:', error);
         update(state => ({
           ...state,
-          servers: state.servers.map(s =>
-            s.id === serverId ? { ...s, status: 'disconnected' as const } : s
-          ),
-          selectedServerId: state.selectedServerId === serverId ? undefined : state.selectedServerId,
-        }));
-      } catch (error) {
-        console.error('Failed to disconnect server:', error);
-        update(state => ({ 
-          ...state, 
-          error: `Failed to disconnect: ${error}` 
+          error: `Failed to disconnect: ${error}`
         }));
         throw error;
       }
     },
 
-    // Create a new server configuration
+    // ✅ FIXED: Create a new server configuration (now with Map and timeout)
     async createServerConfig(
       name: string,
       description: string | undefined,
@@ -248,16 +391,20 @@ function createServerStore() {
       environmentVariables: Record<string, string>
     ) {
       try {
-        const config: ServerConfig = await invoke('create_server_config', {
-          request: {
-            name,
-            description,
-            transport: transportConfig,
-            environment_variables: environmentVariables,
-          }
-        });
+        const config: ServerConfig = await withTimeout(
+          invoke('create_server_config', {
+            request: {
+              name,
+              description,
+              transport: transportConfig,
+              environment_variables: environmentVariables,
+            }
+          }),
+          30000,
+          'Server creation timed out'
+        );
 
-        // Add the new configuration to the server list as disconnected
+        // ✅ NEW: Add to Map as disconnected
         const newServerInfo: ServerInfo = {
           id: config.id,
           config,
@@ -275,14 +422,16 @@ function createServerStore() {
           },
         };
 
-        update(state => ({
-          ...state,
-          servers: [...state.servers.filter(s => s.id !== config.id), newServerInfo]
-        }));
+        update(state => {
+          const newServers = new Map(state.servers);
+          newServers.set(config.id, newServerInfo);
+          return { ...state, servers: newServers };
+        });
 
+        console.log(`✅ Created server config: ${name}`);
         return config;
       } catch (error) {
-        console.error('Failed to create server config:', error);
+        logger.error('❌ Failed to create server config:', error);
         update(state => ({
           ...state,
           error: `Failed to create configuration: ${error}`
@@ -291,20 +440,26 @@ function createServerStore() {
       }
     },
 
-    // Save an existing server configuration
+    // ✅ FIXED: Save an existing server configuration (with Map and timeout)
     async saveServerConfig(config: ServerConfig) {
       try {
-        await invoke('save_server_config', { config });
+        await withTimeout(
+          invoke('save_server_config', { config }),
+          30000,
+          'Save operation timed out'
+        );
 
-        // Update the server in the store
-        update(state => ({
-          ...state,
-          servers: state.servers.map(s =>
-            s.id === config.id ? { ...s, config } : s
-          )
-        }));
+        // ✅ NEW: Update in Map
+        update(state => {
+          const newServers = new Map(state.servers);
+          const server = newServers.get(config.id);
+          if (server) {
+            newServers.set(config.id, { ...server, config });
+          }
+          return { ...state, servers: newServers };
+        });
       } catch (error) {
-        console.error('Failed to save server config:', error);
+        logger.error('❌ Failed to save server config:', error);
         update(state => ({
           ...state,
           error: `Failed to save configuration: ${error}`
@@ -313,7 +468,7 @@ function createServerStore() {
       }
     },
 
-    // Update an existing server configuration
+    // ✅ FIXED: Update an existing server configuration (with Map and timeout)
     async updateServerConfig(
       id: string,
       name: string,
@@ -322,27 +477,34 @@ function createServerStore() {
       environment_variables: Record<string, string>
     ) {
       try {
-        const updatedConfig: ServerConfig = await invoke('update_server_config', {
-          request: {
-            id,
-            name,
-            description,
-            transport,
-            environment_variables
+        const updatedConfig: ServerConfig = await withTimeout(
+          invoke('update_server_config', {
+            request: {
+              id,
+              name,
+              description,
+              transport,
+              environment_variables
+            }
+          }),
+          30000,
+          'Update operation timed out'
+        );
+
+        // ✅ NEW: Update in Map
+        update(state => {
+          const newServers = new Map(state.servers);
+          const server = newServers.get(id);
+          if (server) {
+            newServers.set(id, { ...server, config: updatedConfig });
           }
+          return { ...state, servers: newServers };
         });
 
-        // Update the server in the store with the returned config
-        update(state => ({
-          ...state,
-          servers: state.servers.map(s =>
-            s.id === id ? { ...s, config: updatedConfig } : s
-          )
-        }));
-
+        console.log(`✅ Updated server config: ${name}`);
         return updatedConfig;
       } catch (error) {
-        console.error('Failed to update server config:', error);
+        logger.error('❌ Failed to update server config:', error);
         update(state => ({
           ...state,
           error: `Failed to update configuration: ${error}`
@@ -351,19 +513,40 @@ function createServerStore() {
       }
     },
 
-    // Delete a server configuration
+    // ✅ FIXED: Delete a server configuration with timeout
     async deleteServerConfig(serverId: string) {
       try {
-        await invoke('delete_server_config', { serverId });
+        logger.debug(`🗑️ deleteServerConfig called for serverId: ${serverId}`);
 
-        // Remove from the store
-        update(state => ({
-          ...state,
-          servers: state.servers.filter(s => s.id !== serverId),
-          selectedServerId: state.selectedServerId === serverId ? undefined : state.selectedServerId
-        }));
+        // Call Tauri backend to delete from database
+        logger.debug('📡 Invoking Tauri command: delete_server_config');
+        await withTimeout(
+          invoke('delete_server_config', { serverId }),
+          30000,
+          'Delete operation timed out'
+        );
+        logger.debug('✅ Tauri command completed successfully');
+
+        // ✅ NEW: Remove from Map
+        logger.debug('🗺️ Removing server from local store Map...');
+        update(state => {
+          const newServers = new Map(state.servers);
+          const existed = newServers.has(serverId);
+          newServers.delete(serverId);
+          logger.debug(`Server ${existed ? 'existed and was' : 'did not exist, not'} removed from Map`);
+          logger.debug(`Map size: ${state.servers.size} → ${newServers.size}`);
+          return {
+            ...state,
+            servers: newServers,
+            selectedServerId: state.selectedServerId === serverId ? undefined : state.selectedServerId
+          };
+        });
+
+        logger.info(`✅ Successfully deleted server: ${serverId}`);
       } catch (error) {
-        console.error('Failed to delete server config:', error);
+        logger.error('❌ Failed to delete server config:', error);
+        logger.error('Error type:', typeof error);
+        logger.error('Error details:', JSON.stringify(error, null, 2));
         update(state => ({
           ...state,
           error: `Failed to delete configuration: ${error}`
@@ -384,7 +567,7 @@ function createServerStore() {
         const result: boolean = await invoke('test_server_config', { request });
         return result;
       } catch (error) {
-        console.error('Failed to test server config:', error);
+        logger.error('Failed to test server config:', error);
         throw error;
       }
     },
@@ -443,7 +626,7 @@ function createServerStore() {
           toolExecutions: [execution, ...state.toolExecutions].slice(0, 100) // Keep last 100 executions
         }));
 
-        console.error('Failed to call tool:', error);
+        logger.error('Failed to call tool:', error);
         throw error;
       }
     },
@@ -454,7 +637,7 @@ function createServerStore() {
         const tools: ToolDefinition[] = await invoke('list_tools', { serverId });
         return tools;
       } catch (error) {
-        console.error('Failed to list tools:', error);
+        logger.error('Failed to list tools:', error);
         throw error;
       }
     },
@@ -464,7 +647,7 @@ function createServerStore() {
         const prompts: any[] = await invoke('list_prompts', { serverId });
         return prompts;
       } catch (error) {
-        console.error('Failed to list prompts:', error);
+        logger.error('Failed to list prompts:', error);
         throw error;
       }
     },
@@ -474,7 +657,7 @@ function createServerStore() {
         const resources: any[] = await invoke('list_resources', { serverId });
         return resources;
       } catch (error) {
-        console.error('Failed to list resources:', error);
+        logger.error('Failed to list resources:', error);
         throw error;
       }
     },
@@ -484,7 +667,8 @@ function createServerStore() {
       let currentState: ServerStoreState;
       subscribe(state => currentState = state)(); // Get current state without subscribing
 
-      const server = currentState!.servers.find(s => s.id === serverId);
+      // ✅ FIXED: Get from Map instead of .find()
+      const server = currentState!.servers.get(serverId);
       return server?.config.name || 'Unknown Server';
     },
 
@@ -520,9 +704,8 @@ function createServerStore() {
       return execution;
     },
 
-    // Handle MCP events from backend
+    // ✅ FIXED: Handle MCP events from backend (with Map)
     handleMcpEvent(event: any) {
-
       // Handle Rust enum serialization - the variant name becomes the key
       if (event.StatusChanged) {
         // Validate status field to prevent runtime errors (handle case sensitivity)
@@ -533,44 +716,65 @@ function createServerStore() {
             ? statusLower as 'connected' | 'disconnected' | 'connecting' | 'error'
             : 'error';
 
-        update(state => ({
-          ...state,
-          servers: state.servers.map(s =>
-            s.id === event.StatusChanged.server_id ? { ...s, status: validStatus } : s
-          ),
-        }));
+        update(state => {
+          const newServers = new Map(state.servers);
+          const server = newServers.get(event.StatusChanged.server_id);
+          if (server) {
+            newServers.set(event.StatusChanged.server_id, { ...server, status: validStatus });
+          }
+          return { ...state, servers: newServers };
+        });
       } else if (event.CapabilitiesUpdated) {
-        update(state => ({
-          ...state,
-          servers: state.servers.map(s =>
-            s.id === event.CapabilitiesUpdated.server_id ? { ...s, capabilities: event.CapabilitiesUpdated.capabilities } : s
-          ),
-        }));
+        update(state => {
+          const newServers = new Map(state.servers);
+          const server = newServers.get(event.CapabilitiesUpdated.server_id);
+          if (server) {
+            newServers.set(event.CapabilitiesUpdated.server_id, {
+              ...server,
+              capabilities: event.CapabilitiesUpdated.capabilities
+            });
+          }
+          return { ...state, servers: newServers };
+        });
       } else if (event.MetricsUpdated) {
-        update(state => ({
-          ...state,
-          servers: state.servers.map(s =>
-            s.id === event.MetricsUpdated.server_id ? { ...s, metrics: event.MetricsUpdated.metrics } : s
-          ),
-        }));
+        update(state => {
+          const newServers = new Map(state.servers);
+          const server = newServers.get(event.MetricsUpdated.server_id);
+          if (server) {
+            newServers.set(event.MetricsUpdated.server_id, {
+              ...server,
+              metrics: event.MetricsUpdated.metrics
+            });
+          }
+          return { ...state, servers: newServers };
+        });
       } else if (event.ProcessUpdated) {
-        update(state => ({
-          ...state,
-          servers: state.servers.map(s =>
-            s.id === event.ProcessUpdated.server_id ? { ...s, process_info: event.ProcessUpdated.process_info } : s
-          ),
-        }));
+        update(state => {
+          const newServers = new Map(state.servers);
+          const server = newServers.get(event.ProcessUpdated.server_id);
+          if (server) {
+            newServers.set(event.ProcessUpdated.server_id, {
+              ...server,
+              process_info: event.ProcessUpdated.process_info
+            });
+          }
+          return { ...state, servers: newServers };
+        });
       } else if (event.Error) {
-        console.error('MCP Connection Error:', event.Error);
-        console.error('MCP Error details:', JSON.stringify(event.Error, null, 2));
-        update(state => ({
-          ...state,
-          servers: state.servers.map(s =>
-            s.id === event.Error.server_id ? { ...s, status: 'error' as const } : s
-          ),
-          error: `MCP Error: ${event.Error.error}`
-        }));
-      } else {
+        logger.error('❌ MCP Connection Error:', event.Error);
+        logger.error('MCP Error details:', JSON.stringify(event.Error, null, 2));
+        update(state => {
+          const newServers = new Map(state.servers);
+          const server = newServers.get(event.Error.server_id);
+          if (server) {
+            newServers.set(event.Error.server_id, { ...server, status: 'error' as const });
+          }
+          return {
+            ...state,
+            servers: newServers,
+            error: `MCP Error: ${event.Error.error}`
+          };
+        });
       }
     },
 
@@ -584,9 +788,9 @@ function createServerStore() {
       update(state => ({ ...state, error: undefined }));
     },
 
-    // Get selected server
+    // ✅ FIXED: Get selected server (with Map)
     getSelectedServer(state: ServerStoreState) {
-      return state.servers.find(s => s.id === state.selectedServerId);
+      return state.selectedServerId ? state.servers.get(state.selectedServerId) : undefined;
     },
 
     // Get tool execution history (non-reactive read-only access)
@@ -630,7 +834,7 @@ function createServerStore() {
           this.loadTemplates()
         ]);
       } catch (error) {
-        console.error('❌ Server store initialization failed:', error);
+        logger.error('❌ Server store initialization failed:', error);
         throw error;
       } finally {
         update(state => ({ ...state, initializing: false }));

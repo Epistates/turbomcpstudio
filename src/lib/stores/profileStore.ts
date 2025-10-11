@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { uiStore } from './uiStore';
+import { createLogger } from '$lib/utils/logger';
 
 // ============================================================================
 // TYPES
@@ -108,6 +109,7 @@ const initialState: ProfileStoreState = {
 
 function createProfileStore() {
   const { subscribe, set, update } = writable<ProfileStoreState>(initialState);
+  const logger = createLogger('ProfileStore');
 
   return {
     subscribe,
@@ -259,7 +261,7 @@ function createProfileStore() {
         const activeProfile = await invoke<ActiveProfileState | null>('get_active_profile');
         update((state) => ({ ...state, activeProfile }));
       } catch (error) {
-        console.error('Failed to load active profile:', error);
+        logger.error('Failed to load active profile:', error);
         update((state) => ({ ...state, activeProfile: null }));
       }
     },

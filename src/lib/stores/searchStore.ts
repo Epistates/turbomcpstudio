@@ -127,7 +127,10 @@ function createSearchStore() {
     // Get current server data from serverStore
     let servers: any[] = [];
     const unsubscribe = serverStore.subscribe(state => {
-      servers = state.servers;
+      // ✅ FIXED: Convert Map to array
+      servers = state.servers instanceof Map
+        ? Array.from(state.servers.values())
+        : [];
     });
     unsubscribe();
 

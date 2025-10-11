@@ -8,6 +8,9 @@
 
 import { open, type OpenDialogOptions } from '@tauri-apps/plugin-dialog';
 import { TIMEOUTS } from '$lib/constants';
+import { createLogger } from '$lib/utils/logger';
+
+const logger = createLogger('FilePicker');
 
 /**
  * Pick a file or directory with automatic modal suppression
@@ -37,7 +40,7 @@ export async function pickFile(
 
     return result;
   } catch (error) {
-    console.error('File picker error:', error);
+    logger.error('File picker error:', error);
     throw error;
   } finally {
     // Restore modal state

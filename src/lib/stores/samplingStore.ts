@@ -8,6 +8,7 @@
 import { writable, derived } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { createLogger } from '$lib/utils/logger';
 
 // ============================================================================
 // TYPES
@@ -85,6 +86,7 @@ const initialState: SamplingStoreState = {
 
 function createSamplingStore() {
 	const { subscribe, set, update } = writable<SamplingStoreState>(initialState);
+	const logger = createLogger('SamplingStore');
 
 	// Initialize event listener immediately
 	let eventUnlisten: (() => void) | null = null;
@@ -93,8 +95,6 @@ function createSamplingStore() {
 		try {
 			eventUnlisten = await listen<PendingSamplingRequest>('sampling_requested', (event) => {
 				const request = event.payload;
-
-				console.log('🎯 Sampling request received:', request);
 
 				update((state) => ({
 					...state,
@@ -109,10 +109,8 @@ function createSamplingStore() {
 					});
 				}, 0);
 			});
-
-			console.log('✅ Sampling event listener initialized');
 		} catch (error) {
-			console.error('❌ Failed to initialize sampling event listener:', error);
+			logger.error('Failed to initialize sampling event listener:', error);
 		}
 	};
 
@@ -162,8 +160,6 @@ function createSamplingStore() {
 					history: [completed, ...state.history],
 					loading: false
 				}));
-
-				console.log('✅ Sampling request approved:', requestId);
 			} catch (error) {
 				update((s) => ({
 					...s,
@@ -171,7 +167,7 @@ function createSamplingStore() {
 					error: error instanceof Error ? error.message : String(error)
 				}));
 
-				console.error('❌ Failed to approve sampling request:', error);
+				logger.error('Failed to approve sampling request:', error);
 				throw error;
 			}
 		},
@@ -217,8 +213,6 @@ function createSamplingStore() {
 					history: [completed, ...state.history],
 					loading: false
 				}));
-
-				console.log('❌ Sampling request rejected:', requestId, reason);
 			} catch (error) {
 				update((s) => ({
 					...s,
@@ -226,7 +220,7 @@ function createSamplingStore() {
 					error: error instanceof Error ? error.message : String(error)
 				}));
 
-				console.error('❌ Failed to reject sampling request:', error);
+				logger.error('Failed to reject sampling request:', error);
 				throw error;
 			}
 		},
@@ -281,8 +275,6 @@ function createSamplingStore() {
 					history: [completed, ...state.history],
 					loading: false
 				}));
-
-				console.log('✅ Manual sampling response submitted:', requestId);
 			} catch (error) {
 				update((s) => ({
 					...s,
@@ -290,7 +282,7 @@ function createSamplingStore() {
 					error: error instanceof Error ? error.message : String(error)
 				}));
 
-				console.error('❌ Failed to submit manual sampling response:', error);
+				logger.error('Failed to submit manual sampling response:', error);
 				throw error;
 			}
 		},

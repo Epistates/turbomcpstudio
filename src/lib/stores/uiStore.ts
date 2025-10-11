@@ -2,6 +2,19 @@ import { writable } from 'svelte/store';
 
 export type View = 'dashboard' | 'servers' | 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | 'protocol' | 'collections' | 'settings';
 
+/**
+ * ✅ NEW: Unified modal state structure
+ * Each modal has: open (visibility), loading (operation state), requestId (deduplication)
+ */
+export interface ModalState {
+  open: boolean;
+  loading: boolean;
+  requestId: string | null;
+}
+
+// ✅ Export the type for external use
+export type { ModalState as ModalStateType };
+
 interface UiStoreState {
   currentView: View;
   sidebarCollapsed: boolean;
@@ -12,12 +25,13 @@ interface UiStoreState {
     timeout?: number;
   };
   loading: boolean;
+  // ✅ NEW: Modal state with loading and request tracking
   modals: {
-    addServer: boolean;
-    serverConfig: boolean;
-    toolCall: boolean;
-    profileEditor: boolean;
-    samplingApproval: boolean;
+    addServer: ModalState;
+    serverConfig: ModalState;
+    toolCall: ModalState;
+    profileEditor: ModalState;
+    samplingApproval: ModalState;
   };
   // Sampling approval modal state
   pendingSamplingRequest?: any;
@@ -30,18 +44,28 @@ interface UiStoreState {
   };
 }
 
+/**
+ * ✅ NEW: Helper to create initial modal state
+ */
+const createModalState = (): ModalState => ({
+  open: false,
+  loading: false,
+  requestId: null,
+});
+
 const initialState: UiStoreState = {
   currentView: 'dashboard',
   sidebarCollapsed: false,
   error: undefined,
   notification: undefined,
   loading: false,
+  // ✅ NEW: Initialize all modals with proper state structure
   modals: {
-    addServer: false,
-    serverConfig: false,
-    toolCall: false,
-    profileEditor: false,
-    samplingApproval: false,
+    addServer: createModalState(),
+    serverConfig: createModalState(),
+    toolCall: createModalState(),
+    profileEditor: createModalState(),
+    samplingApproval: createModalState(),
   },
   pendingSamplingRequest: undefined,
   editingProfileId: undefined,
@@ -56,9 +80,7 @@ function createUiStore() {
 
     // Navigate to a different view
     setView(view: View) {
-      console.log('🟢 uiStore.setView called with:', view);
       update(state => {
-        console.log('🟢 uiStore updating state from:', state.currentView, 'to:', view);
         return { ...state, currentView: view };
       });
     },
@@ -106,33 +128,95 @@ function createUiStore() {
       update(state => ({ ...state, notification: undefined }));
     },
 
-    // Modal management
+    // ✅ NEW: Enhanced modal management with loading state
     openModal(modal: keyof UiStoreState['modals']) {
       update(state => ({
         ...state,
-        modals: { ...state.modals, [modal]: true },
+        modals: {
+          ...state.modals,
+          [modal]: { open: true, loading: false, requestId: null },
+        },
       }));
     },
 
-    closeModal(modal: keyof UiStoreState['modals']) {
+    closeModal(modal: keyof UiStoreState['modals'], force = false) {
+      update(state => {
+        const modalState = state.modals[modal];
+
+        // ✅ NEW: Prevent closing if loading (unless forced)
+        if (modalState.loading && !force) {
+          console.warn(`⚠️ Cannot close ${modal} modal while loading. Use force=true to override.`);
+          return state;
+        }
+
+        return {
+          ...state,
+          modals: {
+            ...state.modals,
+            [modal]: { open: false, loading: false, requestId: null },
+          },
+        };
+      });
+    },
+
+    // ✅ NEW: Set modal loading state with request tracking
+    setModalLoading(
+      modal: keyof UiStoreState['modals'],
+      loading: boolean,
+      requestId?: string
+    ) {
       update(state => ({
         ...state,
-        modals: { ...state.modals, [modal]: false },
+        modals: {
+          ...state.modals,
+          [modal]: {
+            ...state.modals[modal],
+            loading,
+            requestId: requestId || null,
+          },
+        },
       }));
+    },
+
+    // ✅ NEW: Check if modal is loading
+    isModalLoading(modal: keyof UiStoreState['modals']): boolean {
+      let isLoading = false;
+      subscribe(state => {
+        isLoading = state.modals[modal].loading;
+      })(); // Immediately unsubscribe
+      return isLoading;
     },
 
     closeAllModals() {
       update(state => ({
         ...state,
         modals: {
-          addServer: false,
-          serverConfig: false,
-          toolCall: false,
-          profileEditor: false,
-          samplingApproval: false,
+          addServer: createModalState(),
+          serverConfig: createModalState(),
+          toolCall: createModalState(),
+          profileEditor: createModalState(),
+          samplingApproval: createModalState(),
         },
         editingProfileId: undefined,
         pendingSamplingRequest: undefined,
+      }));
+    },
+
+    // ✅ NEW: Emergency force close all modals (ignores loading state)
+    forceCloseAllModals() {
+      console.warn('🚨 Force closing all modals (emergency escape)');
+      update(state => ({
+        ...state,
+        modals: {
+          addServer: createModalState(),
+          serverConfig: createModalState(),
+          toolCall: createModalState(),
+          profileEditor: createModalState(),
+          samplingApproval: createModalState(),
+        },
+        editingProfileId: undefined,
+        pendingSamplingRequest: undefined,
+        loading: false,
       }));
     },
 
@@ -140,7 +224,10 @@ function createUiStore() {
     showSamplingApproval(request: any) {
       update(state => ({
         ...state,
-        modals: { ...state.modals, samplingApproval: true },
+        modals: {
+          ...state.modals,
+          samplingApproval: { open: true, loading: false, requestId: null },
+        },
         pendingSamplingRequest: request,
       }));
     },
@@ -148,7 +235,10 @@ function createUiStore() {
     closeSamplingApproval() {
       update(state => ({
         ...state,
-        modals: { ...state.modals, samplingApproval: false },
+        modals: {
+          ...state.modals,
+          samplingApproval: { open: false, loading: false, requestId: null },
+        },
         pendingSamplingRequest: undefined,
       }));
     },
@@ -157,7 +247,10 @@ function createUiStore() {
     openProfileEditor(profileId?: string | null) {
       update(state => ({
         ...state,
-        modals: { ...state.modals, profileEditor: true },
+        modals: {
+          ...state.modals,
+          profileEditor: { open: true, loading: false, requestId: null },
+        },
         editingProfileId: profileId,
         currentView: 'servers', // Navigate to servers view
       }));
@@ -166,7 +259,10 @@ function createUiStore() {
     closeProfileEditor() {
       update(state => ({
         ...state,
-        modals: { ...state.modals, profileEditor: false },
+        modals: {
+          ...state.modals,
+          profileEditor: { open: false, loading: false, requestId: null },
+        },
         editingProfileId: undefined,
       }));
     },
@@ -208,9 +304,6 @@ function createUiStore() {
       this.setView('protocol');
       // TODO: If messageId provided, scroll to and select that message in timeline
       // This would require protocol store integration
-      if (messageId) {
-        console.log('📍 Jumping to protocol message:', messageId);
-      }
     },
   };
 }
