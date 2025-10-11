@@ -495,10 +495,16 @@ pub async fn activate_profile(
 
                 drop(db_lock);
 
-                // Try to connect
-                match mcp_manager.connect_server(server_config).await {
-                    Ok(_) => Ok(server_id_clone),
-                    Err(e) => Err((server_id_clone, e.to_string())),
+                // ✅ Try to connect with timeout (30 seconds per server)
+                match tokio::time::timeout(
+                    tokio::time::Duration::from_secs(30),
+                    mcp_manager.connect_server(server_config),
+                )
+                .await
+                {
+                    Ok(Ok(_)) => Ok(server_id_clone),
+                    Ok(Err(e)) => Err((server_id_clone, e.to_string())),
+                    Err(_) => Err((server_id_clone, "Connection timed out after 30 seconds".to_string())),
                 }
             }));
         }

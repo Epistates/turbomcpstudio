@@ -89,6 +89,8 @@ pub struct PendingSamplingRequest {
     pub estimated_cost: Option<f64>,
     pub estimated_tokens: Option<u32>,
     pub created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry_count: Option<u32>,
 }
 
 /// Studio sampling handler with human-in-the-loop
@@ -103,8 +105,11 @@ pub struct StudioSamplingHandler {
     /// Pending requests awaiting approval
     pending_requests: Arc<DashMap<String, PendingSamplingRequest>>,
 
-    /// Response channels for async communication
-    response_channels: Arc<DashMap<String, tokio::sync::oneshot::Sender<CreateMessageResult>>>,
+    /// Response channels for async communication (supports both success and rejection)
+    response_channels: Arc<DashMap<String, tokio::sync::oneshot::Sender<Result<CreateMessageResult, String>>>>,
+
+    /// Request hash tracking for retry detection (maps content hash → (request_id, count))
+    request_hashes: Arc<DashMap<String, (String, u32)>>,
 
     /// LLM configuration manager for actual LLM calls
     llm_config: Arc<LLMConfigManager>,
@@ -126,6 +131,7 @@ impl StudioSamplingHandler {
             app_handle,
             pending_requests: Arc::new(DashMap::new()),
             response_channels: Arc::new(DashMap::new()),
+            request_hashes: Arc::new(DashMap::new()),
             llm_config,
             db,
         }
@@ -213,7 +219,7 @@ impl StudioSamplingHandler {
             match llm_config.invoke_llm_directly(approved_request, None).await {
                 Ok(result) => {
                     tracing::info!("✅ LLM call succeeded for request: {}", request_id);
-                    if tx.send(result).is_err() {
+                    if tx.send(Ok(result)).is_err() {
                         tracing::error!(
                             "❌ Failed to send LLM response (channel closed): {}",
                             request_id
@@ -221,8 +227,12 @@ impl StudioSamplingHandler {
                     }
                 }
                 Err(e) => {
-                    tracing::error!("❌ LLM call failed for request {}: {}", request_id, e);
-                    // Channel will be dropped, causing receiver to get an error
+                    let error_msg = format!("LLM call failed: {}", e);
+                    tracing::error!("❌ {} for request: {}", error_msg, request_id);
+                    // Send error through channel (will become JSON-RPC error)
+                    if tx.send(Err(error_msg)).is_err() {
+                        tracing::error!("❌ Failed to send LLM error (channel closed): {}", request_id);
+                    }
                 }
             }
         });
@@ -251,8 +261,8 @@ impl StudioSamplingHandler {
             .ok_or_else(|| format!("No pending channel for request: {}", request_id))?
             .1;
 
-        // Send manual response directly through channel
-        if tx.send(manual_response).is_err() {
+        // Send manual response as success through channel
+        if tx.send(Ok(manual_response)).is_err() {
             tracing::error!(
                 "❌ Failed to send manual response (channel closed): {}",
                 request_id
@@ -277,9 +287,23 @@ impl StudioSamplingHandler {
         // Remove from pending
         self.pending_requests.remove(&request_id);
 
-        // Remove and drop channel (causes receiver to error)
-        self.response_channels.remove(&request_id);
+        // Get response channel
+        let tx = self
+            .response_channels
+            .remove(&request_id)
+            .ok_or_else(|| format!("No pending channel for request: {}", request_id))?
+            .1;
 
+        // Send rejection error through channel (will become JSON-RPC error)
+        if tx.send(Err(reason.clone())).is_err() {
+            tracing::error!(
+                "❌ Failed to send rejection (channel closed): {}",
+                request_id
+            );
+            return Err("Channel closed".to_string());
+        }
+
+        tracing::info!("✅ Rejection sent for request: {} - {}", request_id, reason);
         Ok(())
     }
 }
@@ -327,6 +351,42 @@ impl SamplingHandler for StudioSamplingHandler {
             }
         }
 
+        // Detect retries by hashing request content
+        let request_hash = {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
+            let mut hasher = DefaultHasher::new();
+            // Hash key components to detect retries
+            server_context.server_id.hash(&mut hasher);
+            request.messages.len().hash(&mut hasher);
+            if let Some(first_msg) = request.messages.first() {
+                // ContentBlock is an enum, extract text from Text variant
+                match &first_msg.content {
+                    turbomcp_protocol::types::ContentBlock::Text(text_content) => {
+                        text_content.text.hash(&mut hasher);
+                    },
+                    _ => {
+                        // For non-text content, hash a placeholder
+                        "non-text-content".hash(&mut hasher);
+                    }
+                }
+            }
+            format!("{:x}", hasher.finish())
+        };
+
+        let retry_count = if let Some(mut entry) = self.request_hashes.get_mut(&request_hash) {
+            // We've seen this request before - it's a retry!
+            let (prev_id, count) = &mut *entry;
+            *count += 1;
+            *prev_id = request_id.clone(); // Update to current request ID
+            tracing::info!("🔄 Detected retry #{} for request content hash: {}", count, &request_hash[..8]);
+            Some(*count)
+        } else {
+            // First time seeing this request
+            self.request_hashes.insert(request_hash.clone(), (request_id.clone(), 1));
+            None
+        };
+
         // Create pending request
         let pending = PendingSamplingRequest {
             request_id: request_id.clone(),
@@ -336,6 +396,7 @@ impl SamplingHandler for StudioSamplingHandler {
             estimated_cost: self.estimate_cost(&request),
             estimated_tokens: self.estimate_tokens(&request),
             created_at: chrono::Utc::now().to_rfc3339(),
+            retry_count,
         };
 
         // Store pending request
@@ -363,6 +424,7 @@ impl SamplingHandler for StudioSamplingHandler {
             "estimatedCost": pending.estimated_cost,
             "estimatedTokens": pending.estimated_tokens,
             "createdAt": pending.created_at,
+            "retryCount": pending.retry_count,
         });
 
         self.app_handle
@@ -381,7 +443,9 @@ impl SamplingHandler for StudioSamplingHandler {
                 self.response_channels.remove(&request_id);
                 "Timeout waiting for user approval (5 minutes)"
             })?
-            .map_err(|_| "Channel closed before receiving response - user likely rejected")?;
+            .map_err(|_| "Channel closed before receiving response")?
+            // Unwrap inner Result - if Err, this is the user's rejection reason
+            ?;
 
         tracing::info!("🎉 Sampling request completed: {}", request_id);
 
