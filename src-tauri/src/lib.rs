@@ -26,12 +26,22 @@ pub struct AppState {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Initialize logging
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
-
     tauri::Builder::default()
+        // Initialize logging with tauri-plugin-log
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .level_for("turbomcpstudio", log::LevelFilter::Debug)
+                .level_for("turbomcp", log::LevelFilter::Debug)
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                        file_name: Some("mcp-studio".to_string()),
+                    }),
+                ])
+                .build(),
+        )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_fs::init())
@@ -73,8 +83,13 @@ pub fn run() {
             // Defer heavy initialization to background task
             let app_handle_clone = app_handle.clone();
             let database_clone = database.clone();
+            let mcp_manager_clone = mcp_manager.clone();
             tauri::async_runtime::spawn(async move {
                 tracing::info!("Starting background initialization");
+
+                // Start background monitoring loop for MCP connections (must be in async context)
+                let _monitoring_handle = mcp_manager_clone.start_monitoring();
+                tracing::info!("MCP connection monitoring loop started");
 
                 // Heavy initialization in background
                 // Use simple path without spaces to avoid SQLite issues

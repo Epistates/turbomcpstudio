@@ -161,6 +161,13 @@ impl McpTransportClient {
         }
     }
 
+    // ✅ NOTE: process_message() method removed - no longer needed in turbomcp-client v2.0+
+    // The MessageDispatcher background task automatically handles all server-initiated requests
+    // (elicitation, sampling, notifications) without requiring manual message processing loops.
+    //
+    // The dispatcher starts automatically when Client::new() is called and runs until
+    // the client is dropped. This provides zero-configuration bidirectional communication.
+
     /// Get a specific prompt from the MCP server (transport-agnostic)
     pub async fn get_prompt(
         &self,
@@ -346,177 +353,157 @@ impl McpTransportClient {
     // Servers request roots from clients, not vice versa
     // Clients should implement roots handler to respond to server requests
 
-    /// Register an elicitation handler for server user input requests (TurboMCP 1.0.10)
+    /// Register an elicitation handler for server user input requests (TurboMCP 2.0)
     /// Enables servers to request additional information from users during interactions
     #[allow(dead_code)]
-    pub async fn register_elicitation_handler(&self, handler: Arc<dyn ElicitationHandler>) {
+    pub fn register_elicitation_handler(&self, handler: Arc<dyn ElicitationHandler>) {
         match self {
-            McpTransportClient::Stdio(client) => client.on_elicitation(handler),
+            McpTransportClient::Stdio(client) => client.set_elicitation_handler(handler),
 
-            McpTransportClient::ChildProcess(client) => client.on_elicitation(handler),
+            McpTransportClient::ChildProcess(client) => client.set_elicitation_handler(handler),
 
             #[cfg(feature = "http")]
-            McpTransportClient::Http(client) => client.on_elicitation(handler),
+            McpTransportClient::Http(client) => client.set_elicitation_handler(handler),
 
             #[cfg(feature = "websocket")]
-            McpTransportClient::WebSocket(client) => client.on_elicitation(handler),
+            McpTransportClient::WebSocket(client) => client.set_elicitation_handler(handler),
 
             #[cfg(feature = "tcp")]
-            McpTransportClient::Tcp(client) => client.on_elicitation(handler),
+            McpTransportClient::Tcp(client) => client.set_elicitation_handler(handler),
 
             #[cfg(feature = "unix")]
-            McpTransportClient::Unix(client) => client.on_elicitation(handler),
+            McpTransportClient::Unix(client) => client.set_elicitation_handler(handler),
         }
     }
 
-    /// Register a progress handler for server progress notifications (TurboMCP 1.0.10)
+    /// Register a progress handler for server progress notifications (TurboMCP 2.0)
     /// Receives updates about long-running operations on the server
     #[allow(dead_code)]
-    pub async fn register_progress_handler(&self, handler: Arc<dyn ProgressHandler>) {
+    pub fn register_progress_handler(&self, handler: Arc<dyn ProgressHandler>) {
         match self {
-            McpTransportClient::Stdio(client) => client.on_progress(handler),
+            McpTransportClient::Stdio(client) => client.set_progress_handler(handler),
 
-            McpTransportClient::ChildProcess(client) => client.on_progress(handler),
+            McpTransportClient::ChildProcess(client) => client.set_progress_handler(handler),
 
             #[cfg(feature = "http")]
-            McpTransportClient::Http(client) => client.on_progress(handler),
+            McpTransportClient::Http(client) => client.set_progress_handler(handler),
 
             #[cfg(feature = "websocket")]
-            McpTransportClient::WebSocket(client) => client.on_progress(handler),
+            McpTransportClient::WebSocket(client) => client.set_progress_handler(handler),
 
             #[cfg(feature = "tcp")]
-            McpTransportClient::Tcp(client) => client.on_progress(handler),
+            McpTransportClient::Tcp(client) => client.set_progress_handler(handler),
 
             #[cfg(feature = "unix")]
-            McpTransportClient::Unix(client) => client.on_progress(handler),
+            McpTransportClient::Unix(client) => client.set_progress_handler(handler),
         }
     }
 
-    /// Register a log handler for server log messages (TurboMCP 1.0.10)
+    /// Register a log handler for server log messages (TurboMCP 2.0)
     /// Routes server log messages to client logging system
     #[allow(dead_code)]
-    pub async fn register_log_handler(&self, handler: Arc<dyn LogHandler>) {
+    pub fn register_log_handler(&self, handler: Arc<dyn LogHandler>) {
         match self {
-            McpTransportClient::Stdio(client) => client.on_log(handler),
+            McpTransportClient::Stdio(client) => client.set_log_handler(handler),
 
-            McpTransportClient::ChildProcess(client) => client.on_log(handler),
+            McpTransportClient::ChildProcess(client) => client.set_log_handler(handler),
 
             #[cfg(feature = "http")]
-            McpTransportClient::Http(client) => client.on_log(handler),
+            McpTransportClient::Http(client) => client.set_log_handler(handler),
 
             #[cfg(feature = "websocket")]
-            McpTransportClient::WebSocket(client) => client.on_log(handler),
+            McpTransportClient::WebSocket(client) => client.set_log_handler(handler),
 
             #[cfg(feature = "tcp")]
-            McpTransportClient::Tcp(client) => client.on_log(handler),
+            McpTransportClient::Tcp(client) => client.set_log_handler(handler),
 
             #[cfg(feature = "unix")]
-            McpTransportClient::Unix(client) => client.on_log(handler),
+            McpTransportClient::Unix(client) => client.set_log_handler(handler),
         }
     }
 
-    /// Register a resource update handler for resource change notifications (TurboMCP 1.0.10)
+    /// Register a resource update handler for resource change notifications (TurboMCP 2.0)
     /// Receives notifications when subscribed resources change on the server
     #[allow(dead_code)]
-    pub async fn register_resource_update_handler(&self, handler: Arc<dyn ResourceUpdateHandler>) {
+    pub fn register_resource_update_handler(&self, handler: Arc<dyn ResourceUpdateHandler>) {
         match self {
-            McpTransportClient::Stdio(client) => client.on_resource_update(handler),
+            McpTransportClient::Stdio(client) => client.set_resource_update_handler(handler),
 
-            McpTransportClient::ChildProcess(client) => client.on_resource_update(handler),
+            McpTransportClient::ChildProcess(client) => client.set_resource_update_handler(handler),
 
             #[cfg(feature = "http")]
-            McpTransportClient::Http(client) => client.on_resource_update(handler),
+            McpTransportClient::Http(client) => client.set_resource_update_handler(handler),
 
             #[cfg(feature = "websocket")]
-            McpTransportClient::WebSocket(client) => client.on_resource_update(handler),
+            McpTransportClient::WebSocket(client) => client.set_resource_update_handler(handler),
 
             #[cfg(feature = "tcp")]
-            McpTransportClient::Tcp(client) => client.on_resource_update(handler),
+            McpTransportClient::Tcp(client) => client.set_resource_update_handler(handler),
 
             #[cfg(feature = "unix")]
-            McpTransportClient::Unix(client) => client.on_resource_update(handler),
+            McpTransportClient::Unix(client) => client.set_resource_update_handler(handler),
         }
     }
 
-    /// Check if an elicitation handler is registered (TurboMCP 1.0.10)
-    pub async fn has_elicitation_handler(&self) -> bool {
+    /// Check if an elicitation handler is registered (TurboMCP 2.0)
+    pub fn has_elicitation_handler(&self) -> bool {
         match self {
             McpTransportClient::Stdio(client) => client.has_elicitation_handler(),
-
             McpTransportClient::ChildProcess(client) => client.has_elicitation_handler(),
-
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.has_elicitation_handler(),
-
             #[cfg(feature = "websocket")]
             McpTransportClient::WebSocket(client) => client.has_elicitation_handler(),
-
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.has_elicitation_handler(),
-
             #[cfg(feature = "unix")]
             McpTransportClient::Unix(client) => client.has_elicitation_handler(),
         }
     }
 
-    /// Check if a progress handler is registered (TurboMCP 1.0.10)
-    pub async fn has_progress_handler(&self) -> bool {
+    /// Check if a progress handler is registered (TurboMCP 2.0)
+    pub fn has_progress_handler(&self) -> bool {
         match self {
             McpTransportClient::Stdio(client) => client.has_progress_handler(),
-
             McpTransportClient::ChildProcess(client) => client.has_progress_handler(),
-
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.has_progress_handler(),
-
             #[cfg(feature = "websocket")]
             McpTransportClient::WebSocket(client) => client.has_progress_handler(),
-
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.has_progress_handler(),
-
             #[cfg(feature = "unix")]
             McpTransportClient::Unix(client) => client.has_progress_handler(),
         }
     }
 
-    /// Check if a log handler is registered (TurboMCP 1.0.10)
-    pub async fn has_log_handler(&self) -> bool {
+    /// Check if a log handler is registered (TurboMCP 2.0)
+    pub fn has_log_handler(&self) -> bool {
         match self {
             McpTransportClient::Stdio(client) => client.has_log_handler(),
-
             McpTransportClient::ChildProcess(client) => client.has_log_handler(),
-
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.has_log_handler(),
-
             #[cfg(feature = "websocket")]
             McpTransportClient::WebSocket(client) => client.has_log_handler(),
-
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.has_log_handler(),
-
             #[cfg(feature = "unix")]
             McpTransportClient::Unix(client) => client.has_log_handler(),
         }
     }
 
-    /// Check if a resource update handler is registered (TurboMCP 1.0.10)
-    pub async fn has_resource_update_handler(&self) -> bool {
+    /// Check if a resource update handler is registered (TurboMCP 2.0)
+    pub fn has_resource_update_handler(&self) -> bool {
         match self {
             McpTransportClient::Stdio(client) => client.has_resource_update_handler(),
-
             McpTransportClient::ChildProcess(client) => client.has_resource_update_handler(),
-
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.has_resource_update_handler(),
-
             #[cfg(feature = "websocket")]
             McpTransportClient::WebSocket(client) => client.has_resource_update_handler(),
-
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.has_resource_update_handler(),
-
             #[cfg(feature = "unix")]
             McpTransportClient::Unix(client) => client.has_resource_update_handler(),
         }

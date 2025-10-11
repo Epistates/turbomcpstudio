@@ -450,10 +450,59 @@ impl Database {
 
     /// Delete a server configuration
     pub async fn delete_server_config(&self, id: Uuid) -> McpResult<()> {
-        sqlx::query("DELETE FROM server_configs WHERE id = ?")
-            .bind(id.to_string())
+        log::debug!("🗄️ Executing DELETE query for id: {}", id);
+
+        let id_str = id.to_string();
+
+        // ✅ FIXED: Delete from profile_servers first (foreign key dependency)
+        log::debug!("🔗 Removing server from all profiles...");
+        let profile_result = sqlx::query("DELETE FROM profile_servers WHERE server_id = ?")
+            .bind(&id_str)
             .execute(&self.pool)
             .await?;
+
+        if profile_result.rows_affected() > 0 {
+            log::info!("✅ Removed server from {} profile(s)", profile_result.rows_affected());
+        } else {
+            log::debug!("ℹ️ Server was not part of any profiles");
+        }
+
+        // ✅ FIXED: Delete from message_history (another foreign key)
+        log::debug!("💬 Removing message history...");
+        let history_result = sqlx::query("DELETE FROM message_history WHERE server_id = ?")
+            .bind(&id_str)
+            .execute(&self.pool)
+            .await?;
+
+        if history_result.rows_affected() > 0 {
+            log::info!("✅ Deleted {} message(s)", history_result.rows_affected());
+        }
+
+        // ✅ FIXED: Delete from server_sessions (another foreign key)
+        log::debug!("📊 Removing server sessions...");
+        let session_result = sqlx::query("DELETE FROM server_sessions WHERE server_id = ?")
+            .bind(&id_str)
+            .execute(&self.pool)
+            .await?;
+
+        if session_result.rows_affected() > 0 {
+            log::info!("✅ Deleted {} session(s)", session_result.rows_affected());
+        }
+
+        // Now delete the server config itself
+        log::debug!("🗑️ Deleting server configuration...");
+        let result = sqlx::query("DELETE FROM server_configs WHERE id = ?")
+            .bind(&id_str)
+            .execute(&self.pool)
+            .await?;
+
+        log::debug!("📊 DELETE query result: rows_affected = {}", result.rows_affected());
+
+        if result.rows_affected() == 0 {
+            log::warn!("⚠️ No rows affected - server {} may not exist in database", id);
+        } else {
+            log::info!("✅ Successfully deleted server configuration from database");
+        }
 
         Ok(())
     }

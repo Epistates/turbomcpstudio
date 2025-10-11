@@ -67,7 +67,7 @@ impl Initialization {
             server_context,
             elicitation_handler,
         ));
-        client.on_elicitation(elicitation_context_handler);
+        client.set_elicitation_handler(elicitation_context_handler);
         tracing::info!(
             "✅ Elicitation handler registered successfully - {} server can now send elicitation requests",
             transport_name

@@ -41,10 +41,15 @@ impl MonitoringLoop {
             let mut interval = tokio::time::interval(Duration::from_secs(5));
             let mut health_check_interval = tokio::time::interval(Duration::from_secs(30)); // Health checks every 30s
 
+            // ✅ NOTE: Message processing loop removed - turbomcp-client v2.0+ handles this automatically
+            // The MessageDispatcher background task now routes all server-initiated requests (elicitation, sampling)
+            // No manual process_message() calls needed!
+
             tracing::info!("Enhanced MCP connection monitoring started with health checks");
 
             loop {
                 tokio::select! {
+                    // Message processing removed - handled automatically by turbomcp-client dispatcher
                     _ = interval.tick() => {
                         // Update system information and metrics
                         system.write().refresh_all();

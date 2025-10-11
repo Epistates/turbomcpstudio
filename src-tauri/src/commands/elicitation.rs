@@ -21,16 +21,20 @@ pub async fn send_elicitation_response(
         .and_then(|v| v.as_str())
         .ok_or_else(|| "Missing 'action' field".to_string())?;
 
-    let action = match action_str {
-        "accept" => turbomcp_client::handlers::ElicitationAction::Accept,
-        "decline" => turbomcp_client::handlers::ElicitationAction::Decline,
-        "cancel" => turbomcp_client::handlers::ElicitationAction::Cancel,
+    // Use factory methods based on action
+    let response = match action_str {
+        "accept" => {
+            // Extract content and convert to HashMap
+            let content_map: std::collections::HashMap<String, serde_json::Value> = response_data
+                .get("content")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            turbomcp_client::handlers::ElicitationResponse::accept(content_map)
+        }
+        "decline" => turbomcp_client::handlers::ElicitationResponse::decline(),
+        "cancel" => turbomcp_client::handlers::ElicitationResponse::cancel(),
         _ => return Err(format!("Invalid action: {}", action_str)),
     };
-
-    let content = response_data.get("content").cloned();
-
-    let response = turbomcp_client::handlers::ElicitationResponse { action, content };
 
     // Submit response through the elicitation handler
     app_state

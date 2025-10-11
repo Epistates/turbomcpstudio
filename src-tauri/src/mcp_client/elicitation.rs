@@ -115,18 +115,28 @@ impl ElicitationHandler for StudioElicitationHandler {
         let start = Instant::now();
 
         tracing::info!(
-            "Received elicitation request: {} - {}",
-            request.id,
-            request.prompt
+            "Received elicitation request: {:?} - {}",
+            request.id(),
+            request.message()
         );
 
         // Get server context
         let server_context = self.get_server_context();
 
+        // Convert request ID to string early for use throughout
+        let request_id_str = request.id().to_string();
+
         // Capture incoming request for protocol inspector
         let protocol_msg_id = Uuid::new_v4();
         if let Some(db) = self.db.read().await.as_ref() {
-            let request_json = serde_json::to_string(&request)
+            // Serialize a summary of the request for logging
+            let request_summary = serde_json::json!({
+                "id": &request_id_str,
+                "message": request.message(),
+                "timeout_ms": request.timeout().map(|d| d.as_millis()),
+                "cancellable": request.is_cancellable(),
+            });
+            let request_json = serde_json::to_string(&request_summary)
                 .unwrap_or_else(|_| "Failed to serialize request".to_string());
             let size_bytes = request_json.len() as i64;
 
@@ -151,19 +161,29 @@ impl ElicitationHandler for StudioElicitationHandler {
             }
         }
 
+        // Store request with ID as string key (request_id_str defined earlier)
         self.pending_requests
-            .insert(request.id.clone(), request.clone());
+            .insert(request_id_str.clone(), request.clone());
 
         let (tx, rx) = tokio::sync::oneshot::channel();
-        self.response_channels.insert(request.id.clone(), tx);
+        self.response_channels.insert(request_id_str.clone(), tx);
+
+        // Serialize schema for event (typed schema → Value for JSON)
+        let schema_value = serde_json::to_value(request.schema())
+            .unwrap_or_else(|_| serde_json::Value::Null);
+
+        // Convert timeout to seconds for display
+        let timeout_secs = request.timeout().map(|d| d.as_secs());
 
         let event_payload = serde_json::json!({
-            "id": request.id,
+            "id": request_id_str,
             "protocolMessageId": protocol_msg_id.to_string(),  // For Protocol Inspector correlation
-            "message": request.prompt,
-            "requestedSchema": request.schema,
-            "timeout": request.timeout,
-            "metadata": request.metadata,
+            "serverId": server_context.server_id.to_string(),  // Server that initiated the request
+            "serverName": server_context.server_name,  // Human-readable server name
+            "message": request.message(),
+            "requestedSchema": schema_value,
+            "timeout": timeout_secs,
+            // Removed metadata - not in protocol
         });
 
         self.app_handle
@@ -172,16 +192,19 @@ impl ElicitationHandler for StudioElicitationHandler {
                 message: format!("Failed to emit event: {}", e),
             })?;
 
-        tracing::info!("Emitted elicitation_requested event for: {}", request.id);
+        tracing::info!("Emitted elicitation_requested event for: {}", request_id_str);
+
+        // Use timeout from request (Duration) or default to 5 minutes
+        let timeout_duration = request.timeout().unwrap_or(Duration::from_secs(300));
 
         let response =
-            tokio::time::timeout(Duration::from_secs(request.timeout.unwrap_or(300)), rx)
+            tokio::time::timeout(timeout_duration, rx)
                 .await
                 .map_err(|_| {
-                    self.pending_requests.remove(&request.id);
-                    self.response_channels.remove(&request.id);
+                    self.pending_requests.remove(&request_id_str);
+                    self.response_channels.remove(&request_id_str);
                     HandlerError::Timeout {
-                        timeout_seconds: request.timeout.unwrap_or(300),
+                        timeout_seconds: timeout_duration.as_secs(),
                     }
                 })?
                 .map_err(|_| HandlerError::Generic {
@@ -190,15 +213,24 @@ impl ElicitationHandler for StudioElicitationHandler {
 
         tracing::info!(
             "Received elicitation response for: {} - action: {:?}",
-            request.id,
-            response.action
+            request_id_str,
+            response.action()
         );
 
         // Capture outgoing response for protocol inspector
         let processing_time_ms = start.elapsed().as_millis() as i64;
         if let Some(db) = self.db.read().await.as_ref() {
             let msg_id = Uuid::new_v4();
-            let response_json = serde_json::to_string(&response)
+            // Serialize the action/content for logging (not the full protocol type)
+            let response_summary = serde_json::json!({
+                "action": match response.action() {
+                    turbomcp_client::handlers::ElicitationAction::Accept => "accept",
+                    turbomcp_client::handlers::ElicitationAction::Decline => "decline",
+                    turbomcp_client::handlers::ElicitationAction::Cancel => "cancel",
+                },
+                "content": response.content(),
+            });
+            let response_json = serde_json::to_string(&response_summary)
                 .unwrap_or_else(|_| "Failed to serialize response".to_string());
             let size_bytes = response_json.len() as i64;
 

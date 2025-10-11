@@ -125,10 +125,10 @@ impl MiscOperations {
         })?;
 
         // Check all handler registration statuses
-        let elicitation_handler = client.has_elicitation_handler().await;
-        let progress_handler = client.has_progress_handler().await;
-        let log_handler = client.has_log_handler().await;
-        let resource_update_handler = client.has_resource_update_handler().await;
+        let elicitation_handler = client.has_elicitation_handler();
+        let progress_handler = client.has_progress_handler();
+        let log_handler = client.has_log_handler();
+        let resource_update_handler = client.has_resource_update_handler();
 
         // Update metrics
         *connection.request_count.lock() += 1;
