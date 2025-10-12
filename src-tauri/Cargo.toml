@@ -1,7 +1,7 @@
 [package]
 name = "turbomcpstudio"
 version = "0.1.0"
-description = "Native desktop application for Model Context Protocol development - the Postman for MCP"
+description = "TurboMCP Studio - Native desktop application for Model Context Protocol development - the Postman for MCP"
 authors = ["MCP Studio Team"]
 edition = "2021"
 
@@ -16,11 +16,13 @@ tauri-build = { version = "2.0", features = [] }
 # Tauri core
 tauri = { version = "2.0", features = [] }
 tauri-plugin-opener = "2.0"
+tauri-plugin-shell = "2.0"
 tauri-plugin-sql = { version = "2.0", features = ["sqlite"] }
 tauri-plugin-fs = "2.0"
 tauri-plugin-process = "2.0"
 tauri-plugin-dialog = "2.0"
 tauri-plugin-http = "2.0"
+tauri-plugin-clipboard-manager = "2.0"
 
 # HTTP client for LLM API requests
 reqwest = { version = "0.12", features = ["json"] }
@@ -28,11 +30,11 @@ reqwest = { version = "0.12", features = ["json"] }
 # LLM Provider SDKs
 async-openai = "0.24"  # Official OpenAI SDK for Rust
 
-# TurboMCP integration - using local development version (v2.0 - core merged into protocol)
-turbomcp = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp" }
-turbomcp-client = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp-client" }
-turbomcp-transport = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp-transport", features = ["stdio", "http", "websocket", "tcp", "unix", "compression", "tls"] }
-turbomcp-protocol = { path = "/Users/nickpaterno/work/turbomcp/crates/turbomcp-protocol" }
+# TurboMCP integration - using local repo with error handling fix
+turbomcp = { path = "../../turbomcp/crates/turbomcp" }
+turbomcp-client = { path = "../../turbomcp/crates/turbomcp-client" }
+turbomcp-transport = { path = "../../turbomcp/crates/turbomcp-transport", features = ["stdio", "http", "websocket", "tcp", "unix", "compression", "tls"] }
+turbomcp-protocol = { path = "../../turbomcp/crates/turbomcp-protocol" }
 
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
