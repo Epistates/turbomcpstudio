@@ -6,6 +6,47 @@
 //! - Make LLM completion requests
 
 use serde_json::Value;
+use tauri::Manager;
+
+use serde::{Deserialize, Serialize};
+
+/// Application paths response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppPaths {
+    pub data_directory: String,
+    pub log_directory: String,
+}
+
+/// Get the application data and log directories using Tauri's native path APIs
+#[tauri::command]
+pub async fn get_app_paths(app_handle: tauri::AppHandle) -> Result<AppPaths, String> {
+    // Use Tauri's native path APIs for platform-agnostic directory resolution
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+
+    let log_dir = app_handle
+        .path()
+        .app_log_dir()
+        .map_err(|e| format!("Failed to get app log directory: {}", e))?;
+
+    // Ensure directories exist
+    if !data_dir.exists() {
+        std::fs::create_dir_all(&data_dir)
+            .map_err(|e| format!("Failed to create data directory: {}", e))?;
+    }
+
+    if !log_dir.exists() {
+        std::fs::create_dir_all(&log_dir)
+            .map_err(|e| format!("Failed to create log directory: {}", e))?;
+    }
+
+    Ok(AppPaths {
+        data_directory: data_dir.to_string_lossy().to_string(),
+        log_directory: log_dir.to_string_lossy().to_string(),
+    })
+}
 
 /// Open a URL in the system's default browser
 /// Note: Future feature - not yet registered

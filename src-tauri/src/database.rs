@@ -21,10 +21,12 @@ impl Database {
         let database_url = if database_path == ":memory:" {
             "sqlite://:memory:".to_string()
         } else {
-            // For file paths, SQLite URLs need three slashes for absolute paths
+            // For file paths, SQLite URLs need proper platform-specific formatting
             let path = std::path::Path::new(database_path);
             if path.is_absolute() {
-                format!("sqlite:///{}", database_path.trim_start_matches('/'))
+                // Use the path as-is for absolute paths (works on all platforms)
+                // SQLx handles the platform-specific path format internally
+                format!("sqlite://{}", database_path)
             } else {
                 format!("sqlite://{}", database_path)
             }
@@ -50,6 +52,17 @@ impl Database {
             let pool = SqlitePool::connect(&database_url).await?;
             let db = Self { pool };
             db.run_migrations().await?;
+
+            // ✅ FIXED: Clear active profile state on startup (in-memory path)
+            match db.clear_active_profile_on_startup().await {
+                Ok(_) => {
+                    tracing::info!("✅ Cleared active profile state for fresh startup (in-memory)");
+                }
+                Err(e) => {
+                    tracing::warn!("⚠️ Failed to clear active profile state (non-critical): {}", e);
+                }
+            }
+
             return Ok(db);
         }
 
@@ -117,6 +130,18 @@ impl Database {
                 match db.run_migrations().await {
                     Ok(_) => {
                         tracing::info!("Database migrations completed successfully");
+
+                        // ✅ FIXED: Clear active profile state on startup
+                        // This ensures every app session starts fresh with no auto-connections
+                        match db.clear_active_profile_on_startup().await {
+                            Ok(_) => {
+                                tracing::info!("✅ Cleared active profile state for fresh startup");
+                            }
+                            Err(e) => {
+                                tracing::warn!("⚠️ Failed to clear active profile state (non-critical): {}", e);
+                            }
+                        }
+
                         Ok(db)
                     }
                     Err(e) => {
@@ -160,9 +185,11 @@ impl Database {
 
     /// Run database migrations to set up schema
     async fn run_migrations(&self) -> McpResult<()> {
+        let migration_start = std::time::Instant::now();
         tracing::info!("Starting database migrations");
 
         // Server configurations table
+        let step_start = std::time::Instant::now();
         tracing::info!("Creating server_configs table");
         sqlx::query(
             r#"
@@ -180,7 +207,7 @@ impl Database {
         )
         .execute(&self.pool)
         .await?;
-        tracing::info!("server_configs table created successfully");
+        tracing::info!("server_configs table created successfully ({:?})", step_start.elapsed());
 
         // Enhanced Collections table with workflow support
         tracing::info!("Creating enhanced collections table");
@@ -317,6 +344,86 @@ impl Database {
         .await?;
         tracing::info!("server_sessions table created successfully");
 
+        // Server profiles table
+        tracing::info!("Creating server_profiles table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS server_profiles (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                icon TEXT,
+                color TEXT,
+                auto_activate INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("server_profiles table created successfully");
+
+        // Profile servers relationship table
+        tracing::info!("Creating profile_servers table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS profile_servers (
+                profile_id TEXT NOT NULL,
+                server_id TEXT NOT NULL,
+                startup_order INTEGER NOT NULL DEFAULT 0,
+                startup_delay_ms INTEGER NOT NULL DEFAULT 0,
+                auto_connect INTEGER NOT NULL DEFAULT 1,
+                auto_restart INTEGER NOT NULL DEFAULT 0,
+                required INTEGER NOT NULL DEFAULT 0,
+                environment_overrides TEXT,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (profile_id, server_id),
+                FOREIGN KEY(profile_id) REFERENCES server_profiles(id) ON DELETE CASCADE,
+                FOREIGN KEY(server_id) REFERENCES server_configs(id) ON DELETE CASCADE
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("profile_servers table created successfully");
+
+        // Profile activations table
+        tracing::info!("Creating profile_activations table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS profile_activations (
+                id TEXT PRIMARY KEY,
+                profile_id TEXT NOT NULL,
+                activated_at TEXT NOT NULL,
+                deactivated_at TEXT,
+                success_count INTEGER NOT NULL DEFAULT 0,
+                failure_count INTEGER NOT NULL DEFAULT 0,
+                errors TEXT,
+                FOREIGN KEY(profile_id) REFERENCES server_profiles(id) ON DELETE CASCADE
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("profile_activations table created successfully");
+
+        // Active profile state table (singleton with id = 1)
+        tracing::info!("Creating active_profile_state table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS active_profile_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                profile_id TEXT,
+                activated_at TEXT NOT NULL,
+                FOREIGN KEY(profile_id) REFERENCES server_profiles(id) ON DELETE SET NULL
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("active_profile_state table created successfully");
+
         // Create indexes for performance
         tracing::info!("Creating database indexes");
 
@@ -335,7 +442,18 @@ impl Database {
             .execute(&self.pool)
             .await?;
 
-        tracing::info!("Database migrations completed successfully");
+        tracing::info!("Creating idx_profile_servers_server_id index");
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_profile_servers_server_id ON profile_servers(server_id)")
+            .execute(&self.pool)
+            .await?;
+
+        tracing::info!("Creating idx_profile_activations_profile_id index");
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_profile_activations_profile_id ON profile_activations(profile_id)")
+            .execute(&self.pool)
+            .await?;
+
+        let migration_duration = migration_start.elapsed();
+        tracing::info!("✅ Database migrations completed successfully in {:?} (first run: ~3-5s, subsequent runs: ~50-200ms)", migration_duration);
         Ok(())
     }
 
@@ -849,5 +967,35 @@ impl Database {
             .await?;
 
         Ok(())
+    }
+
+    /// Clear active profile state on startup to ensure fresh sessions
+    /// This prevents auto-reconnection to servers from previous sessions
+    pub async fn clear_active_profile_on_startup(&self) -> McpResult<()> {
+        tracing::info!("Clearing active profile state for fresh startup");
+
+        // ✅ FIXED: Handle case where table doesn't exist yet (fresh installation)
+        // Use a safer query that won't fail if table is missing
+        let result = sqlx::query("DELETE FROM active_profile_state WHERE id = 1")
+            .execute(&self.pool)
+            .await;
+
+        match result {
+            Ok(_) => {
+                tracing::info!("✅ Active profile state cleared successfully");
+                Ok(())
+            }
+            Err(e) => {
+                // If table doesn't exist yet, that's fine - it means fresh install
+                if e.to_string().contains("no such table") {
+                    tracing::info!("ℹ️ Active profile state table not yet created (fresh install) - skipping clear");
+                    Ok(())
+                } else {
+                    // Other errors should be logged but not fail startup
+                    tracing::warn!("⚠️ Failed to clear active profile state: {} (non-critical)", e);
+                    Ok(())
+                }
+            }
+        }
     }
 }

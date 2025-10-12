@@ -11,7 +11,7 @@ use turbomcp_client::{Client, ClientBuilder, ConnectionConfig};
 use turbomcp_protocol::capabilities::builders::ClientCapabilitiesBuilder;
 use turbomcp_transport::Transport;
 
-// Plugin system ready for TurboMCP 1.1.0
+// Plugin system ready for TurboMCP 2.0.0-rc.1
 #[cfg(feature = "plugins")]
 use turbomcp_client::plugins::{
     CacheConfig, CachePlugin, MetricsPlugin, PluginConfig, RetryConfig, RetryPlugin,
@@ -98,7 +98,7 @@ impl Configuration {
 
     /// Configure client capabilities with type-state builders for compile-time validation
     ///
-    /// Uses TurboMCP 1.1.0 type-state capability builders to ensure:
+    /// Uses TurboMCP 2.0.0-rc.1 type-state capability builders to ensure:
     /// - Compile-time validation of capability combinations
     /// - Sub-capabilities only available when parent enabled
     /// - TurboMCP exclusive features (LLM provider, UI capabilities)
@@ -111,7 +111,7 @@ impl Configuration {
     /// - **LLM Provider**: OpenAI GPT-4 (TurboMCP exclusive)
     /// - **UI Capabilities**: Form, dialog, toast (TurboMCP exclusive)
     pub fn configure_client_capabilities() -> turbomcp_protocol::types::ClientCapabilities {
-        // Use TurboMCP 1.1.0 type-state capability builders for compile-time validation
+        // Use TurboMCP 2.0.0-rc.1 type-state capability builders for compile-time validation
         let client_caps = ClientCapabilitiesBuilder::new()
             .enable_experimental() // Enables experimental capability state
             .enable_roots() // Enables roots capability state (for MCP Studio file access)

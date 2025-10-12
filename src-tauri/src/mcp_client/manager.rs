@@ -108,7 +108,11 @@ impl McpClientManager {
 
         tracing::info!("MCP Client Manager initialized - ready for enterprise connections");
         tracing::info!("Available transports: STDIO, HTTP, WebSocket, TCP, Unix");
-        tracing::info!("TurboMCP v1.1.0 integration ready with plugin and LLM registry support");
+        tracing::info!(
+            "TurboMCP v{} (protocol: {}) integration ready with plugin and LLM registry support",
+            turbomcp_client::VERSION,
+            turbomcp_protocol::PROTOCOL_VERSION
+        );
         tracing::info!("Elicitation handler initialized with protocol logging");
         tracing::info!("Sampling handler initialized with HITL approval and protocol logging");
 

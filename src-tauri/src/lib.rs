@@ -43,11 +43,13 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
 
@@ -85,18 +87,18 @@ pub fn run() {
             let database_clone = database.clone();
             let mcp_manager_clone = mcp_manager.clone();
             tauri::async_runtime::spawn(async move {
+                let bg_init_start = std::time::Instant::now();
                 tracing::info!("Starting background initialization");
 
                 // Start background monitoring loop for MCP connections (must be in async context)
                 let _monitoring_handle = mcp_manager_clone.start_monitoring();
                 tracing::info!("MCP connection monitoring loop started");
 
-                // Heavy initialization in background
-                // Use simple path without spaces to avoid SQLite issues
-                let app_data_dir = match std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
-                    Ok(home) => std::path::PathBuf::from(home).join(".turbomcpstudio"),
-                    Err(_) => {
-                        // Final fallback
+                // Use Tauri's native path APIs for platform-agnostic directory resolution
+                let app_data_dir = match app_handle_clone.path().app_data_dir() {
+                    Ok(path) => path,
+                    Err(e) => {
+                        tracing::error!("Failed to get app data directory: {}, using fallback", e);
                         std::path::PathBuf::from(".").join(".turbomcpstudio")
                     }
                 };
@@ -193,7 +195,8 @@ pub fn run() {
                     tracing::info!("LLM providers initialized");
                 }
 
-                tracing::info!("MCP Studio background initialization complete");
+                let bg_init_duration = bg_init_start.elapsed();
+                tracing::info!("✅ MCP Studio background initialization complete in {:?}", bg_init_duration);
 
                 // Emit ready event to frontend
                 let _ = app_handle_clone.emit("app-ready", ());
@@ -296,6 +299,8 @@ pub fn run() {
             // LLM API commands (avoids CORS issues)
             commands::fetch_llm_models,
             commands::llm_completion_request,
+            // Application utility commands
+            commands::get_app_paths,
             // Server Profile commands (enterprise server management)
             commands::create_server_profile,
             commands::update_server_profile,

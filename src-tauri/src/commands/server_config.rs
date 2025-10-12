@@ -143,8 +143,13 @@ pub async fn test_server_config(
                         return Err(format!("Executable not found: {}", command));
                     }
                 } else {
-                    // Try to find in PATH using 'which' command
-                    match Command::new("which").arg(&command).output() {
+                    // Try to find in PATH using platform-specific command
+                    #[cfg(target_os = "windows")]
+                    let which_cmd = "where";
+                    #[cfg(not(target_os = "windows"))]
+                    let which_cmd = "which";
+
+                    match Command::new(which_cmd).arg(&command).output() {
                         Ok(output) if output.status.success() => {}
                         _ => {
                             return Err(format!(
@@ -185,10 +190,21 @@ pub async fn test_server_config(
                             actual_command, actual_working_dir
                         ))
                     } else if e.kind() == std::io::ErrorKind::PermissionDenied {
-                        Err(format!(
-                            "Permission denied executing '{}'. Try: chmod +x {}",
+                        #[cfg(target_os = "windows")]
+                        let permission_hint = format!(
+                            "Permission denied executing '{}'.\n\
+                            Please check:\n\
+                            • File permissions in Windows Explorer\n\
+                            • Antivirus or security software may be blocking execution",
+                            actual_command
+                        );
+                        #[cfg(not(target_os = "windows"))]
+                        let permission_hint = format!(
+                            "Permission denied executing '{}'.\n\
+                            Try: chmod +x {}",
                             actual_command, actual_command
-                        ))
+                        );
+                        Err(permission_hint)
                     } else {
                         Err(format!(
                             "Failed to test executable '{}': {}\n\

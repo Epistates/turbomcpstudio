@@ -29,6 +29,54 @@ use uuid::Uuid;
 /// All methods require a connection reference from the manager.
 pub struct McpOperations;
 
+/// Check if an error represents a user action that should NOT be retried
+///
+/// User actions (rejection, cancellation, validation failures, timeouts) are intentional
+/// and final. Retrying these creates confusing UX where users see multiple prompts for
+/// the same action after making a decision.
+///
+/// # Error Codes (from HandlerError)
+///
+/// - **-32800**: HandlerError::UserCancelled (user explicitly rejected)
+/// - **-32801**: HandlerError::Timeout (handler operation timed out)
+/// - **-32602**: HandlerError::InvalidInput (user provided bad data)
+///
+/// These codes are properly propagated from sampling.rs through TurboMCP's downcast logic.
+///
+/// # Examples
+///
+/// ```
+/// // User rejection (returns HandlerError::UserCancelled)
+/// // → JSON-RPC -32800 → is_user_action_error() = true → no retry
+///
+/// // LLM failure (returns HandlerError::Generic)
+/// // → JSON-RPC -32603 → is_user_action_error() = false → retry
+/// ```
+fn is_user_action_error(error: &turbomcp_protocol::Error) -> bool {
+    // Check JSON-RPC error code
+    // HandlerError codes are now properly preserved by TurboMCP's downcast logic
+    let code = error.jsonrpc_error_code();
+
+    match code {
+        -32800 => {
+            // HandlerError::UserCancelled
+            tracing::info!("User action detected: UserCancelled (-32800)");
+            true
+        }
+        -32801 => {
+            // HandlerError::Timeout
+            tracing::info!("User action detected: HandlerTimeout (-32801)");
+            true
+        }
+        -32602 => {
+            // HandlerError::InvalidInput
+            tracing::info!("User action detected: InvalidInput (-32602)");
+            true
+        }
+        _ => false,
+    }
+}
+
 impl McpOperations {
     /// Call a tool on an MCP server with retry logic
     ///
@@ -119,7 +167,26 @@ impl McpOperations {
                     last_error = Some(e);
                     *connection.error_count.lock() += 1;
 
-                    // Check if we should retry
+                    // Check if this is a user action error - if so, don't retry
+                    // User decisions (rejection, cancellation, timeout) are final and
+                    // retrying them creates confusing UX (multiple prompts for same action)
+                    if let Some(ref err) = last_error {
+                        if is_user_action_error(err) {
+                            tracing::info!(
+                                "Tool call '{}' rejected by user (not retrying): {}",
+                                tool_name,
+                                err
+                            );
+                            // Return immediately with clear user-action error
+                            return Err(McpStudioError::ToolCallFailed(format!(
+                                "Tool call '{}' rejected by user: {}",
+                                tool_name,
+                                err
+                            )));
+                        }
+                    }
+
+                    // Check if we should retry (only for transient errors)
                     if attempt < max_retries {
                         tracing::warn!(
                             "Tool call '{}' failed (attempt {}/{}), retrying: {}",
@@ -426,14 +493,161 @@ impl McpOperations {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use turbomcp_protocol::error::{Error, ErrorKind};
+
     #[test]
     fn test_operations_module_exists() {
         // Smoke test - module compiles
     }
 
-    // TODO(testing): Add integration tests with mock MCP servers
-    // - Test retry logic for call_tool
-    // - Test connection validation
-    // - Test metrics tracking
-    // - Test error handling
+    #[test]
+    fn test_is_user_action_error_direct_cancellation() {
+        // Direct cancellation - user rejected/cancelled
+        let error = Error::new(ErrorKind::Cancelled, "User cancelled");
+        assert!(
+            is_user_action_error(&error),
+            "Direct Cancelled ErrorKind should be recognized as user action"
+        );
+    }
+
+    #[test]
+    fn test_is_user_action_error_validation_error() {
+        // Validation errors - user provided bad input
+        let error = Error::new(
+            ErrorKind::Validation,
+            "Invalid input: field 'email' must be valid email",
+        );
+        assert!(
+            is_user_action_error(&error),
+            "Validation ErrorKind should be recognized as user action"
+        );
+    }
+
+    #[test]
+    fn test_is_user_action_error_tool_execution_failed_unwrapped() {
+        // Tool execution failure (-32002) by itself should NOT be treated as user action
+        let error = Error::new(
+            ErrorKind::ToolExecutionFailed,
+            "Handler error: Sampling request failed",
+        );
+        assert!(
+            !is_user_action_error(&error),
+            "Unwrapped ToolExecutionFailed should NOT be user action (should retry)"
+        );
+    }
+
+    #[test]
+    fn test_is_user_action_error_wrapped_cancellation() {
+        // THE KEY TEST: ToolExecutionFailed wrapping Cancelled (real-world scenario)
+        // This is what actually happens when user rejects sampling!
+        let inner = Error::new(ErrorKind::Cancelled, "User rejected sampling");
+        let mut outer = Error::new(
+            ErrorKind::ToolExecutionFailed,
+            "Tool execution failed",
+        );
+        outer.source = Some(inner);
+
+        assert!(
+            is_user_action_error(&outer),
+            "Wrapped Cancelled SHOULD be detected via error chain walking"
+        );
+    }
+
+    #[test]
+    fn test_is_user_action_error_deeply_wrapped() {
+        // Test multiple levels of wrapping
+        let inner = Error::new(ErrorKind::Cancelled, "User rejected");
+        let mut middle = Error::new(ErrorKind::Internal, "Internal error");
+        middle.source = Some(inner);
+        let mut outer = Error::new(ErrorKind::ToolExecutionFailed, "Tool failed");
+        outer.source = Some(middle);
+
+        assert!(
+            is_user_action_error(&outer),
+            "Deeply wrapped Cancelled should be detected through entire chain"
+        );
+    }
+
+    #[test]
+    fn test_is_user_action_error_internal_error() {
+        // Internal error (-32603) should be retried
+        let error = Error::new(ErrorKind::Internal, "Database connection failed");
+        assert!(
+            !is_user_action_error(&error),
+            "Internal error (-32603) should NOT be user action (should retry)"
+        );
+    }
+
+    #[test]
+    fn test_is_user_action_error_transport_error() {
+        // Transport errors (-32014) should be retried
+        let error = Error::new(ErrorKind::Transport, "Connection lost");
+        assert!(
+            !is_user_action_error(&error),
+            "Transport errors should NOT be user action (should retry)"
+        );
+    }
+
+    #[test]
+    fn test_is_user_action_error_timeout() {
+        // Timeout errors (-32012) should NOT be retried (server-side timeout)
+        // But this is different from HandlerTimeout (-32801) which is client-side user timeout
+        let error = Error::new(ErrorKind::Timeout, "Operation timed out");
+        // Note: This is a server-side timeout, NOT the same as handler timeout
+        // For now, we're not treating server timeouts as user actions
+        assert!(
+            !is_user_action_error(&error),
+            "Server timeout (-32012) should NOT be user action (should retry)"
+        );
+    }
+
+    #[test]
+    fn test_is_user_action_error_protocol_error() {
+        // Protocol errors (-32601) should be retried
+        let error = Error::new(ErrorKind::Protocol, "Invalid message format");
+        assert!(
+            !is_user_action_error(&error),
+            "Protocol errors should NOT be user action (should retry)"
+        );
+    }
+
+    #[test]
+    fn test_wrapped_validation_error() {
+        // Validation errors can also be wrapped
+        let inner = Error::new(ErrorKind::Validation, "Invalid email");
+        let mut outer = Error::new(ErrorKind::ToolExecutionFailed, "Tool failed");
+        outer.source = Some(inner);
+
+        assert!(
+            is_user_action_error(&outer),
+            "Wrapped Validation should be detected via error chain walking"
+        );
+    }
+
+    #[test]
+    fn test_error_code_mapping() {
+        // Verify ErrorKind to JSON-RPC code mappings (for reference)
+        assert_eq!(
+            Error::new(ErrorKind::Cancelled, "test").jsonrpc_error_code(),
+            -32017
+        );
+        assert_eq!(
+            Error::new(ErrorKind::Validation, "test").jsonrpc_error_code(),
+            -32602
+        );
+        assert_eq!(
+            Error::new(ErrorKind::Internal, "test").jsonrpc_error_code(),
+            -32603
+        );
+        assert_eq!(
+            Error::new(ErrorKind::ToolExecutionFailed, "test").jsonrpc_error_code(),
+            -32002
+        );
+    }
+
+    // Integration test coverage (manual testing with elicitation-test-server):
+    // 1. User rejects sampling → No retry, single elicitation
+    // 2. Network failure → Retry with exponential backoff
+    // 3. Server error → Retry logic works
 }

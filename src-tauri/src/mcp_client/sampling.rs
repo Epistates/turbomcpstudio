@@ -37,6 +37,7 @@ use serde::Serialize;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::Emitter;
+use turbomcp_client::handlers::HandlerError;
 use turbomcp_client::sampling::SamplingHandler;
 use turbomcp_protocol::types::{CreateMessageRequest, CreateMessageResult};
 use uuid::Uuid;
@@ -106,7 +107,8 @@ pub struct StudioSamplingHandler {
     pending_requests: Arc<DashMap<String, PendingSamplingRequest>>,
 
     /// Response channels for async communication (supports both success and rejection)
-    response_channels: Arc<DashMap<String, tokio::sync::oneshot::Sender<Result<CreateMessageResult, String>>>>,
+    /// Uses Box<dyn Error> for errors to preserve error type information (e.g., HandlerError::UserCancelled)
+    response_channels: Arc<DashMap<String, tokio::sync::oneshot::Sender<Result<CreateMessageResult, Box<dyn std::error::Error + Send + Sync>>>>>,
 
     /// Request hash tracking for retry detection (maps content hash → (request_id, count))
     request_hashes: Arc<DashMap<String, (String, u32)>>,
@@ -227,10 +229,13 @@ impl StudioSamplingHandler {
                     }
                 }
                 Err(e) => {
-                    let error_msg = format!("LLM call failed: {}", e);
-                    tracing::error!("❌ {} for request: {}", error_msg, request_id);
-                    // Send error through channel (will become JSON-RPC error)
-                    if tx.send(Err(error_msg)).is_err() {
+                    tracing::error!("❌ LLM call failed: {} for request: {}", e, request_id);
+                    // Use HandlerError::Generic for LLM failures (retryable)
+                    let llm_error = HandlerError::Generic {
+                        message: format!("LLM call failed: {}", e)
+                    };
+                    let boxed_error: Box<dyn std::error::Error + Send + Sync> = Box::new(llm_error);
+                    if tx.send(Err(boxed_error)).is_err() {
                         tracing::error!("❌ Failed to send LLM error (channel closed): {}", request_id);
                     }
                 }
@@ -294,8 +299,13 @@ impl StudioSamplingHandler {
             .ok_or_else(|| format!("No pending channel for request: {}", request_id))?
             .1;
 
-        // Send rejection error through channel (will become JSON-RPC error)
-        if tx.send(Err(reason.clone())).is_err() {
+        // Send rejection error using HandlerError::UserCancelled
+        // Maps to JSON-RPC error -32800 (user action)
+        // TurboMCP client will preserve this error code via downcast
+        // CRITICAL: This ensures the retry logic recognizes this as a user action and doesn't retry
+        let rejection_error = HandlerError::UserCancelled;
+        let boxed_error: Box<dyn std::error::Error + Send + Sync> = Box::new(rejection_error);
+        if tx.send(Err(boxed_error)).is_err() {
             tracing::error!(
                 "❌ Failed to send rejection (channel closed): {}",
                 request_id
@@ -441,10 +451,17 @@ impl SamplingHandler for StudioSamplingHandler {
             .map_err(|_| {
                 self.pending_requests.remove(&request_id);
                 self.response_channels.remove(&request_id);
-                "Timeout waiting for user approval (5 minutes)"
+                // Return ErrorKind::Timeout for proper error code (-32012)
+                // Timeout waiting for user (5 minutes)
+                Box::new(HandlerError::Timeout { timeout_seconds: 300 }) as Box<dyn std::error::Error + Send + Sync>
             })?
-            .map_err(|_| "Channel closed before receiving response")?
-            // Unwrap inner Result - if Err, this is the user's rejection reason
+            .map_err(|_| {
+                // Channel closed before response - internal error
+                Box::new(HandlerError::Generic {
+                    message: "Channel closed before receiving response".to_string()
+                }) as Box<dyn std::error::Error + Send + Sync>
+            })?
+            // Unwrap inner Result - if Err, this is the user's rejection (HandlerError::UserCancelled)
             ?;
 
         tracing::info!("🎉 Sampling request completed: {}", request_id);
