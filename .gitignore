@@ -1,20 +1,40 @@
-.DS_Store
+# Dependencies
 node_modules
 /build
 /.svelte-kit
 /package
+
+# Environment
 .env
 .env.*
 !.env.example
+
+# Tauri
+src-tauri/target
+src-tauri/gen
+
+# Build artifacts
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-
-.strategy
 debug.log
 
+# OS
+.DS_Store
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea
+
+# Development/Internal docs (not for public repo)
+.strategy
+.ast-grep-rules
+*-test-server
+
+# Keep only public-facing documentation
 *.md
 !README.md
 !CHANGELOG.md
-
-*-test-server
-.ast-grep-rules
+!CONTRIBUTING.md
+!LICENSE

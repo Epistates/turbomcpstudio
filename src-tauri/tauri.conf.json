@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "turbomcpstudio",
+  "productName": "TurboMCP Studio",
   "version": "0.1.0",
-  "identifier": "com.turbomcpstudio.app",
+  "identifier": "com.turbomcpstudio.studio",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "turbomcpstudio",
+        "title": "TurboMCP Studio",
         "width": 800,
         "height": 600
       }
@@ -23,7 +23,7 @@
       "capabilities": [
         {
           "identifier": "default",
-          "description": "Default capabilities for MCP Studio",
+          "description": "Default capabilities for TurboMCP Studio",
           "windows": ["main"],
           "webviews": ["main"],
           "permissions": [
@@ -38,6 +38,52 @@
             "http:default",
             "log:allow-log",
             "log:default",
+            "opener:default",
+            "shell:default",
+            "shell:allow-execute",
+            "shell:allow-open",
+            "clipboard-manager:default",
+            "clipboard-manager:allow-read-text",
+            {
+              "identifier": "shell:allow-execute",
+              "allow": [
+                {
+                  "name": "open-finder",
+                  "cmd": "open",
+                  "args": ["-R", { "validator": ".*" }],
+                  "sidecar": false
+                }
+              ]
+            },
+            {
+              "identifier": "opener:allow-open-path",
+              "allow": [
+                {
+                  "path": "$APPDATA"
+                },
+                {
+                  "path": "$APPDATA/**"
+                },
+                {
+                  "path": "$APPLOG"
+                },
+                {
+                  "path": "$APPLOG/**"
+                },
+                {
+                  "path": "$HOME/Library/Application Support/**"
+                },
+                {
+                  "path": "$HOME/Library/Logs/**"
+                },
+                {
+                  "path": "https://**"
+                },
+                {
+                  "path": "http://**"
+                }
+              ]
+            },
             {
               "identifier": "http:allow-fetch",
               "allow": [
