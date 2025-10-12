@@ -451,8 +451,8 @@ impl SamplingHandler for StudioSamplingHandler {
             .map_err(|_| {
                 self.pending_requests.remove(&request_id);
                 self.response_channels.remove(&request_id);
-                // Return ErrorKind::Timeout for proper error code (-32012)
-                // Timeout waiting for user (5 minutes)
+                // User didn't respond in time (5 minute timeout)
+                // HandlerError::Timeout maps to JSON-RPC -32801
                 Box::new(HandlerError::Timeout { timeout_seconds: 300 }) as Box<dyn std::error::Error + Send + Sync>
             })?
             .map_err(|_| {
