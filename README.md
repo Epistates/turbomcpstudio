@@ -1,31 +1,58 @@
-# MCP Studio
+<div align="center">
+
+<img src="static/turbomcp-studio-logo.png" alt="TurboMCP Studio" width="200"/>
+
+# TurboMCP Studio
 
 **The Postman for Model Context Protocol (MCP)**
 
-A native desktop application for developing, testing, and debugging Model Context Protocol servers. Built with Tauri, SvelteKit, and powered by TurboMCP for enterprise-grade MCP operations.
+A native desktop application for developing, testing, and debugging Model Context Protocol servers.
 
-[![Release](https://img.shields.io/github/v/release/YOUR_ORG/turbomcpstudio)](https://github.com/YOUR_ORG/turbomcpstudio/releases)
+[![Release](https://img.shields.io/github/v/release/Epistates/turbomcpstudio)](https://github.com/Epistates/turbomcpstudio/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Features
+[Download](https://github.com/Epistates/turbomcpstudio/releases/latest) • [Documentation](#documentation) • [Contributing](CONTRIBUTING.md)
 
-### Phase 1 (v0.1.0) - Foundation ✅
-- **Enterprise UI Foundation**: Complete design system with light/dark themes
-- **Native Desktop App**: Built with Tauri 2.0 for macOS, Windows, and Linux
-- **Modern Stack**: SvelteKit 5 with Svelte 5 runes mode and TypeScript
-- **TurboMCP Integration**: Foundation for production-grade MCP operations
-- **Server Management**: Connect, configure, and manage MCP servers
-- **Responsive Design**: Adaptive layouts with mobile support
+</div>
+
+---
+
+## ✨ Why TurboMCP Studio?
+
+- 🚀 **Native Performance** - Built with Rust and Tauri for blazing-fast native desktop experience
+- 🎨 **Beautiful UI** - Modern design system with light/dark themes and responsive layouts
+- 🔌 **Multi-Transport** - STDIO, HTTP, WebSocket, TCP, and Unix socket support
+- 🏢 **Enterprise Ready** - Production-grade error handling and state management
+- 🔒 **Type Safe** - Full TypeScript integration throughout
+- 🌍 **Cross-Platform** - Single codebase for macOS, Windows, and Linux
+
+## 🎯 Quick Start
+
+1. **Download** the latest release for your platform
+2. **Install** and launch TurboMCP Studio
+3. **Connect** to your MCP server
+4. **Explore** tools, resources, and prompts
+5. **Test** your MCP implementation
+
+## 🎯 Features
+
+### Current (v0.1.0)
+
+- ✅ **Server Management** - Connect, configure, and manage MCP servers with ease
+- ✅ **Enterprise UI** - Complete design system with light/dark themes
+- ✅ **Tool Explorer** - Discover and test MCP tools
+- ✅ **Resource Browser** - Navigate and inspect MCP resources
+- ✅ **Prompt Designer** - Create and test MCP prompts
+- ✅ **Protocol Inspector** - Real-time protocol message viewing
+- ✅ **Settings** - Configure application preferences and themes
 
 ### Coming Soon
-- **Tool Explorer**: Auto-generated forms from JSON schemas, response visualization
-- **Resource Browser**: Tree navigation, URI templates, subscription management
-- **Prompt Designer**: Visual composition, variable management, A/B testing
-- **Sampling Debugger**: Step-through debugging, token tracking, conversation history
-- **Elicitation Flow**: Visual workflow designer, conditional logic, form validation
-- **Collections & Testing**: Multi-server operation chains, contract testing, load testing
-- **Protocol Analysis**: Real-time message inspection, flow visualization, replay
-- **Team Collaboration**: Shared workspaces, version control integration
+
+- 🔜 **Advanced Tool Testing** - Auto-generated forms from JSON schemas
+- 🔜 **Collections** - Multi-server operation chains and workflows
+- 🔜 **Testing Framework** - Contract testing and load testing
+- 🔜 **Protocol Analysis** - Flow visualization and message replay
+- 🔜 **Team Collaboration** - Shared workspaces and version control
 
 ## Installation
 
@@ -33,7 +60,7 @@ A native desktop application for developing, testing, and debugging Model Contex
 
 Download the latest release for your platform:
 
-**[→ Download Latest Release](https://github.com/YOUR_ORG/turbomcpstudio/releases/latest)**
+**[→ Download Latest Release](https://github.com/Epistates/turbomcpstudio/releases/latest)**
 
 #### macOS
 - **Universal DMG** (Intel + Apple Silicon): `MCP-Studio_x.x.x_universal.dmg`
@@ -122,7 +149,7 @@ sudo dnf install -y \
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_ORG/turbomcpstudio.git
+git clone https://github.com/Epistates/turbomcpstudio.git
 cd turbomcpstudio
 ```
 
@@ -132,16 +159,10 @@ cd turbomcpstudio
 # Install frontend dependencies
 pnpm install
 
-# TurboMCP dependencies are handled automatically
-# The project uses local path dependencies that point to:
-# /Users/nickpaterno/work/turbomcp/
-#
-# You have two options:
-#
-# Option 1: Clone TurboMCP to the same parent directory
-git clone https://github.com/Epistates/turbomcp.git ../turbomcp
-
-# Option 2: Update Cargo.toml to use git dependencies (see RELEASE.md)
+# TurboMCP dependencies are handled automatically via crates.io
+# If you need the latest development version, you can use git dependencies:
+# Edit src-tauri/Cargo.toml and replace version numbers with:
+# turbomcp = { git = "https://github.com/Epistates/turbomcp.git", branch = "main" }
 ```
 
 ### Development Build
@@ -238,7 +259,7 @@ turbomcpstudio/
 
 ### Architecture
 
-MCP Studio uses a three-layer architecture:
+TurboMCP Studio uses a three-layer architecture:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -311,8 +332,7 @@ MCP Studio uses a three-layer architecture:
 - **[CHANGELOG.md](CHANGELOG.md)**: Release history and version notes
 - **[RELEASE.md](RELEASE.md)**: Release process and versioning guide
 - **[CLAUDE.md](CLAUDE.md)**: Development guidelines and project overview
-- **[MCP_STUDIO_ANALYSIS.md](MCP_STUDIO_ANALYSIS.md)**: Strategic vision and business plan
-- **[MCP_STUDIO_TECHNICAL_DESIGN.md](MCP_STUDIO_TECHNICAL_DESIGN.md)**: Technical architecture
+- **[REFACTORING.md](REFACTORING.md)**: Comprehensive refactoring tracking and architecture decisions
 
 ## Contributing
 
@@ -370,20 +390,41 @@ Before submitting:
 
 ### Getting Help
 
-- **Issues**: [GitHub Issues](https://github.com/YOUR_ORG/turbomcpstudio/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/YOUR_ORG/turbomcpstudio/discussions)
+- **Issues**: [GitHub Issues](https://github.com/Epistates/turbomcpstudio/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Epistates/turbomcpstudio/discussions)
 - **Documentation**: Check the docs listed above
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+## Built with TurboMCP
+
+<div align="center">
+<img src="static/Turbomcp-logo.png" alt="TurboMCP" width="120"/>
+</div>
+
+TurboMCP Studio is powered by **[TurboMCP](https://github.com/Epistates/turbomcp)**, an enterprise-grade Rust implementation of the Model Context Protocol.
+
+### Why TurboMCP?
+
+- **🚀 SIMD-Accelerated JSON**: 2-3x faster protocol operations with SIMD optimization
+- **🏢 Enterprise Security**: OAuth 2.1, CORS, TLS, rate limiting, and circuit breakers built-in
+- **🔌 Multi-Transport Native**: Full support for STDIO, HTTP, WebSocket, TCP, and Unix sockets
+- **💪 Production Resilience**: Connection pooling, health monitoring, and automatic retry logic
+- **📋 100% MCP Compliant**: Complete implementation of the MCP 2025-06-18 specification
+- **🎯 Type Safety**: Comprehensive Rust types for all protocol operations
+
+TurboMCP enables TurboMCP Studio to deliver a production-ready, enterprise-grade developer experience for MCP server development and testing.
+
+**Learn More**: [TurboMCP Documentation](https://github.com/Epistates/turbomcp)
+
 ## Acknowledgments
 
-- Built with [Tauri](https://tauri.app/)
-- Powered by [TurboMCP](https://github.com/Epistates/turbomcp)
-- UI framework: [SvelteKit](https://kit.svelte.dev/)
-- MCP specification: [Model Context Protocol](https://modelcontextprotocol.io/)
+- **MCP Client**: Powered by [TurboMCP](https://github.com/Epistates/turbomcp) - Enterprise-grade MCP for Rust
+- **Desktop Framework**: Built with [Tauri](https://tauri.app/) - Native desktop apps with Rust + Web
+- **Frontend**: [SvelteKit](https://kit.svelte.dev/) - Modern full-stack web framework
+- **Protocol**: [Model Context Protocol](https://modelcontextprotocol.io/) - Universal AI integration standard
 
 ---
 
