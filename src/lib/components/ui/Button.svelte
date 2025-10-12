@@ -19,11 +19,12 @@
     href?: string;
     children?: any;
     onclick?: (event: MouseEvent) => void;
+    class?: string;
     [key: string]: any;
   }
 
   // Props using Svelte 5 runes
-  const {
+  let {
     variant = 'primary' as ButtonVariant,
     size = 'md' as ButtonSize,
     loading = false,
@@ -33,7 +34,8 @@
     rightIcon = undefined,
     href = undefined as string | undefined,
     children,
-    onclick,
+    onclick = undefined,
+    class: className = '',
     ...restProps
   }: Props = $props();
 
@@ -44,7 +46,8 @@
     `btn-${size}`,
     fullWidth && 'w-full',
     loading && 'opacity-75 cursor-wait',
-    disabled && 'opacity-60 cursor-not-allowed'
+    disabled && 'opacity-60 cursor-not-allowed',
+    className
   ].filter(Boolean).join(' '));
 
   // Handle click events with proper validation
@@ -54,16 +57,25 @@
       event.stopPropagation();
       return;
     }
-    onclick?.(event);
+    // Call the onclick handler if provided
+    if (onclick) {
+      onclick(event);
+    }
   }
 
   // Handle key events for accessibility
   function handleKeydown(event: KeyboardEvent) {
     if (loading || disabled) return;
-    
+
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      handleClick(event as any);
+      // Manually create a MouseEvent for the click handler
+      const clickEvent = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      });
+      handleClick(clickEvent);
     }
   }
 </script>
@@ -77,9 +89,9 @@
     role="button"
     tabindex={disabled ? -1 : 0}
     aria-disabled={disabled}
+    {...restProps}
     onclick={handleClick}
     onkeydown={handleKeydown}
-    {...restProps}
   >
     {#if loading}
       <LoadingSpinner size={size === 'sm' ? 'sm' : size === 'lg' ? 'lg' : 'md'} />
@@ -101,8 +113,8 @@
     class={baseClasses}
     disabled={disabled || loading}
     aria-disabled={disabled || loading}
-    onclick={handleClick}
     {...restProps}
+    onclick={handleClick}
   >
     {#if loading}
       <LoadingSpinner size={size === 'sm' ? 'sm' : size === 'lg' ? 'lg' : 'md'} />
@@ -110,9 +122,9 @@
       {@const IconComponent = leftIcon}
       <IconComponent size={size === 'sm' ? 14 : size === 'lg' ? 18 : 16} />
     {/if}
-    
+
     {@render children?.()}
-    
+
     {#if !loading && rightIcon}
       {@const IconComponent = rightIcon}
       <IconComponent size={size === 'sm' ? 14 : size === 'lg' ? 18 : 16} />

@@ -166,16 +166,18 @@
     });
 
     // Start timeout AFTER listeners are registered
-    // Increase timeout to 3 seconds for slower systems
+    // Use 6 second timeout for first-run database migration (7 tables + 3 indexes)
+    // After first run, subsequent startups will be much faster
     setTimeout(() => {
       if (!appReadyReceived) {
-        console.warn('⚠️ FRONTEND: No app-ready event received after 3 seconds, forcing completion');
-        console.warn('This may indicate slow database initialization or event system issues');
+        console.warn('⚠️ FRONTEND: No app-ready event received after 6 seconds, forcing completion');
+        console.warn('This may indicate slow database initialization (first run creates 7 tables + 3 indexes)');
+        console.warn('or event system issues. Check Rust logs for database initialization progress.');
         appStore.setDatabaseReady(true);
         appStore.setMcpManagerReady(true);
         appStore.completeInitialization();
       }
-    }, 3000);
+    }, 6000);
   });
 
   // Cleanup event listeners

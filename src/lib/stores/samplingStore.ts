@@ -156,6 +156,13 @@ function createSamplingStore() {
 			eventUnlisten = await listen<PendingSamplingRequest>('sampling_requested', (event) => {
 				const request = event.payload;
 
+				logger.info('📥 [DEBUG] Received sampling_requested event:', {
+					requestId: request.requestId,
+					serverId: request.serverId,
+					serverName: request.serverName,
+					timestamp: new Date().toISOString()
+				});
+
 				update((state) => ({
 					...state,
 					pending: [...state.pending, request],
@@ -165,6 +172,7 @@ function createSamplingStore() {
 				// Auto-show modal via dynamic import (avoid circular dependency)
 				setTimeout(() => {
 					import('./uiStore').then(({ uiStore }) => {
+						logger.info('🔔 [DEBUG] Showing sampling modal for request:', request.requestId);
 						uiStore.showSamplingApproval(request);
 					});
 				}, 0);
@@ -239,6 +247,7 @@ function createSamplingStore() {
 		 * @param reason - Reason for rejection
 		 */
 		async reject(requestId: string, reason: string): Promise<void> {
+			logger.info('❌ [DEBUG] Rejecting sampling request:', { requestId, reason });
 			update((s) => ({ ...s, loading: true, error: null }));
 
 			try {
@@ -253,11 +262,13 @@ function createSamplingStore() {
 					throw new Error(`Request not found: ${requestId}`);
 				}
 
+				logger.info('📤 [DEBUG] Calling backend reject_sampling_request');
 				// Call backend to reject
 				await invoke('reject_sampling_request', {
 					requestId,
 					reason
 				});
+				logger.info('✅ [DEBUG] Backend rejection completed');
 
 				// Move from pending to history
 				const completed: CompletedSamplingRequest = {
@@ -273,6 +284,7 @@ function createSamplingStore() {
 					history: [completed, ...state.history],
 					loading: false
 				}));
+				logger.info('📋 [DEBUG] Moved request to history');
 			} catch (error) {
 				update((s) => ({
 					...s,

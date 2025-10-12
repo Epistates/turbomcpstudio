@@ -179,6 +179,17 @@
   async function handleConnectServer(serverId: string) {
     const server = servers.find(s => s.id === serverId);
     if (server) {
+      // ✅ FIXED: Clean up stale connection states before reconnecting
+      const status = getServerStatus(server);
+      if (status === 'error' || status === 'connecting') {
+        try {
+          await serverStore.disconnectServer(serverId);
+        } catch (disconnectError) {
+          // Ignore disconnect errors - server might already be disconnected
+          logger.warn('Failed to disconnect before reconnecting:', disconnectError);
+        }
+      }
+
       await serverStore.connectServer(server.config);
     }
   }
@@ -286,46 +297,42 @@
     }
   }
 
-  // Incrementally sync active profile when it changes (for real-time updates)
-  $effect(() => {
-    if (activeProfile?.servers && activeProfile.profile) {
-      const profileId = activeProfile.profile.id;
-      const serverIds = new Set(activeProfile.servers.map(ps => ps.server_id));
+  // ✅ FIXED: Single effect to sync active profile (prevents infinite loop)
+  // Track previous profile ID to detect actual profile changes
+  let previousProfileId = $state<string | null>(null);
 
+  $effect(() => {
+    // Only run if we have an active profile with servers
+    if (!activeProfile?.servers || !activeProfile.profile) {
+      previousProfileId = null;
+      return;
+    }
+
+    const profileId = activeProfile.profile.id;
+    const serverIds = new Set(activeProfile.servers.map(ps => ps.server_id));
+
+    // Check if data actually changed (prevents unnecessary updates)
+    const existing = localProfileServerMap.get(profileId);
+    const profileChanged = previousProfileId !== profileId;
+    const serversChanged = !existing ||
+      existing.size !== serverIds.size ||
+      !Array.from(serverIds).every(id => existing.has(id));
+
+    // Only update if something actually changed
+    if (profileChanged || serversChanged) {
       logger.debug('🔄 Syncing active profile to local map:', {
         profileId,
         profileName: activeProfile.profile.name,
         serverCount: serverIds.size,
-        serverIds: Array.from(serverIds)
+        serverIds: Array.from(serverIds),
+        reason: profileChanged ? 'Profile changed' : 'Servers changed'
       });
 
       // Create new Map to trigger reactivity
       const newMap = new Map(localProfileServerMap);
       newMap.set(profileId, serverIds);
       localProfileServerMap = newMap;
-    }
-  });
-
-  // Also sync when active profile data changes (for edge cases)
-  $effect(() => {
-    // This effect runs when servers or profiles arrays change
-    // Re-sync active profile data if it changed
-    if (activeProfile?.servers && activeProfile.profile) {
-      const profileId = activeProfile.profile.id;
-      const serverIds = new Set(activeProfile.servers.map(ps => ps.server_id));
-
-      // Only update if data actually changed
-      const existing = localProfileServerMap.get(profileId);
-      const changed = !existing ||
-        existing.size !== serverIds.size ||
-        !Array.from(serverIds).every(id => existing.has(id));
-
-      if (changed) {
-        logger.debug('🔄 Active profile data changed, syncing to local map');
-        const newMap = new Map(localProfileServerMap);
-        newMap.set(profileId, serverIds);
-        localProfileServerMap = newMap;
-      }
+      previousProfileId = profileId;
     }
   });
 

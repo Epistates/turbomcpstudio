@@ -7,6 +7,8 @@
   import { createLogger } from '$lib/utils/logger';
 
   import { invoke } from '@tauri-apps/api/core';
+  import { openPath } from '@tauri-apps/plugin-opener';
+  import { Command } from '@tauri-apps/plugin-shell';
 
   import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 
@@ -38,7 +40,10 @@
     ExternalLink,
     Cpu,
     Cloud,
-    DollarSign
+    DollarSign,
+    Info,
+    Folder,
+    FileText
   } from 'lucide-svelte';
 
   // ===============================================
@@ -104,6 +109,10 @@
 
   // Show API keys toggle
   let showApiKeys = $state(false);
+
+  // Application info
+  let dataDirectory = $state<string>('');
+  let logDirectory = $state<string>('');
 
   // ===============================================
   // PROVIDER DEFINITIONS (2025 Local + Cloud)
@@ -495,11 +504,49 @@
   }
 
   // ===============================================
+  // APPLICATION INFO
+  // ===============================================
+
+  async function loadDirectories() {
+    try {
+      // Get the actual paths from the backend (matches lib.rs logic)
+      const paths = await invoke<{ data_directory: string; log_directory: string }>('get_app_paths');
+      dataDirectory = paths.data_directory;
+      logDirectory = paths.log_directory;
+    } catch (error) {
+      logger.error('Failed to load directory paths:', error);
+      dataDirectory = 'Unable to load path';
+      logDirectory = 'Unable to load path';
+    }
+  }
+
+  async function openDirectory(path: string) {
+    try {
+      // Use named 'open-finder' command configured in tauri.conf.json
+      // The -R flag reveals the item in Finder, even if it's in a hidden directory like ~/Library
+      const command = Command.create('open-finder', ['-R', path]);
+      await command.execute();
+    } catch (error) {
+      logger.error('Failed to open directory:', error);
+    }
+  }
+
+  async function openExternalUrl(url: string) {
+    try {
+      // openPath can handle both file paths and URLs in Tauri 2.0
+      await openPath(url);
+    } catch (error) {
+      logger.error('Failed to open URL:', error);
+    }
+  }
+
+  // ===============================================
   // LIFECYCLE
   // ===============================================
 
   onMount(() => {
     loadProviders();
+    loadDirectories();
   });
 </script>
 
@@ -738,25 +785,123 @@
 
     {:else if activeTab === 'global'}
       <div class="settings-section">
-        <h2 class="section-title">Global Settings</h2>
-        <p class="mb-6 text-secondary">Application-wide preferences</p>
+        <!-- Application Info -->
+        <div class="info-section">
+          <div class="flex items-center gap-2 mb-4">
+            <Info size={20} class="text-mcp-primary-600" />
+            <h2 class="section-title">Application Information</h2>
+          </div>
 
-        <div class="setting-group">
-          <label class="setting-label">
-            <input type="checkbox" class="setting-checkbox" />
-            Auto-start sampling on server connection
-          </label>
-          <p class="setting-description">
-            Automatically begin sampling when a new MCP server connects
-          </p>
+          <div class="info-grid">
+            <!-- Version -->
+            <div class="info-item">
+              <div class="info-label">Version</div>
+              <p class="info-value">0.1.0</p>
+            </div>
+
+            <!-- Data Directory -->
+            <div class="info-item">
+              <div class="info-label">Data Directory</div>
+              <div class="flex items-center gap-2">
+                <p class="info-value flex-1 truncate" title={dataDirectory}>
+                  {dataDirectory || 'Loading...'}
+                </p>
+                <button
+                  class="link-item"
+                  onclick={() => openDirectory(dataDirectory)}
+                  disabled={!dataDirectory}
+                  aria-label="Open data directory"
+                >
+                  <Folder size={16} />
+                  Open
+                </button>
+              </div>
+            </div>
+
+            <!-- Log Directory -->
+            <div class="info-item">
+              <div class="info-label">Log Directory</div>
+              <div class="flex items-center gap-2">
+                <p class="info-value flex-1 truncate" title={logDirectory}>
+                  {logDirectory || 'Loading...'}
+                </p>
+                <button
+                  class="link-item"
+                  onclick={() => openDirectory(logDirectory)}
+                  disabled={!logDirectory}
+                  aria-label="Open log directory"
+                >
+                  <FileText size={16} />
+                  Open
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="setting-group">
-          <label for="settings-default-temperature" class="setting-label">Default Temperature</label>
-          <input id="settings-default-temperature" type="range" min="0" max="2" step="0.1" value="0.7" class="setting-slider" />
-          <p class="setting-description">
-            Default temperature for sampling requests (0.7 recommended)
-          </p>
+        <!-- About / Attribution -->
+        <div class="about-section">
+          <div class="flex items-center gap-2 mb-4">
+            <Info size={20} class="text-mcp-primary-600" />
+            <h2 class="section-title">About</h2>
+          </div>
+
+          <div class="about-card">
+            <div class="flex items-start gap-4 mb-4">
+              <img
+                src="/turbomcp-studio-logo.png"
+                alt="TurboMCP Studio Logo"
+                class="w-16 h-16 object-contain rounded-lg"
+              />
+              <div class="flex-1">
+                <h3 class="text-lg font-semibold text-primary mb-1">TurboMCP Studio</h3>
+                <p class="text-sm text-secondary mb-3">
+                  A desktop application for testing and debugging Model Context Protocol (MCP) servers
+                </p>
+                <p class="text-xs text-secondary">
+                  Built on <button onclick={() => openExternalUrl('https://github.com/Epistates/turbomcp')} class="link-external-button">
+                    TurboMCP
+                    <ExternalLink size={12} class="inline ml-1" />
+                  </button>
+                </p>
+              </div>
+            </div>
+
+            <!-- Links -->
+            <div class="links-grid">
+              <button
+                onclick={() => openExternalUrl('https://github.com/Epistates/turbomcpstudio')}
+                class="link-item"
+              >
+                <ExternalLink size={14} />
+                GitHub Repository
+              </button>
+              <button
+                onclick={() => openExternalUrl('https://github.com/Epistates/turbomcp')}
+                class="link-item"
+              >
+                <ExternalLink size={14} />
+                TurboMCP Project
+              </button>
+              <button
+                onclick={() => openExternalUrl('https://github.com/Epistates/turbomcpstudio/issues')}
+                class="link-item"
+              >
+                <ExternalLink size={14} />
+                Report Issues
+              </button>
+            </div>
+
+            <!-- License & Copyright -->
+            <div class="mt-4 pt-4 border-t border-mcp-border-primary">
+              <p class="text-xs text-secondary text-center mb-1">
+                Copyright © 2025 Epistates Inc.
+              </p>
+              <p class="text-xs text-secondary text-center">
+                Licensed under the MIT License
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -812,8 +957,8 @@
 <!-- =============================================== -->
 
 {#if quickSetup.show && quickSetup.provider}
-  <div class="modal-overlay" onclick={closeQuickSetup} onkeydown={(e) => e.key === 'Escape' && closeQuickSetup()} role="button" tabindex="0">
-    <div class="modal-content" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+  <div class="modal-overlay" onclick={(e) => { if (e.target === e.currentTarget) closeQuickSetup(); }} onkeydown={(e) => e.key === 'Escape' && closeQuickSetup()} role="button" tabindex="0">
+    <div class="modal-content" role="dialog" aria-modal="true">
       <div class="modal-header">
         <div class="flex items-center gap-3">
           <span class="text-2xl">{quickSetup.provider.icon}</span>
@@ -1162,5 +1307,66 @@
   .test-result.error {
     background: var(--mcp-error-50);
     color: var(--mcp-error-700);
+  }
+
+  /* Application Info Styles */
+  .info-section {
+    @apply mb-8;
+  }
+
+  .info-grid {
+    @apply space-y-4;
+  }
+
+  .info-item {
+    @apply p-4 border rounded-lg;
+    background: var(--mcp-card-background);
+    border-color: var(--mcp-border-primary);
+  }
+
+  .info-label {
+    @apply block text-sm font-medium mb-2;
+    color: var(--mcp-text-secondary);
+  }
+
+  .info-value {
+    @apply text-sm font-mono;
+    color: var(--mcp-text-primary);
+  }
+
+  /* About Section Styles */
+  .about-section {
+    @apply mb-8;
+  }
+
+  .about-card {
+    @apply p-6 border rounded-lg;
+    background: var(--mcp-card-background);
+    border-color: var(--mcp-border-primary);
+  }
+
+  .links-grid {
+    @apply grid grid-cols-1 md:grid-cols-3 gap-3;
+  }
+
+  .link-item {
+    @apply flex items-center gap-2 px-4 py-2 border rounded-md text-sm font-medium transition-colors;
+    background: var(--mcp-surface-secondary);
+    border-color: var(--mcp-border-primary);
+    color: var(--mcp-text-primary);
+  }
+
+  .link-item:hover {
+    background: var(--mcp-primary-50);
+    border-color: var(--mcp-primary-200);
+    color: var(--mcp-primary-700);
+  }
+
+  .link-external-button {
+    @apply inline text-mcp-primary-600 hover:text-mcp-primary-700 transition-colors cursor-pointer bg-transparent border-none p-0;
+  }
+
+  .link-external {
+    @apply text-mcp-primary-600 hover:text-mcp-primary-700 transition-colors;
   }
 </style>

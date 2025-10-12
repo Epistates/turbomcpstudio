@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { serverStore, type ServerConfig, type TransportConfig } from '$lib/stores/serverStore';
+  import { serverStore, type ServerConfig, type TransportConfig, type ServerStoreState } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
   import { createModalEscapeHandler, createModalOutsideClickHandler, globalModalManager } from '$lib/utils/modalHelpers';
   import { createLogger } from '$lib/utils/logger';
@@ -25,6 +25,7 @@
     Code
   } from 'lucide-svelte';
   import { open } from '@tauri-apps/plugin-dialog';
+  import { readText } from '@tauri-apps/plugin-clipboard-manager';
 
 
   // ✅ NEW: Use uiStore for modal state (single source of truth)
@@ -33,7 +34,46 @@
   const showModal = $derived(modalState.open);
   const modalLoading = $derived(modalState.loading);
 
+  // ✅ FIXED: Track currentStep changes for debugging
   let currentStep = $state(1);
+
+  // ✅ NEW: Inline error display (always visible to user)
+  let modalError = $state<string | null>(null);
+
+  // ✅ NEW: Log all currentStep changes for debugging
+  $effect(() => {
+    logger.debug(`📍 currentStep changed to: ${currentStep}`);
+  });
+
+  // ✅ FIXED: Force reset showJsonImport when modal opens + Auto-detect clipboard
+  // 🎯 UX FLOW: JSON import appears as overlay on top of regular modal
+  //   - If clipboard has MCP config → show JSON import overlay (can cancel to reveal regular form)
+  //   - If user cancels JSON import → return to regular 3-step form underneath
+  //   - If user completes JSON import → close both modals
+  $effect(() => {
+    if (showModal) {
+      logger.debug('🔓 Modal opened - forcing state reset');
+      showJsonImport = false;  // Start with regular form (may be overridden by clipboard detection)
+      modalError = null;       // Clear any previous errors
+      connectAfterAdding = false; // Reset connection option
+
+      // ✅ NEW: Auto-detect MCP config in clipboard using Tauri clipboard API
+      autoDetectClipboard();
+    } else {
+      // ✅ FIXED: Reset state when modal actually closes
+      logger.debug('🔒 Modal closed - resetting all state');
+      currentStep = 1;
+      showJsonImport = false;
+      clipboardDetected = false;
+      jsonConfig = '';
+      jsonError = '';
+      modalError = null;
+      testResult = null;
+      modalHiddenForPicker = false;
+      connectAfterAdding = false;
+    }
+  });
+
   let testResult = $state<{ success: boolean; message?: string } | null>(null);
   let templates: ServerConfig[] = $state([]);
   let showJsonImport = $state(false);
@@ -47,7 +87,6 @@
   let clipboardDetected = $state(false);
   let detectedServerName = $state('');
   let detectedServerCount = $state(0);
-  let clipboardAutoProcessed = $state(false); // Track if we've already auto-processed clipboard
 
   // Form data
   let formData = $state({
@@ -81,18 +120,77 @@
   let headerPairs = $state([{ key: '', value: '' }]);
   let envPairs = $state([{ key: '', value: '' }]);
 
-  // Computed values for STDIO command handling
-  const isAbsolutePath = $derived(() => {
-    const command = formData.stdio.command.trim();
-    return command.startsWith('/') || /^[A-Za-z]:[/\\]/.test(command); // Unix absolute or Windows absolute
-  });
+  // ✅ NEW: Real-time duplicate detection
+  const serverStoreState = $derived($serverStore);
+  const existingServers = $derived(
+    serverStoreState.servers instanceof Map
+      ? Array.from(serverStoreState.servers.values())
+      : []
+  );
 
-  const derivedWorkingDirectory = $derived(() => {
-    if (!isAbsolutePath()) return '';
-    const command = formData.stdio.command.trim();
-    const lastSlash = Math.max(command.lastIndexOf('/'), command.lastIndexOf('\\'));
-    return lastSlash > 0 ? command.substring(0, lastSlash) : '';
-  });
+  // ✅ FIXED: Step 2: Check for duplicate server name (IIFE for immediate execution)
+  const duplicateNameServer = $derived(
+    (() => {
+      if (!formData.name.trim()) return null;
+      return existingServers.find(
+        s => s.config.name.toLowerCase() === formData.name.toLowerCase()
+      );
+    })()  // <-- IIFE: Execute immediately and return result
+  );
+
+  // ✅ FIXED: Step 3: Check for duplicate transport configuration (IIFE)
+  const duplicateTransportServer = $derived(
+    (() => {
+      if (formData.transportType === 'stdio') {
+        const command = formData.stdio.command.trim();
+        if (!command) return null;
+        return existingServers.find(s => {
+          if (s.config.transport_config.type !== 'stdio') return false;
+          return s.config.transport_config.command === command;
+        });
+      } else if (formData.transportType === 'http' || formData.transportType === 'websocket') {
+        const url = formData.transportType === 'http' ? formData.http.url : formData.websocket.url;
+        if (!url.trim()) return null;
+        return existingServers.find(s => {
+          // Type guard for url-based transports
+          if (s.config.transport_config.type !== 'http' && s.config.transport_config.type !== 'websocket') return false;
+          return s.config.transport_config.url === url;
+        });
+      } else if (formData.transportType === 'tcp') {
+        const { host, port } = formData.tcp;
+        if (!host.trim()) return null;
+        return existingServers.find(s => {
+          if (s.config.transport_config.type !== 'tcp') return false;
+          return s.config.transport_config.host === host && s.config.transport_config.port === port;
+        });
+      } else if (formData.transportType === 'unix') {
+        const path = formData.unix.path.trim();
+        if (!path) return null;
+        return existingServers.find(s => {
+          if (s.config.transport_config.type !== 'unix') return false;
+          return s.config.transport_config.path === path;
+        });
+      }
+      return null;
+    })()
+  );
+
+  // Computed values for STDIO command handling
+  const isAbsolutePath = $derived(
+    (() => {
+      const command = formData.stdio.command.trim();
+      return command.startsWith('/') || /^[A-Za-z]:[/\\]/.test(command); // Unix absolute or Windows absolute
+    })()
+  );
+
+  const derivedWorkingDirectory = $derived(
+    (() => {
+      if (!isAbsolutePath) return '';
+      const command = formData.stdio.command.trim();
+      const lastSlash = Math.max(command.lastIndexOf('/'), command.lastIndexOf('\\'));
+      return lastSlash > 0 ? command.substring(0, lastSlash) : '';
+    })()
+  );
 
   const transportTypes = [
     { 
@@ -135,27 +233,32 @@
   // ✅ NEW: Proper lifecycle management with cleanup
   let templateUnsubscribe: (() => void) | null = null;
 
+  // Effect 1: Load templates on mount
   $effect(() => {
     loadTemplates();
 
-    // Register modal with global manager
-    if (showModal && modalRef) {
-      globalModalManager.register('addServer', modalRef, {
-        lockScroll: true,
-        trapFocus: true
-      });
-    }
-
-    // Cleanup on unmount or modal close
+    // Cleanup template subscription on unmount
     return () => {
       if (templateUnsubscribe) {
         templateUnsubscribe();
         templateUnsubscribe = null;
       }
-      if (showModal) {
-        globalModalManager.unregister('addServer');
-      }
     };
+  });
+
+  // Effect 2: Register modal with global manager when shown
+  $effect(() => {
+    if (showModal && modalRef) {
+      globalModalManager.register('addServer', modalRef, {
+        lockScroll: true,
+        trapFocus: true
+      });
+
+      // Cleanup: Unregister when modal closes
+      return () => {
+        globalModalManager.unregister('addServer');
+      };
+    }
   });
 
   // ✅ NEW: Escape key handler
@@ -167,12 +270,45 @@
     }
   });
 
-  // Check clipboard for MCP config when modal opens and auto-process if valid
-  $effect(() => {
-    if (showModal && currentStep === 1 && !clipboardAutoProcessed) {
-      checkClipboardForConfig();
+  // ✅ NEW: Auto-detect MCP config in clipboard (Tauri API - no permission prompt!)
+  async function autoDetectClipboard() {
+    try {
+      logger.info('📋 Starting clipboard auto-detection...');
+
+      // Use Tauri clipboard API (no permission prompt required)
+      const clipboardText = await readText();
+
+      if (!clipboardText || !clipboardText.trim()) {
+        logger.info('📋 Clipboard is empty, skipping auto-detection');
+        return;
+      }
+
+      logger.info(`📋 Clipboard contains ${clipboardText.length} characters, checking if valid MCP config...`);
+      const detected = detectMCPConfig(clipboardText);
+
+      if (detected.valid) {
+        clipboardDetected = true;
+        detectedServerCount = detected.servers.length;
+        jsonConfig = clipboardText; // Pre-populate JSON editor
+
+        detectedServerName = detected.servers.length === 1
+          ? detected.servers[0].name
+          : `${detected.servers.length} servers`;
+
+        logger.info(`📋 ✅ Auto-detected ${detectedServerName} in clipboard - showing notification`);
+
+        // ✅ NEW UX: Show notification instead of auto-opening
+        // User can click the banner to import, or continue with manual form
+        // showJsonImport = true;  // REMOVED: Don't auto-open
+        logger.info(`📋 Clipboard detection complete - waiting for user action`);
+      } else {
+        logger.info('📋 Clipboard content is not valid MCP configuration (no mcpServers key found)');
+      }
+    } catch (error) {
+      // Better error logging to understand what's failing
+      logger.error('📋 Failed to read clipboard:', error);
     }
-  });
+  }
 
   // ✅ FIXED: Properly manage subscription lifecycle
   async function loadTemplates() {
@@ -185,23 +321,19 @@
       }
 
       // Create new subscription with cleanup
-      templateUnsubscribe = serverStore.subscribe((s: any) => {
-        templates = s.templates;
+      templateUnsubscribe = serverStore.subscribe((state: ServerStoreState) => {
+        templates = state.templates;
       });
     } catch (error) {
       logger.error('❌ Failed to load templates:', error);
     }
   }
 
-  // ✅ NEW: Use uiStore to close (single source of truth)
+  // ✅ FIXED: Simplified close - state reset now handled by $effect
   function closeModal() {
+    logger.info(`🚪 Closing modal - currentStep was: ${currentStep}`);
     uiStore.closeModal('addServer');
-    // Reset state for next open
-    clipboardAutoProcessed = false;
-    clipboardDetected = false;
-    jsonConfig = '';
-    currentStep = 1; // Reset to first step
-    showJsonImport = false; // Close JSON import if open
+    // State reset happens automatically in $effect when showModal becomes false
   }
 
   function nextStep() {
@@ -305,14 +437,20 @@
     updateEnvironmentVariables();
   }
 
+  // ✅ FIXED: File picker state preservation
+  // Hide modal visually without destroying component (preserves state)
+  let modalHiddenForPicker = $state(false);
+
   // Directory picker for STDIO transport
   async function selectDirectory() {
     try {
-      // ✅ FIXED: Close modal using uiStore (showModal is derived, can't assign)
-      uiStore.closeModal('addServer');
+      logger.debug('📁 Opening directory picker');
 
-      // Small delay to ensure modal is hidden
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // ✅ FIXED: Hide modal visually but keep component alive (preserves ALL state)
+      modalHiddenForPicker = true;
+
+      // Small delay to ensure modal is hidden before file picker shows
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const result = await open({
         directory: true,
@@ -320,27 +458,30 @@
         title: 'Select Working Directory'
       });
 
-      // ✅ FIXED: Restore modal using uiStore
-      uiStore.openModal('addServer');
+      logger.debug('📁 Directory picker result:', result);
 
       if (result && typeof result === 'string') {
         formData.stdio.workingDirectory = result;
+        logger.info(`✅ Selected working directory: ${result}`);
       }
     } catch (error) {
-      logger.error('Failed to select directory:', error);
-      // ✅ FIXED: Restore modal using uiStore
-      uiStore.openModal('addServer');
+      logger.error('❌ Failed to select directory:', error);
+    } finally {
+      // ✅ FIXED: Show modal again (currentStep, formData, everything preserved!)
+      modalHiddenForPicker = false;
     }
   }
 
   // File picker for executable selection
   async function selectExecutable() {
     try {
-      // ✅ FIXED: Close modal using uiStore (showModal is derived, can't assign)
-      uiStore.closeModal('addServer');
+      logger.debug('📄 Opening executable picker');
 
-      // Small delay to ensure modal is hidden
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // ✅ FIXED: Hide modal visually but keep component alive (preserves ALL state)
+      modalHiddenForPicker = true;
+
+      // Small delay to ensure modal is hidden before file picker shows
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const result = await open({
         directory: false,
@@ -349,16 +490,17 @@
         // No filters - allow all files including extensionless executables
       });
 
-      // ✅ FIXED: Restore modal using uiStore
-      uiStore.openModal('addServer');
+      logger.debug('📄 Executable picker result:', result);
 
       if (result && typeof result === 'string') {
         formData.stdio.command = result;
+        logger.info(`✅ Selected executable: ${result}`);
       }
     } catch (error) {
-      logger.error('Failed to select executable:', error);
-      // ✅ FIXED: Restore modal using uiStore
-      uiStore.openModal('addServer');
+      logger.error('❌ Failed to select executable:', error);
+    } finally {
+      // ✅ FIXED: Show modal again (currentStep, formData, everything preserved!)
+      modalHiddenForPicker = false;
     }
   }
 
@@ -370,6 +512,30 @@
       // Pre-populate with current config when opening
       exportToJson();
     }
+  }
+
+  // ✅ NEW: Cancel JSON import (keep main modal open)
+  function cancelJsonImport() {
+    logger.debug('❌ User canceled JSON import - returning to main modal');
+    showJsonImport = false;
+    clipboardDetected = false;
+    jsonConfig = '';
+    jsonError = '';
+  }
+
+  // ✅ NEW: User-initiated JSON import from clipboard detection banner
+  function openClipboardImport() {
+    logger.info('📋 User clicked to import from clipboard');
+    showJsonImport = true;
+  }
+
+  // ✅ NEW: Dismiss clipboard notification without importing
+  function dismissClipboardNotification() {
+    logger.info('📋 User dismissed clipboard notification');
+    clipboardDetected = false;
+    detectedServerName = '';
+    detectedServerCount = 0;
+    jsonConfig = '';
   }
 
   function exportToJson() {
@@ -409,50 +575,53 @@
     }
   }
 
-  // Clipboard detection for MCP config with auto-processing
-  async function checkClipboardForConfig() {
+  // ✅ FIXED: Manual clipboard import (user-triggered)
+  async function importFromClipboard() {
     try {
-      // Use browser's native clipboard API (available in Tauri)
-      const clipboardText = await navigator.clipboard.readText();
-      if (!clipboardText || !clipboardText.trim()) return;
+      // Use Tauri clipboard API (consistent with auto-detection)
+      const clipboardText = await readText();
+      if (!clipboardText || !clipboardText.trim()) {
+        uiStore.showError('Clipboard is empty');
+        return;
+      }
 
       const detected = detectMCPConfig(clipboardText);
 
       if (detected.valid) {
         clipboardDetected = true;
-        clipboardAutoProcessed = true; // Mark as processed to avoid re-processing
         detectedServerCount = detected.servers.length;
-        jsonConfig = clipboardText; // Store for both single and multiple
+        jsonConfig = clipboardText; // Pre-populate JSON editor
 
-        logger.info(`📋 Detected ${detected.servers.length} MCP server(s) in clipboard`);
-
-        // For ANY valid JSON config (single or multiple), open JSON editor
-        // This is the most consistent UX - if they have JSON, they likely want to edit JSON
         detectedServerName = detected.servers.length === 1
           ? detected.servers[0].name
           : `${detected.servers.length} servers`;
 
-        logger.info(`✨ Auto-opening JSON editor for ${detectedServerName}`);
+        logger.info(`📋 Importing ${detectedServerName} from clipboard`);
+
+        // Open JSON import view with clipboard content
         showJsonImport = true;
+      } else {
+        uiStore.showError('Clipboard does not contain valid MCP configuration JSON');
       }
     } catch (error) {
-      // Silently fail - clipboard might be empty, inaccessible, or not text
-      // This is expected behavior, not an error condition
-      logger.debug('Clipboard check failed (expected if empty):', error);
+      logger.error('Failed to read clipboard:', error);
+      uiStore.showError('Failed to read clipboard');
     }
   }
 
-  function detectMCPConfig(text: string): { valid: boolean; servers: Array<{name: string, config: any}> } {
+  function detectMCPConfig(text: string): { valid: boolean; servers: Array<{name: string, config: Record<string, unknown>}> } {
     try {
       const parsed = JSON.parse(text);
       if (parsed.mcpServers && typeof parsed.mcpServers === 'object') {
         const servers = Object.entries(parsed.mcpServers).map(([name, config]) => ({
           name,
-          config: config as any
+          config: config as Record<string, unknown>
         }));
         return { valid: true, servers };
       }
-    } catch {}
+    } catch {
+      // ✅ Empty catch is intentional - invalid JSON is a normal failure case
+    }
     return { valid: false, servers: [] };
   }
 
@@ -604,8 +773,8 @@
       case 'stdio':
         // Use explicit working directory if provided, otherwise derive from absolute path
         let workingDir = formData.stdio.workingDirectory;
-        if (!workingDir && isAbsolutePath()) {
-          workingDir = derivedWorkingDirectory();
+        if (!workingDir && isAbsolutePath) {
+          workingDir = derivedWorkingDirectory;
         }
 
         transport = {
@@ -657,11 +826,17 @@
     };
   }
 
-  // ✅ FIXED: Save and connect with proper loading state management
-  async function saveAndConnect() {
-    // ✅ NEW: Prevent concurrent calls
+  // ✅ NEW: Separate add and connect functionality
+  let connectAfterAdding = $state(false);
+
+  // ✅ FIXED: Add server configuration (without auto-connecting)
+  async function addServer() {
+    // Clear any previous errors
+    modalError = null;
+
+    // ✅ FIXED: Prevent concurrent calls
     if (modalLoading) {
-      logger.warn('⚠️ Connection already in progress, ignoring duplicate click');
+      logger.warn('⚠️ Add operation already in progress, ignoring duplicate click');
       return;
     }
 
@@ -669,20 +844,59 @@
     uiStore.setModalLoading('addServer', true, requestId);
 
     try {
-      // ✅ NEW: Build config WITHOUT saving (no database call)
+      // ✅ Build config - validation already done by reactive $derived checks
       const config = buildConfig();
 
-      logger.debug(`🔌 Connecting to server: ${config.name}`);
+      logger.info(`➕ Adding server: ${config.name} (connect: ${connectAfterAdding})`);
+      logger.debug('Server config:', config);
 
-      // ✅ NEW: connectServer() handles BOTH creation and connection atomically
-      await serverStore.connectServer(config);
+      if (connectAfterAdding) {
+        // ✅ User wants to connect immediately - use connectServer() (creates + connects)
+        await serverStore.connectServer(config);
+        logger.info(`✅ Successfully added and connected to: ${config.name}`);
+        uiStore.showSuccess(`Added and connected to ${config.name}`);
+      } else {
+        // ✅ Just add the configuration without connecting
+        await serverStore.createServerConfig(
+          config.name,
+          config.description,
+          config.transport_config,
+          config.environment_variables
+        );
+        logger.info(`✅ Successfully added server: ${config.name}`);
+        uiStore.showSuccess(`Added ${config.name} (not connected)`);
+      }
 
-      logger.debug(`✅ Successfully connected to: ${config.name}`);
-      uiStore.showSuccess(`Connected to ${config.name}`);
       closeModal();
     } catch (error) {
-      logger.error('❌ Failed to connect:', error);
-      uiStore.showError(`Failed to connect: ${error}`);
+      logger.error('❌ Failed to add server:', error);
+      logger.error('Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      // ✅ FIXED: Parse error and show user-friendly message INLINE
+      const errorStr = error instanceof Error ? error.message : String(error);
+
+      // Handle common error scenarios with clear, actionable messages
+      if (errorStr.toLowerCase().includes('already exists') ||
+          errorStr.toLowerCase().includes('duplicate')) {
+        modalError = `⚠️ Server "${formData.name}" already exists. Please use a different name.`;
+      } else if (errorStr.toLowerCase().includes('timeout')) {
+        modalError = `⏱️ Operation timed out. Please try again.`;
+      } else if (errorStr.toLowerCase().includes('econnrefused') ||
+                 errorStr.toLowerCase().includes('connection refused')) {
+        modalError = `🔌 Could not connect to server. Is it running?`;
+      } else if (errorStr.toLowerCase().includes('command not found') ||
+                 errorStr.toLowerCase().includes('no such file')) {
+        modalError = `📁 Could not find the server executable. Please check the command path.`;
+      } else if (errorStr.toLowerCase().includes('permission')) {
+        modalError = `🔐 Permission denied. The command may not be executable.`;
+      } else {
+        modalError = `❌ Failed to add server: ${errorStr}`;
+      }
+
+      // ✅ FIXED: Don't close modal on error - user can see error and fix it
     } finally {
       uiStore.setModalLoading('addServer', false);
     }
@@ -703,9 +917,16 @@
       if (e.key === 'Escape' && !modalLoading) closeModal();
     }}
     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    class:hidden={modalHiddenForPicker || showJsonImport}
   >
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
+    <!--
+      ✅ modalHiddenForPicker: Hides modal visually during file picker dialogs
+      - Preserves component state (currentStep, formData) while hidden
+      - Prevents modal from overlapping native file picker on macOS
+      - See selectDirectory() and selectExecutable() for usage
+    -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
       onclick={(e) => e.stopPropagation()}
       class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden"
@@ -729,6 +950,67 @@
           {/each}
         </div>
       </div>
+
+      <!-- ✅ NEW: Clipboard Detection Banner (Opt-in for JSON import) -->
+      {#if clipboardDetected && !showJsonImport}
+        <div class="mx-6 mt-4 p-4 bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500 dark:border-blue-400 rounded-r-md">
+          <div class="flex items-start">
+            <div class="p-2 rounded-lg bg-blue-500 dark:bg-blue-600 text-white mr-3 flex-shrink-0">
+              <Check size={16} />
+            </div>
+            <div class="flex-1 min-w-0">
+              <h4 class="font-semibold text-blue-900 dark:text-blue-100 text-sm">MCP Configuration Detected in Clipboard</h4>
+              <p class="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                Found <strong>{detectedServerName}</strong> ready to import.
+                {#if detectedServerCount > 1}
+                  <span class="text-xs block mt-1 opacity-90">All {detectedServerCount} servers will be imported and connected.</span>
+                {/if}
+              </p>
+              <div class="flex gap-2 mt-3">
+                <button
+                  onclick={openClipboardImport}
+                  class="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors shadow-sm"
+                >
+                  <Upload size={14} class="inline mr-1.5" />
+                  Import from Clipboard
+                </button>
+                <button
+                  onclick={dismissClipboardNotification}
+                  class="px-4 py-2 bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-300 text-sm font-medium rounded-lg border border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Continue Manually
+                </button>
+              </div>
+            </div>
+            <button
+              onclick={dismissClipboardNotification}
+              class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 ml-2 flex-shrink-0"
+              aria-label="Dismiss notification"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      {/if}
+
+      <!-- ✅ NEW: Inline Error Banner (Always Visible) -->
+      {#if modalError}
+        <div class="mx-6 mt-4 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-md">
+          <div class="flex items-start">
+            <AlertCircle size={20} class="text-red-600 mr-3 flex-shrink-0 mt-0.5" />
+            <div class="flex-1">
+              <p class="text-sm font-medium text-red-800">{modalError}</p>
+            </div>
+            <button
+              onclick={() => { modalError = null; }}
+              class="text-red-600 hover:text-red-800 ml-2 flex-shrink-0"
+              aria-label="Dismiss error"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      {/if}
 
       <!-- Content -->
       <div class="p-6 overflow-y-auto max-h-[60vh]">
@@ -763,9 +1045,7 @@
               {/each}
             </div>
 
-            <!-- Templates -->
-
-            <!-- JSON Import Option -->
+            <!-- JSON Import Options -->
             <div class="mt-8 pt-6 border-t border-gray-200">
               <button
                 onclick={toggleJsonImport}
@@ -777,7 +1057,7 @@
                   </div>
                   <div class="text-center">
                     <h4 class="json-import-title font-medium">Import JSON Configuration</h4>
-                    <p class="json-import-subtitle text-sm">Paste or edit a JSON configuration</p>
+                    <p class="json-import-subtitle text-sm">Paste or type MCP server configuration</p>
                   </div>
                 </div>
               </button>
@@ -800,8 +1080,25 @@
                 bind:value={formData.name}
                 placeholder="My MCP Server"
                 class="form-input"
+                class:border-red-500={duplicateNameServer}
                 required
               />
+              <!-- ✅ NEW: Duplicate name warning -->
+              {#if duplicateNameServer}
+                <div class="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 dark:border-yellow-500 rounded-r-md">
+                  <div class="flex items-start">
+                    <AlertCircle size={16} class="text-yellow-600 dark:text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
+                    <div class="flex-1">
+                      <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                        ⚠️ A server named "{formData.name}" already exists
+                      </p>
+                      <p class="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                        Please use a different name to continue
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              {/if}
             </div>
 
             <div>
@@ -860,9 +1157,9 @@
                     Browse
                   </button>
                 </div>
-                {#if isAbsolutePath() && derivedWorkingDirectory()}
+                {#if isAbsolutePath && derivedWorkingDirectory}
                   <p class="text-xs text-gray-500 mt-1">
-                    <span class="font-medium">Working directory:</span> {derivedWorkingDirectory()}
+                    <span class="font-medium">Working directory:</span> {derivedWorkingDirectory}
                   </p>
                 {/if}
               </div>
@@ -880,7 +1177,7 @@
                 <p class="text-xs text-gray-500 mt-1">Space-separated command arguments</p>
               </div>
 
-              {#if !isAbsolutePath()}
+              {#if !isAbsolutePath}
                 <div>
                   <label for="add-server-stdio-workdir" class="form-label">Working Directory</label>
                   <div class="flex gap-2">
@@ -1024,6 +1321,27 @@
               </div>
             {/if}
 
+            <!-- ✅ NEW: Duplicate transport config warning -->
+            {#if duplicateTransportServer}
+              <div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 dark:border-yellow-500 rounded-r-md">
+                <div class="flex items-start">
+                  <AlertCircle size={16} class="text-yellow-600 dark:text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
+                  <div class="flex-1">
+                    <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                      ⚠️ Similar configuration detected
+                    </p>
+                    <p class="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                      Server <strong>"{duplicateTransportServer?.config.name}"</strong> already uses the same
+                      {formData.transportType === 'stdio' ? 'command' :
+                       formData.transportType === 'http' || formData.transportType === 'websocket' ? 'URL' :
+                       formData.transportType === 'tcp' ? 'host and port' : 'socket path'}.
+                      This may connect to the same server instance.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            {/if}
+
             <!-- Environment Variables -->
             <div>
               <label class="form-label">Environment Variables</label>
@@ -1060,8 +1378,8 @@
             </div>
 
             <!-- Test Configuration -->
-            <div class="border-t border-gray-200 pt-4">
-              <div class="flex items-center justify-between mb-3">
+            <div class="border-t border-gray-200 pt-4 space-y-4">
+              <div class="flex items-center justify-between">
                 <h4 class="text-sm font-medium text-gray-900">Test Configuration</h4>
                 <button
                   onclick={testConfiguration}
@@ -1086,6 +1404,29 @@
                   </div>
                 </div>
               {/if}
+
+              <!-- ✅ NEW: Connection option -->
+              <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <label class="flex items-center cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    bind:checked={connectAfterAdding}
+                    class="w-4 h-4 text-mcp-primary-600 border-gray-300 rounded focus:ring-mcp-primary-500 cursor-pointer"
+                  />
+                  <div class="ml-3 flex-1">
+                    <span class="text-sm font-medium text-gray-900 group-hover:text-mcp-primary-700">
+                      Connect immediately after adding
+                    </span>
+                    <p class="text-xs text-gray-600 mt-0.5">
+                      {#if connectAfterAdding}
+                        Will attempt to connect to the server after saving configuration
+                      {:else}
+                        Server will be added but not connected (you can connect later)
+                      {/if}
+                    </p>
+                  </div>
+                </label>
+              </div>
             </div>
           </div>
         {/if}
@@ -1107,27 +1448,32 @@
           </button>
           
           {#if currentStep < 3}
-            <button 
-              onclick={nextStep} 
+            <button
+              onclick={nextStep}
               class="btn-primary"
-              disabled={currentStep === 2 && !formData.name}
+              disabled={currentStep === 2 && (!formData.name || !!duplicateNameServer)}
             >
               Next
             </button>
           {:else}
             <button
-              onclick={saveAndConnect}
-              disabled={modalLoading}
-              class="btn-primary {modalLoading ? 'opacity-50 cursor-not-allowed' : ''}"
+              onclick={addServer}
+              disabled={modalLoading || !!duplicateNameServer}
+              class="btn-primary {(modalLoading || duplicateNameServer) ? 'opacity-50 cursor-not-allowed' : ''}"
             >
               {#if modalLoading}
                 <div class="flex items-center">
                   <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                  Connecting...
+                  {connectAfterAdding ? 'Adding & Connecting...' : 'Adding...'}
                 </div>
               {:else}
-                <Play size={16} class="mr-2" />
-                Connect
+                {#if connectAfterAdding}
+                  <Play size={16} class="mr-2" />
+                  Add & Connect
+                {:else}
+                  <Check size={16} class="mr-2" />
+                  Add Server
+                {/if}
               {/if}
             </button>
           {/if}
@@ -1137,14 +1483,27 @@
   </div>
 {/if}
 
-<!-- JSON Import Modal -->
+<!-- JSON Import Modal - Layered on top of main modal -->
 {#if showJsonImport}
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div
+    class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-60 p-4"
+    onclick={(e) => {
+      // Click outside closes JSON import, reveals main modal
+      if (e.target === e.currentTarget) cancelJsonImport();
+    }}
+  >
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <div
+      class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden"
+      onclick={(e) => e.stopPropagation()}
+    >
       <!-- Header -->
       <div class="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
         <h2 class="text-lg sm:text-xl font-semibold text-gray-900">Import JSON Configuration</h2>
-        <button onclick={() => showJsonImport = false} class="text-gray-400 hover:text-gray-600">
+        <button onclick={cancelJsonImport} class="text-gray-400 hover:text-gray-600" aria-label="Cancel JSON import">
           <X size={24} />
         </button>
       </div>
@@ -1210,7 +1569,7 @@
 
           <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <button
-              onclick={() => { showJsonImport = false; clipboardDetected = false; }}
+              onclick={cancelJsonImport}
               class="btn-secondary text-sm order-2 sm:order-1"
             >
               Cancel
@@ -1346,5 +1705,10 @@
   .json-import-subtitle {
     font-size: var(--mcp-text-sm);
     color: var(--mcp-text-secondary);
+  }
+
+  /* ✅ NEW: Custom z-index for layered modals */
+  .z-60 {
+    z-index: 60;
   }
 </style>

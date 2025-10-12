@@ -55,7 +55,6 @@
   }
 
 
-  let servers: ServerInfo[] = $state([]);
   let selectedServerId: string | undefined = $state(undefined);
   let prompts: PromptTemplate[] = $state([]);
   let loading = $state(false);
@@ -66,62 +65,57 @@
   let executingPrompt = $state(false);
   let expandedPrompt: string | null = $state(null);
   let savedPrompts: Array<{id: string; name: string; template: PromptTemplate; arguments: Record<string, any>}> = $state([]);
-  // Get execution history from centralized store (filtered for prompts)
-  let serverStoreState = $state<any>(null);
   let isHistoricalResult = $state(false);
 
+  // ✅ FIXED: Use $derived instead of manual subscription to prevent infinite loops
+  const serverStoreState = $derived($serverStore);
+  const globalSelectedId = $derived(serverStoreState.selectedServerId);
+
+  // ✅ FIXED: Derive servers list reactively
+  const allServers = $derived(
+    serverStoreState.servers instanceof Map
+      ? Array.from(serverStoreState.servers.values())
+      : []
+  );
+
+  // ✅ FIXED: Filter to only show connected servers that support prompts
+  const servers = $derived(filterServersByCapability(allServers, 'prompts'));
+
   // All execution history, reactive to serverStoreState changes
-  let allExecutionHistory = $derived(
+  const allExecutionHistory = $derived(
     serverStoreState?.toolExecutions?.filter((e: any) => e.tool.startsWith('prompt:')) || []
   );
 
   // Filter execution history by selected prompt
-  let executionHistory = $derived(
+  const executionHistory = $derived(
     selectedPrompt
       ? allExecutionHistory.filter((e: any) => e.tool === `prompt:${selectedPrompt!.name}`)
       : allExecutionHistory
   );
 
   // Selected server info
-  let selectedServer = $derived(
+  const selectedServer = $derived(
     servers.find(s => s.id === selectedServerId)
   );
 
-  // Subscribe to stores
+  // ✅ FIXED: Single effect for server selection logic with proper dependency tracking
   $effect(() => {
-    const unsubscribeServers = serverStore.subscribe((state: any) => {
-      // ✅ FIXED: Convert Map to array before filtering with explicit type
-      const allServers: ServerInfo[] = state.servers instanceof Map
-        ? Array.from(state.servers.values())
-        : [];
-      // Filter to only show connected servers that support prompts
-      const connectedServers = filterServersByCapability(allServers, 'prompts');
-      servers = connectedServers;
-      serverStoreState = state; // Update reactive state for execution history
-
-      // Validate that the globally selected server exists in our filtered list and supports prompts
-      if (selectedServerId !== state.selectedServerId) {
-        const globallySelectedId = state.selectedServerId;
-
-        // Only update if the globally selected server is in our filtered prompts servers list
-        if (globallySelectedId && connectedServers.some(s => s.id === globallySelectedId)) {
-          selectedServerId = globallySelectedId;
-          loadPrompts();
-        } else if (globallySelectedId !== selectedServerId) {
-          // Global selection is invalid for prompts, clear our local selection
-          selectedServerId = undefined;
-        }
+    // Validate that the globally selected server exists in our filtered list and supports prompts
+    if (globalSelectedId && servers.some(s => s.id === globalSelectedId)) {
+      if (selectedServerId !== globalSelectedId) {
+        selectedServerId = globalSelectedId;
+        loadPrompts();
       }
+      return; // Exit early if synced with global
+    }
 
-      // Auto-select first connected server if none selected
-      if (!state.selectedServerId && connectedServers.length > 0 && !selectedServerId) {
-        serverStore.selectServer(connectedServers[0].id);
+    // Auto-select first connected server if none selected
+    if (!selectedServerId && servers.length > 0) {
+      selectedServerId = servers[0].id;
+      if (selectedServerId) {
+        loadPrompts();
       }
-    });
-
-    return () => {
-      unsubscribeServers();
-    };
+    }
   });
 
   let filteredPrompts = $derived.by(() => {

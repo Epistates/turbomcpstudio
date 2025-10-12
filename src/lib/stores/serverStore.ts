@@ -82,7 +82,7 @@ export interface ToolExecution {
 /**
  * ✅ NEW: Server store state with Map-based storage for O(1) operations
  */
-interface ServerStoreState {
+export interface ServerStoreState {
   // ✅ NEW: Map instead of array for O(1) lookups
   servers: Map<string, ServerInfo>;
   selectedServerId?: string;

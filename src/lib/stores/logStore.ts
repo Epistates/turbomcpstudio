@@ -49,7 +49,8 @@ function createLogStore() {
       };
 
       update((state) => {
-        const logs = [entry, ...state.logs].slice(0, state.maxLogs);
+        // Append new log to end (chronological order, newest at bottom)
+        const logs = [...state.logs, entry].slice(-state.maxLogs);
         return { ...state, logs };
       });
     },

@@ -49,6 +49,16 @@
         await serverStore.disconnectServer(server.id);
         uiStore.showSuccess(`Disconnected from ${server.config.name}`);
       } else {
+        // ✅ FIXED: If server is in error/connecting state, disconnect first to clean up
+        if (safeStatus === 'error' || safeStatus === 'connecting') {
+          try {
+            await serverStore.disconnectServer(server.id);
+          } catch (disconnectError) {
+            // Ignore disconnect errors - server might already be disconnected
+            console.warn('Failed to disconnect before reconnecting:', disconnectError);
+          }
+        }
+
         // For reconnection, pass the server config instead of the full server info
         await serverStore.connectServer(server.config);
         uiStore.showSuccess(`Connected to ${server.config.name}`);

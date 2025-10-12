@@ -188,13 +188,14 @@
       <!-- Logo & Title -->
       <div class="mcp-header__logo">
         <div class="mcp-header__logo-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="2"/>
-            <path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="2"/>
-          </svg>
+          <img
+            src="/turbomcp-studio-logo.png"
+            alt="TurboMCP Studio"
+            class="w-6 h-6 object-contain"
+          />
         </div>
         <div class="mcp-header__title">
-          <h1>MCP Studio</h1>
+          <h1>TurboMCP Studio</h1>
           {#if !isMobile}
             <span class="mcp-header__subtitle">Model Context Protocol</span>
           {/if}

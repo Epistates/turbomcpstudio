@@ -74,51 +74,36 @@
   let isHistoricalResult = $state(false);
   let filterType = $state('all');
 
-  // Reactive store access using Svelte 5 derived
-  let serverData = $state<CapabilityStoreData | null>(null);
+  // ✅ FIXED: Use $derived instead of manual subscription to prevent infinite loops
+  const serverData = $derived($resourceServersStore);
+  const serverState = $derived($serverStore);
+  const globalSelectedId = $derived(serverState.selectedServerId);
 
+  // ✅ FIXED: Derive server list reactively
+  const serverList = $derived(
+    serverData?.servers instanceof Map
+      ? Array.from(serverData.servers.values())
+      : (Array.isArray(serverData?.servers) ? serverData.servers : [])
+  );
+
+  // ✅ FIXED: Single effect for server selection logic with proper dependency tracking
   $effect(() => {
-    const unsubscribe = resourceServersStore.subscribe(value => {
-      serverData = value;
-    });
-    return unsubscribe;
-  });
+    // Only run logic if we have valid server data
+    if (!serverData || !serverList) return;
 
-  // Listen to global server selection changes
-  $effect(() => {
-    const unsubscribe = serverStore.subscribe((state: any) => {
-      const globalSelectedId = state.selectedServerId;
-
-      // If global selection changed and points to a valid resources server, sync it
-      if (globalSelectedId && serverData?.servers?.some(s => s.id === globalSelectedId)) {
-        if (selectedServerId !== globalSelectedId) {
-          selectedServerId = globalSelectedId;
-          loadResources();
-        }
+    // Sync with global selection if it's a valid resources server
+    if (globalSelectedId && serverList.some(s => s.id === globalSelectedId)) {
+      if (selectedServerId !== globalSelectedId) {
+        selectedServerId = globalSelectedId;
+        loadResources(); // Safe: next effect run will early-return due to equality check above
       }
-    });
-    return unsubscribe;
-  });
+      return; // Exit early if synced with global
+    }
 
-  // Auto-manage server selection
-  $effect(() => {
-    const data = serverData;
-    if (!data) return;
+    // Auto-manage selection: pick first server if none selected or current is invalid
+    const currentServerValid = selectedServerId && serverList.find(s => s.id === selectedServerId);
 
-    // ✅ FIXED: Convert Map to array for server selection
-    const serverList = data.servers instanceof Map
-      ? Array.from(data.servers.values())
-      : [];
-
-    // Only update selectedServerId if current selection is no longer valid
-    if (selectedServerId && !serverList.find((s: ServerInfo) => s.id === selectedServerId)) {
-      // Current selection is invalid, pick first available
-      selectedServerId = serverList.length > 0 ? serverList[0].id : undefined;
-      if (selectedServerId) {
-        loadResources();
-      }
-    } else if (!selectedServerId && serverList.length > 0) {
-      // No selection and servers available, auto-select first
+    if (!currentServerValid && serverList.length > 0) {
       selectedServerId = serverList[0].id;
       if (selectedServerId) {
         loadResources();

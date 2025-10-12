@@ -4,6 +4,7 @@
 -->
 <script lang="ts">
   import { uiStore } from '$lib/stores/uiStore';
+  import { contextStore } from '$lib/stores/contextStore';
   import Dashboard from '../Dashboard.svelte';
   import ServerManagement from '../ServerManagement.svelte';
   import ToolExplorer from '../ToolExplorer.svelte';
@@ -17,6 +18,7 @@
   import AddServerModal from '../AddServerModal.svelte';
   import ServerConfigModal from '../ServerConfigModal.svelte';
   import ModeIndicator from '../ModeIndicator.svelte';
+  import ServerContextBar from '../ServerContextBar.svelte';
 
   // Reactive view state using Svelte 5 runes
   // Access store properties directly with $derived to maintain reactivity
@@ -28,6 +30,36 @@
   const showModeIndicator = $derived(
     currentView === 'sampling' || currentView === 'elicitation' || currentView === 'protocol'
   );
+
+  // ✅ NEW: Check if current view should show server context bar (operational views)
+  const showContextBar = $derived(
+    currentView === 'tools' ||
+    currentView === 'resources' ||
+    currentView === 'prompts' ||
+    currentView === 'sampling' ||
+    currentView === 'elicitation' ||
+    currentView === 'protocol' ||
+    currentView === 'collections'
+  );
+
+  // ✅ NEW: Get required capability for current view (for filtering servers)
+  const requiredCapability = $derived(() => {
+    switch (currentView) {
+      case 'tools': return 'tools';
+      case 'resources': return 'resources';
+      case 'prompts': return 'prompts';
+      case 'sampling': return 'sampling';
+      case 'elicitation': return 'elicitation';
+      default: return null;
+    }
+  });
+
+  // ✅ NEW: Auto-select server when context bar is shown
+  $effect(() => {
+    if (showContextBar) {
+      contextStore.autoSelectServer();
+    }
+  });
 
   // Content component mapping (unused - kept for reference)
   // function getContentComponent(view: string) {
@@ -57,6 +89,11 @@
   <!-- Mode Indicator for Testing Views -->
   {#if showModeIndicator}
     <ModeIndicator mode="manual" compact={true} />
+  {/if}
+
+  <!-- ✅ NEW: Server Context Bar for Operational Views -->
+  {#if showContextBar}
+    <ServerContextBar requiredCapability={requiredCapability()} />
   {/if}
 
   <!-- Dynamic Content Area -->
