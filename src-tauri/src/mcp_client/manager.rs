@@ -69,8 +69,8 @@ pub struct McpClientManager {
     /// System information for process monitoring
     system: Arc<RwLock<System>>,
 
-    /// Event channel for connection updates
-    event_sender: mpsc::UnboundedSender<ConnectionEvent>,
+    /// Event channel for connection updates (Issue #20: bounded to prevent memory leak)
+    event_sender: mpsc::Sender<ConnectionEvent>,
 
     /// Sampling handler for LLM integration (HITL approval)
     sampling_handler: Arc<StudioSamplingHandler>,
@@ -85,8 +85,10 @@ impl McpClientManager {
         app_handle: tauri::AppHandle,
         llm_config: Arc<crate::llm_config::LLMConfigManager>,
         db: Arc<tokio::sync::RwLock<Option<Arc<crate::database::Database>>>>,
-    ) -> (Self, mpsc::UnboundedReceiver<ConnectionEvent>) {
-        let (event_sender, event_receiver) = mpsc::unbounded_channel();
+    ) -> (Self, mpsc::Receiver<ConnectionEvent>) {
+        // Issue #20 fix: Use bounded channel to prevent memory leak
+        // Buffer size: 1000 events ≈ 500KB max (vs potentially 288MB with unbounded)
+        let (event_sender, event_receiver) = mpsc::channel(1000);
 
         // Initialize sampling handler with HITL approval and protocol logging
         let sampling_handler = Arc::new(StudioSamplingHandler::new(
@@ -439,10 +441,19 @@ impl McpClientManager {
         }
     }
 
-    /// Send connection event
+    /// Send connection event (Issue #20: non-blocking with bounded channel)
     fn send_event(&self, event: ConnectionEvent) {
-        if let Err(e) = self.event_sender.send(event) {
-            tracing::error!("Failed to send connection event: {}", e);
+        use tokio::sync::mpsc::error::TrySendError;
+
+        match self.event_sender.try_send(event) {
+            Ok(_) => {},
+            Err(TrySendError::Full(_)) => {
+                tracing::warn!("Event channel full, dropping event (backpressure active)");
+                // Event dropped - frontend likely paused/slow
+            }
+            Err(TrySendError::Closed(_)) => {
+                tracing::error!("Event channel closed, cannot send event");
+            }
         }
     }
 

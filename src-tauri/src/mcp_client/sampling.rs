@@ -90,8 +90,6 @@ pub struct PendingSamplingRequest {
     pub estimated_cost: Option<f64>,
     pub estimated_tokens: Option<u32>,
     pub created_at: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub retry_count: Option<u32>,
 }
 
 /// Studio sampling handler with human-in-the-loop
@@ -109,9 +107,6 @@ pub struct StudioSamplingHandler {
     /// Response channels for async communication (supports both success and rejection)
     /// Uses Box<dyn Error> for errors to preserve error type information (e.g., HandlerError::UserCancelled)
     response_channels: Arc<DashMap<String, tokio::sync::oneshot::Sender<Result<CreateMessageResult, Box<dyn std::error::Error + Send + Sync>>>>>,
-
-    /// Request hash tracking for retry detection (maps content hash → (request_id, count))
-    request_hashes: Arc<DashMap<String, (String, u32)>>,
 
     /// LLM configuration manager for actual LLM calls
     llm_config: Arc<LLMConfigManager>,
@@ -133,7 +128,6 @@ impl StudioSamplingHandler {
             app_handle,
             pending_requests: Arc::new(DashMap::new()),
             response_channels: Arc::new(DashMap::new()),
-            request_hashes: Arc::new(DashMap::new()),
             llm_config,
             db,
         }
@@ -300,9 +294,8 @@ impl StudioSamplingHandler {
             .1;
 
         // Send rejection error using HandlerError::UserCancelled
-        // Maps to JSON-RPC error -32800 (user action)
-        // TurboMCP client will preserve this error code via downcast
-        // CRITICAL: This ensures the retry logic recognizes this as a user action and doesn't retry
+        // Maps to JSON-RPC error -1 (MCP spec: "User rejected sampling request")
+        // MCP servers recognize -1 as permanent rejection and will not retry
         let rejection_error = HandlerError::UserCancelled;
         let boxed_error: Box<dyn std::error::Error + Send + Sync> = Box::new(rejection_error);
         if tx.send(Err(boxed_error)).is_err() {
@@ -361,42 +354,6 @@ impl SamplingHandler for StudioSamplingHandler {
             }
         }
 
-        // Detect retries by hashing request content
-        let request_hash = {
-            use std::collections::hash_map::DefaultHasher;
-            use std::hash::{Hash, Hasher};
-            let mut hasher = DefaultHasher::new();
-            // Hash key components to detect retries
-            server_context.server_id.hash(&mut hasher);
-            request.messages.len().hash(&mut hasher);
-            if let Some(first_msg) = request.messages.first() {
-                // ContentBlock is an enum, extract text from Text variant
-                match &first_msg.content {
-                    turbomcp_protocol::types::ContentBlock::Text(text_content) => {
-                        text_content.text.hash(&mut hasher);
-                    },
-                    _ => {
-                        // For non-text content, hash a placeholder
-                        "non-text-content".hash(&mut hasher);
-                    }
-                }
-            }
-            format!("{:x}", hasher.finish())
-        };
-
-        let retry_count = if let Some(mut entry) = self.request_hashes.get_mut(&request_hash) {
-            // We've seen this request before - it's a retry!
-            let (prev_id, count) = &mut *entry;
-            *count += 1;
-            *prev_id = request_id.clone(); // Update to current request ID
-            tracing::info!("🔄 Detected retry #{} for request content hash: {}", count, &request_hash[..8]);
-            Some(*count)
-        } else {
-            // First time seeing this request
-            self.request_hashes.insert(request_hash.clone(), (request_id.clone(), 1));
-            None
-        };
-
         // Create pending request
         let pending = PendingSamplingRequest {
             request_id: request_id.clone(),
@@ -406,7 +363,6 @@ impl SamplingHandler for StudioSamplingHandler {
             estimated_cost: self.estimate_cost(&request),
             estimated_tokens: self.estimate_tokens(&request),
             created_at: chrono::Utc::now().to_rfc3339(),
-            retry_count,
         };
 
         // Store pending request
@@ -434,7 +390,6 @@ impl SamplingHandler for StudioSamplingHandler {
             "estimatedCost": pending.estimated_cost,
             "estimatedTokens": pending.estimated_tokens,
             "createdAt": pending.created_at,
-            "retryCount": pending.retry_count,
         });
 
         self.app_handle
@@ -446,7 +401,7 @@ impl SamplingHandler for StudioSamplingHandler {
         // Wait for user approval + LLM result (with timeout)
         tracing::info!("⏳ Waiting for user approval: {}", request_id);
 
-        let result = tokio::time::timeout(Duration::from_secs(300), rx)
+        let response_result = tokio::time::timeout(Duration::from_secs(300), rx)
             .await
             .map_err(|_| {
                 self.pending_requests.remove(&request_id);
@@ -460,43 +415,98 @@ impl SamplingHandler for StudioSamplingHandler {
                 Box::new(HandlerError::Generic {
                     message: "Channel closed before receiving response".to_string()
                 }) as Box<dyn std::error::Error + Send + Sync>
-            })?
-            // Unwrap inner Result - if Err, this is the user's rejection (HandlerError::UserCancelled)
-            ?;
+            })?;
 
-        tracing::info!("🎉 Sampling request completed: {}", request_id);
-
-        // Capture outgoing response for protocol inspector
+        // Process response (success or rejection) and log to protocol inspector
         let processing_time_ms = start.elapsed().as_millis() as i64;
-        if let Some(db) = self.db.read().await.as_ref() {
-            let msg_id = Uuid::new_v4();
-            let response_json = serde_json::to_string(&result)
-                .unwrap_or_else(|_| "Failed to serialize response".to_string());
-            let size_bytes = response_json.len() as i64;
 
-            let message = MessageHistory {
-                id: msg_id,
-                server_id: server_context.server_id,
-                timestamp: Utc::now(),
-                direction: MessageDirection::ClientToServer,
-                content: response_json,
-                size_bytes,
-                processing_time_ms: Some(processing_time_ms),
-            };
+        match response_result {
+            Ok(result) => {
+                tracing::info!("🎉 Sampling request completed successfully: {}", request_id);
 
-            if let Err(e) = db.save_message(&message).await {
-                tracing::warn!("Failed to save outgoing sampling response: {}", e);
-            } else {
-                // Emit real-time event for UI
-                let _ = self.app_handle.emit("protocol_message", &msg_id);
-                tracing::debug!(
-                    "📝 Captured outgoing sampling response: {} ({}ms)",
-                    msg_id,
-                    processing_time_ms
-                );
+                // Log successful response to protocol inspector
+                if let Some(db) = self.db.read().await.as_ref() {
+                    let msg_id = Uuid::new_v4();
+                    let response_json = serde_json::to_string(&result)
+                        .unwrap_or_else(|_| "Failed to serialize response".to_string());
+                    let size_bytes = response_json.len() as i64;
+
+                    let message = MessageHistory {
+                        id: msg_id,
+                        server_id: server_context.server_id,
+                        timestamp: Utc::now(),
+                        direction: MessageDirection::ClientToServer,
+                        content: response_json,
+                        size_bytes,
+                        processing_time_ms: Some(processing_time_ms),
+                    };
+
+                    if let Err(e) = db.save_message(&message).await {
+                        tracing::warn!("Failed to save outgoing sampling response: {}", e);
+                    } else {
+                        let _ = self.app_handle.emit("protocol_message", &msg_id);
+                        tracing::debug!(
+                            "📝 Captured outgoing sampling response: {} ({}ms)",
+                            msg_id,
+                            processing_time_ms
+                        );
+                    }
+                }
+
+                Ok(result)
+            }
+            Err(error) => {
+                tracing::info!("❌ Sampling request rejected/failed: {}", request_id);
+
+                // Log error response to protocol inspector
+                if let Some(db) = self.db.read().await.as_ref() {
+                    let msg_id = Uuid::new_v4();
+
+                    // Create JSON-RPC error response for logging
+                    let error_code = if let Some(handler_err) = error.downcast_ref::<HandlerError>() {
+                        handler_err.into_jsonrpc_error().code
+                    } else {
+                        -32603 // Internal error default
+                    };
+
+                    let error_response = serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": {
+                            "code": error_code,
+                            "message": error.to_string()
+                        }
+                    });
+
+                    let response_json = serde_json::to_string(&error_response)
+                        .unwrap_or_else(|_| format!(r#"{{"error": "{}"}}"#, error));
+                    let size_bytes = response_json.len() as i64;
+
+                    let message = MessageHistory {
+                        id: msg_id,
+                        server_id: server_context.server_id,
+                        timestamp: Utc::now(),
+                        direction: MessageDirection::ClientToServer,
+                        content: response_json,
+                        size_bytes,
+                        processing_time_ms: Some(processing_time_ms),
+                    };
+
+                    if let Err(e) = db.save_message(&message).await {
+                        tracing::warn!("Failed to save sampling error response: {}", e);
+                    } else {
+                        let _ = self.app_handle.emit("protocol_message", &msg_id);
+                        tracing::debug!(
+                            "📝 Captured sampling error response: {} ({}ms, code: {})",
+                            msg_id,
+                            processing_time_ms,
+                            error_code
+                        );
+                    }
+                }
+
+                Err(error)
             }
         }
-
-        Ok(result)
     }
 }

@@ -167,3 +167,26 @@ pub async fn llm_completion_request(
         Err(e) => Err(format!("Failed to complete LLM request: {}", e)),
     }
 }
+
+/// Issue #18 fix: Gracefully shutdown background monitoring tasks
+/// Called by frontend before window close to prevent resource leaks
+#[tauri::command]
+pub async fn shutdown_background_tasks(
+    state: tauri::State<'_, crate::AppState>,
+) -> Result<(), String> {
+    tracing::info!("🛑 Shutting down background tasks...");
+
+    // Stop monitoring loop by aborting the task
+    if let Some(handle) = state.monitoring_handle.lock().await.take() {
+        handle.abort();
+        tracing::info!("✅ Monitoring loop stopped");
+    } else {
+        tracing::warn!("⚠️ No monitoring handle found (already stopped or never started)");
+    }
+
+    // Give tasks time to clean up gracefully
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    tracing::info!("✅ Background tasks shutdown complete");
+    Ok(())
+}

@@ -453,7 +453,7 @@ impl Database {
             .await?;
 
         let migration_duration = migration_start.elapsed();
-        tracing::info!("✅ Database migrations completed successfully in {:?} (first run: ~3-5s, subsequent runs: ~50-200ms)", migration_duration);
+        tracing::info!("✅ Database migrations completed successfully in {:?} (11 tables + 3 indexes, typically 3-15ms)", migration_duration);
         Ok(())
     }
 

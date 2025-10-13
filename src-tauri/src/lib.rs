@@ -13,7 +13,8 @@ use hitl_sampling::HITLSamplingManager;
 use llm_config::LLMConfigManager;
 use mcp_client::McpClientManager;
 use std::sync::Arc;
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Listener, Manager};
+use types::InitializationError;
 
 /// Application state shared across all commands
 #[derive(Clone)]
@@ -22,6 +23,8 @@ pub struct AppState {
     pub llm_config: Arc<LLMConfigManager>,
     pub hitl_sampling: Arc<HITLSamplingManager>,
     pub database: Arc<tokio::sync::RwLock<Option<Arc<Database>>>>,
+    /// Issue #18 fix: Store monitoring loop handle for graceful shutdown
+    pub monitoring_handle: Arc<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -53,6 +56,50 @@ pub fn run() {
         .setup(|app| {
             let app_handle = app.handle().clone();
 
+            // Issue #5 fix: Set up panic hook to catch crashes and notify frontend
+            // This replaces the frontend timeout as the primary failure detection mechanism
+            let panic_app_handle = app_handle.clone();
+            std::panic::set_hook(Box::new(move |panic_info| {
+                // Extract panic details
+                let panic_message = if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "Unknown panic occurred".to_string()
+                };
+
+                // Extract panic location
+                let location = if let Some(location) = panic_info.location() {
+                    format!("{}:{}:{}", location.file(), location.line(), location.column())
+                } else {
+                    "unknown location".to_string()
+                };
+
+                // Log panic details
+                tracing::error!("💥 PANIC: {} at {}", panic_message, location);
+                tracing::error!("Panic info: {:?}", panic_info);
+
+                // Emit critical error to frontend
+                let _ = panic_app_handle.emit("initialization-error", InitializationError {
+                    critical: true,
+                    component: "runtime".to_string(),
+                    message: format!("Application panic: {} ({})", panic_message, location),
+                    fallback_used: None,
+                    user_action: Some("Please restart the application and check logs".to_string()),
+                });
+
+                // Emit app-ready to unblock UI (same pattern as critical database errors)
+                let _ = panic_app_handle.emit("app-ready", ());
+
+                // Show main window even on panic so user can see error (Tauri v2 pattern)
+                if let Some(window) = panic_app_handle.get_webview_window("main") {
+                    let _ = window.show();
+                }
+            }));
+
+            tracing::info!("✅ Panic hook installed - will emit events on crashes");
+
             // Initialize LLM config first (needed by MCP manager)
             let llm_config = Arc::new(LLMConfigManager::new());
 
@@ -71,28 +118,52 @@ pub fn run() {
             let (hitl_sampling, mut sampling_event_receiver) = HITLSamplingManager::new(llm_config.clone());
             let hitl_sampling = Arc::new(hitl_sampling);
 
+            // Issue #18 fix: Create monitoring handle storage for graceful shutdown
+            let monitoring_handle = Arc::new(tokio::sync::Mutex::new(None));
+
             // Store lightweight state immediately to unblock UI
             app.manage(AppState {
                 mcp_manager: mcp_manager.clone(),
                 llm_config: llm_config.clone(),
                 hitl_sampling: hitl_sampling.clone(),
                 database: database.clone(),
+                monitoring_handle: monitoring_handle.clone(),
             });
 
-            // Emit immediate ready event so UI can start working
-            let _ = app_handle.emit("app-early-ready", ());
+            // Issue #5 fix: Proper handshake pattern to prevent race condition
+            // Create a oneshot channel to signal when frontend is ready
+            // This ensures app-ready is only emitted AFTER frontend listeners are registered
+            let (frontend_ready_tx, frontend_ready_rx) = tokio::sync::oneshot::channel::<()>();
+
+            let app_handle_for_ready_handshake = app_handle.clone();
+            app.once("frontend-ready", move |_event| {
+                tracing::info!("🔔 Received frontend-ready signal, emitting app-early-ready");
+                let _ = app_handle_for_ready_handshake.emit("app-early-ready", ());
+                tracing::info!("✅ Emitted app-early-ready event (handshake pattern - deterministic)");
+
+                // Signal the background task that frontend is ready for app-ready event
+                let _ = frontend_ready_tx.send(());
+            });
 
             // Defer heavy initialization to background task
             let app_handle_clone = app_handle.clone();
             let database_clone = database.clone();
             let mcp_manager_clone = mcp_manager.clone();
+            let monitoring_handle_clone = monitoring_handle.clone();  // Issue #18 fix
             tauri::async_runtime::spawn(async move {
+                // Issue #5 fix: Wait for frontend to signal readiness before proceeding
+                // This prevents race condition where app-ready fires before listeners are registered
+                match frontend_ready_rx.await {
+                    Ok(_) => tracing::info!("Frontend ready signal received, proceeding with initialization"),
+                    Err(_) => tracing::warn!("Frontend ready channel closed unexpectedly, continuing anyway"),
+                }
                 let bg_init_start = std::time::Instant::now();
                 tracing::info!("Starting background initialization");
 
-                // Start background monitoring loop for MCP connections (must be in async context)
-                let _monitoring_handle = mcp_manager_clone.start_monitoring();
-                tracing::info!("MCP connection monitoring loop started");
+                // Issue #18 fix: Start monitoring and STORE the handle for graceful shutdown
+                let handle = mcp_manager_clone.start_monitoring();
+                *monitoring_handle_clone.lock().await = Some(handle);
+                tracing::info!("MCP connection monitoring loop started (handle stored for shutdown)");
 
                 // Use Tauri's native path APIs for platform-agnostic directory resolution
                 let app_data_dir = match app_handle_clone.path().app_data_dir() {
@@ -106,15 +177,32 @@ pub fn run() {
                 tracing::info!("App data directory: {:?}", app_data_dir);
 
                 // Create directory if it doesn't exist
-                if let Err(e) = std::fs::create_dir_all(&app_data_dir) {
+                // Issue #16 fix: Emit error instead of early return to prevent frontend hang
+                let directory_created = if let Err(e) = std::fs::create_dir_all(&app_data_dir) {
                     tracing::error!("Failed to create data directory: {}", e);
-                    return;
-                }
 
-                tracing::info!("Data directory created successfully");
+                    // Emit initialization error to frontend
+                    let _ = app_handle_clone.emit("initialization-error", InitializationError {
+                        critical: false,
+                        component: "filesystem".to_string(),
+                        message: format!("Cannot create app directory: {}", e),
+                        fallback_used: Some("in-memory database".to_string()),
+                        user_action: Some("Check folder permissions or disk space".to_string()),
+                    });
+
+                    false  // Will use in-memory database as fallback
+                } else {
+                    tracing::info!("Data directory created successfully");
+                    true
+                };
 
                 // Initialize database with robust fallback strategy
-                let db_path = app_data_dir.join("mcp_studio.db");
+                let db_path = if directory_created {
+                    app_data_dir.join("mcp_studio.db")
+                } else {
+                    // Directory creation failed, skip file-based database
+                    std::path::PathBuf::from(":memory:")
+                };
                 tracing::info!("Attempting to initialize database at: {:?}", db_path);
 
                 // Convert path to string, handling invalid Unicode gracefully
@@ -167,14 +255,35 @@ pub fn run() {
                                 match Database::new_with_full_migration(":memory:").await {
                                     Ok(db) => {
                                         tracing::warn!("⚠️ Using in-memory database - data will not persist between sessions!");
-                                        // Emit warning to frontend
-                                        let _ = app_handle_clone.emit("database-fallback", "in-memory");
+                                        // Emit warning to frontend using InitializationError
+                                        let _ = app_handle_clone.emit("initialization-error", InitializationError {
+                                            critical: false,
+                                            component: "database".to_string(),
+                                            message: "Using in-memory database - data will not persist".to_string(),
+                                            fallback_used: Some("in-memory".to_string()),
+                                            user_action: None,
+                                        });
                                         db
                                     }
                                     Err(e) => {
                                         tracing::error!("💥 Critical error: Even in-memory database failed: {}", e);
-                                        // Emit critical error to frontend
-                                        let _ = app_handle_clone.emit("database-critical-error", e.to_string());
+
+                                        // Issue #16 fix: Emit error AND app-ready to unblock frontend
+                                        let _ = app_handle_clone.emit("initialization-error", InitializationError {
+                                            critical: true,
+                                            component: "database".to_string(),
+                                            message: format!("Database initialization failed: {}", e),
+                                            fallback_used: None,
+                                            user_action: Some("Please restart the application".to_string()),
+                                        });
+
+                                        // Still emit app-ready to unblock UI (app won't work, but frontend won't hang)
+                                        let _ = app_handle_clone.emit("app-ready", ());
+
+                                        // Show main window so user can see critical error (Tauri v2 pattern)
+                                        if let Some(window) = app_handle_clone.get_webview_window("main") {
+                                            let _ = window.show();
+                                        }
                                         return;
                                     }
                                 }
@@ -201,6 +310,18 @@ pub fn run() {
                 // Emit ready event to frontend
                 let _ = app_handle_clone.emit("app-ready", ());
                 tracing::info!("app-ready event emitted");
+
+                // Show main window now that initialization is complete (Tauri v2 best practice)
+                // Window starts hidden (visible: false in tauri.conf.json) to prevent white flash
+                if let Some(window) = app_handle_clone.get_webview_window("main") {
+                    if let Err(e) = window.show() {
+                        tracing::error!("Failed to show main window: {}", e);
+                    } else {
+                        tracing::info!("✅ Main window shown");
+                    }
+                } else {
+                    tracing::warn!("Main window not found, cannot show");
+                }
             });
 
             // Note: Monitoring will be started lazily when first MCP connection is made
@@ -225,6 +346,31 @@ pub fn run() {
 
             tracing::info!("MCP Studio setup complete, background initialization started");
             Ok(())
+        })
+        // Issue #18 fix: Handle window close event on Rust side for cleanup
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                tracing::info!("🛑 Window close requested, shutting down background tasks...");
+
+                // Get app state and shutdown background tasks
+                let app_handle = window.app_handle();
+                if let Some(state) = app_handle.try_state::<AppState>() {
+                    tauri::async_runtime::block_on(async {
+                        // Stop monitoring loop by aborting the task
+                        if let Some(handle) = state.monitoring_handle.lock().await.take() {
+                            handle.abort();
+                            tracing::info!("✅ Monitoring loop stopped");
+                        }
+
+                        // Give tasks time to clean up gracefully
+                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+                        tracing::info!("✅ Background tasks shutdown complete");
+                    });
+                }
+
+                // Don't call api.prevent_close() - let window close naturally after cleanup
+            }
         })
         .invoke_handler(tauri::generate_handler![
             // Server management commands
@@ -301,6 +447,7 @@ pub fn run() {
             commands::llm_completion_request,
             // Application utility commands
             commands::get_app_paths,
+            commands::shutdown_background_tasks,  // Issue #18 fix
             // Server Profile commands (enterprise server management)
             commands::create_server_profile,
             commands::update_server_profile,
