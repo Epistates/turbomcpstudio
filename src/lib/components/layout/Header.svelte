@@ -39,8 +39,8 @@
     ontoggleSidebar?: () => void;
   } = $props();
 
-  // Store subscriptions
-  const theme = $themeStore;
+  // Store subscriptions with reactive derived
+  const theme = $derived($themeStore);
   const ui = $uiStore;
   const serverState = $derived($serverStore);
 
@@ -189,7 +189,7 @@
       <div class="mcp-header__logo">
         <div class="mcp-header__logo-icon">
           <img
-            src="/turbomcp-studio-logo.png"
+            src="/turbomcp-studio-cropped-logo.png"
             alt="TurboMCP Studio"
             class="w-6 h-6 object-contain"
           />
@@ -345,7 +345,7 @@
         title="Toggle theme"
       >
         {#if !isMobile}
-          {theme.theme === 'system' ? 'Auto' : theme.resolvedTheme === 'dark' ? 'Dark' : 'Light'}
+          {theme.theme === 'system' ? 'Auto' : theme.resolvedTheme === 'dark' ? 'Light' : 'Dark'}
         {/if}
       </Button>
 

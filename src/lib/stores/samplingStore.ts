@@ -286,10 +286,28 @@ function createSamplingStore() {
 				}));
 				logger.info('📋 [DEBUG] Moved request to history');
 			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error);
+
+				// Handle "no pending channel" error - this means the request is stale
+				if (errorMessage.includes('No pending channel for request')) {
+					logger.warn('⚠️ [DEBUG] No pending channel - request is stale, removing from pending list:', requestId);
+
+					// Remove from pending list without adding to history since the backend already processed it
+					update((state) => ({
+						...state,
+						pending: state.pending.filter((r) => r.requestId !== requestId),
+						loading: false,
+						error: 'Request no longer valid (already processed or timed out)'
+					}));
+
+					// Don't throw - just return, error is stored in state
+					return;
+				}
+
 				update((s) => ({
 					...s,
 					loading: false,
-					error: error instanceof Error ? error.message : String(error)
+					error: errorMessage
 				}));
 
 				logger.error('Failed to reject sampling request:', error);
@@ -356,10 +374,28 @@ function createSamplingStore() {
 					loading: false
 				}));
 			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error);
+
+				// Handle "no pending channel" error - this means the request is stale
+				if (errorMessage.includes('No pending channel for request')) {
+					logger.warn('⚠️ [DEBUG] No pending channel for manual response - request is stale, removing from pending list:', requestId);
+
+					// Remove from pending list without adding to history since the backend already processed it
+					update((state) => ({
+						...state,
+						pending: state.pending.filter((r) => r.requestId !== requestId),
+						loading: false,
+						error: 'Request no longer valid (already processed or timed out)'
+					}));
+
+					// Don't throw - just return, error is stored in state
+					return;
+				}
+
 				update((s) => ({
 					...s,
 					loading: false,
-					error: error instanceof Error ? error.message : String(error)
+					error: errorMessage
 				}));
 
 				logger.error('Failed to submit manual sampling response:', error);

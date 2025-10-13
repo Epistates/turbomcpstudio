@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { withTimeout, globalRequestManager } from '$lib/utils/asyncHelpers';
 import { createLogger } from '$lib/utils/logger';
@@ -108,22 +108,16 @@ function createServerStore() {
   const { subscribe, set, update } = writable<ServerStoreState>(initialState);
   const logger = createLogger('ServerStore');
 
-  // ✅ NEW: Helper to convert Map to array for UI compatibility
+  // ✅ FIXED: Helper to convert Map to array for UI compatibility (no memory leak)
   const getServersArray = (): ServerInfo[] => {
-    let serversArray: ServerInfo[] = [];
-    subscribe(state => {
-      serversArray = Array.from(state.servers.values());
-    })();
-    return serversArray;
+    const state = get({ subscribe });
+    return Array.from(state.servers.values());
   };
 
-  // ✅ NEW: Helper to get a single server by ID
+  // ✅ FIXED: Helper to get a single server by ID (no memory leak)
   const getServer = (serverId: string): ServerInfo | undefined => {
-    let server: ServerInfo | undefined;
-    subscribe(state => {
-      server = state.servers.get(serverId);
-    })();
-    return server;
+    const state = get({ subscribe });
+    return state.servers.get(serverId);
   };
 
   return {
@@ -664,11 +658,9 @@ function createServerStore() {
 
     // Get server name by ID (utility method)
     getServerName(serverId: string): string {
-      let currentState: ServerStoreState;
-      subscribe(state => currentState = state)(); // Get current state without subscribing
-
-      // ✅ FIXED: Get from Map instead of .find()
-      const server = currentState!.servers.get(serverId);
+      // ✅ FIXED: Use get() helper to avoid memory leak
+      const state = get({ subscribe });
+      const server = state.servers.get(serverId);
       return server?.config.name || 'Unknown Server';
     },
 
@@ -795,13 +787,11 @@ function createServerStore() {
 
     // Get tool execution history (non-reactive read-only access)
     getToolExecutions(serverId?: string) {
-      let executions: ToolExecution[] = [];
-      subscribe(state => {
-        executions = serverId
-          ? state.toolExecutions.filter(e => e.serverId === serverId)
-          : state.toolExecutions;
-      })(); // Immediately unsubscribe
-      return executions;
+      // ✅ FIXED: Use get() helper to avoid memory leak
+      const state = get({ subscribe });
+      return serverId
+        ? state.toolExecutions.filter(e => e.serverId === serverId)
+        : state.toolExecutions;
     },
 
     // Clear execution history
@@ -817,11 +807,10 @@ function createServerStore() {
     // Initialize the store by loading servers and templates
     async initialize() {
 
-      // Check if already initializing to prevent race conditions
-      let currentState: ServerStoreState;
-      subscribe(state => currentState = state)(); // Get current state without subscribing
+      // ✅ FIXED: Check if already initializing to prevent race conditions (no memory leak)
+      const currentState = get({ subscribe });
 
-      if (currentState!.initializing) {
+      if (currentState.initializing) {
         return; // Already initializing, skip
       }
 

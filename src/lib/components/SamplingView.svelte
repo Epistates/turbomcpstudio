@@ -136,16 +136,6 @@
 									<p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
 										{getRequestPreview(request)}
 									</p>
-									{#if (request.estimatedTokens && request.estimatedTokens > 0) || (request.estimatedCost && request.estimatedCost > 0)}
-										<div class="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
-											{#if request.estimatedTokens && request.estimatedTokens > 0}
-												<span>~{request.estimatedTokens} tokens</span>
-											{/if}
-											{#if request.estimatedCost && request.estimatedCost > 0}
-												<span>~${request.estimatedCost.toFixed(4)}</span>
-											{/if}
-										</div>
-									{/if}
 								</div>
 								<div class="flex items-center gap-2">
 									{#if request.protocolMessageId}

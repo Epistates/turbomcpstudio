@@ -332,8 +332,15 @@
   // ✅ FIXED: Simplified close - state reset now handled by $effect
   function closeModal() {
     logger.info(`🚪 Closing modal - currentStep was: ${currentStep}`);
+
+    // ✅ CRITICAL FIX: Reset form data SYNCHRONOUSLY before closing modal
+    // This prevents duplicate detection from firing on the just-added server
+    formData.name = '';
+    formData.description = '';
+    modalError = null;
+
     uiStore.closeModal('addServer');
-    // State reset happens automatically in $effect when showModal becomes false
+    // Full state reset happens automatically in $effect when showModal becomes false
   }
 
   function nextStep() {
