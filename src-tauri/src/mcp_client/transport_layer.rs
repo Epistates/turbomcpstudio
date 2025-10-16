@@ -137,9 +137,9 @@ impl TransportLayer {
             TransportConfig::Tcp { .. } => Err(McpStudioError::UnsupportedTransport(
                 "TCP transport not enabled in build".to_string(),
             )),
-            #[cfg(not(feature = "unix"))]
+            #[cfg(not(unix))]
             TransportConfig::Unix { .. } => Err(McpStudioError::UnsupportedTransport(
-                "Unix transport not enabled in build".to_string(),
+                "Unix transport not available on this platform".to_string(),
             )),
         }
     }
@@ -374,16 +374,16 @@ impl TransportLayer {
         }
     }
 
-    #[cfg(not(feature = "unix"))]
+    #[cfg(not(unix))]
     async fn connect_unix(
         _connection: Arc<ManagedConnection>,
         _path: &str,
         _sampling_handler: Arc<StudioSamplingHandler>,
         _elicitation_handler: Arc<StudioElicitationHandler>,
     ) -> McpResult<()> {
-        tracing::error!("Unix socket transport not compiled - enable 'unix' feature");
+        tracing::error!("Unix socket transport not available on this platform");
         Err(McpStudioError::UnsupportedTransport(
-            "Unix socket transport not compiled - enable 'unix' feature".to_string(),
+            "Unix socket transport not available on this platform".to_string(),
         ))
     }
 
