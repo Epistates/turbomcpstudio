@@ -160,29 +160,4 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
           npm_config_registry: 'https://registry.npmjs.org/'
         with:
-          releaseId: ${{ needs.create-release.outputs.upload_url }}
           args: ${{ matrix.args }}
-
-  # Publish release (make it non-draft after all builds succeed)
-  publish-release:
-    name: Publish Release
-    needs: [create-release, build-tauri]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Publish Release
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const { data: release } = await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag: '${{ needs.create-release.outputs.version }}'
-            });
-
-            await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: release.id,
-              draft: false
-            });
