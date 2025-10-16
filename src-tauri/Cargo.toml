@@ -38,7 +38,7 @@ async-openai = "0.24"  # Official OpenAI SDK for Rust
 # TurboMCP integration - v2.0.0-rc.2
 turbomcp = "2.0.0-rc.2"
 turbomcp-client = "2.0.0-rc.2"
-turbomcp-transport = { version = "2.0.0-rc.2", features = ["stdio", "http", "websocket", "tcp", "unix", "compression", "tls"] }
+# turbomcp-transport is defined in target-specific sections below
 turbomcp-protocol = "2.0.0-rc.2"
 
 # Async runtime
@@ -79,13 +79,21 @@ keyring = "2.3"
 tauri-plugin-log = "2.7.0"
 log = "0.4.28"
 
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+# Unix socket support on Linux and macOS
+turbomcp-transport = { version = "2.0.0-rc.2", features = ["stdio", "http", "websocket", "tcp", "unix", "compression", "tls"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# Exclude unix feature on Windows
+turbomcp-transport = { version = "2.0.0-rc.2", features = ["stdio", "http", "websocket", "tcp", "compression", "tls"] }
+
 [features]
-default = ["stdio", "http", "websocket", "tcp", "unix", "plugins"]
+default = ["stdio", "http", "websocket", "tcp", "plugins"]
 stdio = []
 http = []
 websocket = []
 tcp = []
 unix = []
 plugins = []  # Plugin system support for TurboMCP 1.0.9+
-full = ["stdio", "http", "websocket", "tcp", "unix", "plugins"]  # All features for production
+full = ["stdio", "http", "websocket", "tcp", "plugins"]  # All features for production
 
