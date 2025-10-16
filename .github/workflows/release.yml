@@ -161,4 +161,5 @@ jobs:
           npm_config_registry: 'https://registry.npmjs.org/'
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
+          releaseDraft: true
           args: ${{ matrix.args }} ${{ startsWith(matrix.os, 'macos') && '--bundles app dmg' || '' }}
