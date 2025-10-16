@@ -61,31 +61,31 @@ Download the latest release for your platform:
 **[→ Download Latest Release](https://github.com/Epistates/turbomcpstudio/releases/latest)**
 
 #### macOS
-- **Universal DMG** (Intel + Apple Silicon): `MCP-Studio_x.x.x_universal.dmg`
-- **Intel DMG**: `MCP-Studio_x.x.x_x64.dmg`
-- **Apple Silicon DMG**: `MCP-Studio_x.x.x_aarch64.dmg`
+- **Universal DMG** (Intel + Apple Silicon): `TurboMCP-Studio_x.x.x_universal.dmg`
+- **Intel DMG**: `TurboMCP-Studio_x.x.x_x64.dmg`
+- **Apple Silicon DMG**: `TurboMCP-Studio_x.x.x_aarch64.dmg`
 
 Requirements: macOS 11.0 (Big Sur) or later
 
 #### Windows
-- **MSI Installer**: `MCP-Studio_x.x.x_x64_en-US.msi` (recommended)
-- **EXE Installer**: `MCP-Studio_x.x.x_x64-setup.exe`
+- **MSI Installer**: `TurboMCP-Studio_x.x.x_x64_en-US.msi` (recommended)
+- **EXE Installer**: `TurboMCP-Studio_x.x.x_x64-setup.exe`
 
 Requirements: Windows 10 (1809+) or Windows 11
 
 #### Linux
-- **AppImage** (universal): `mcp-studio_x.x.x_amd64.AppImage`
+- **AppImage** (universal): `turbomcp-studio_x.x.x_amd64.AppImage`
   ```bash
-  chmod +x mcp-studio_x.x.x_amd64.AppImage
-  ./mcp-studio_x.x.x_amd64.AppImage
+  chmod +x turbomcp-studio_x.x.x_amd64.AppImage
+  ./turbomcp-studio_x.x.x_amd64.AppImage
   ```
 - **DEB Package** (Debian/Ubuntu):
   ```bash
-  sudo dpkg -i mcp-studio_x.x.x_amd64.deb
+  sudo dpkg -i turbomcp-studio_x.x.x_amd64.deb
   ```
 - **RPM Package** (Fedora/RHEL):
   ```bash
-  sudo rpm -i mcp-studio-x.x.x-1.x86_64.rpm
+  sudo rpm -i turbomcp-studio-x.x.x-1.x86_64.rpm
   ```
 
 Requirements: Modern Linux distribution with GTK 3.24+
@@ -156,11 +156,22 @@ cd turbomcpstudio
 ```bash
 # Install frontend dependencies
 pnpm install
+```
 
-# TurboMCP dependencies are handled automatically via crates.io
-# If you need the latest development version, you can use git dependencies:
-# Edit src-tauri/Cargo.toml and replace version numbers with:
+TurboMCP is published to [crates.io](https://crates.io/crates/turbomcp) and handled automatically during the build process.
+
+**Current Version**: TurboMCP v2.0.0-rc.2 (stable, production-ready)
+
+For development with the latest changes:
+```bash
+# Option 1: Git dependency (latest development version)
+# Edit src-tauri/Cargo.toml:
 # turbomcp = { git = "https://github.com/Epistates/turbomcp.git", branch = "main" }
+
+# Option 2: Clone TurboMCP locally for parallel development
+git clone https://github.com/Epistates/turbomcp.git ../turbomcp
+# Then edit src-tauri/Cargo.toml:
+# turbomcp = { path = "../../turbomcp/crates/turbomcp" }
 ```
 
 ### Development Build
