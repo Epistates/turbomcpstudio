@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="static/turbomcp-studio-logo.png" alt="TurboMCP Studio" width="200"/>
+<img src="static/turbomcp-studio-cropped-logo.png" alt="TurboMCP Studio" width="200"/>
 
 # TurboMCP Studio
 
@@ -51,6 +51,8 @@ A native desktop application for developing, testing, and debugging Model Contex
 - 🔜 **Testing Framework** - Contract testing and load testing
 - 🔜 **Protocol Analysis** - Flow visualization and message replay
 - 🔜 **Team Collaboration** - Shared workspaces and version control
+
+<img src="static/screenshot.png" alt="TurboMCP Studio" width="200"/>
 
 ## Installation
 
