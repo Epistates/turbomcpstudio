@@ -11,6 +11,7 @@ use crate::mcp_client::connection::ManagedConnection;
 use std::sync::Arc;
 use turbomcp_client::sampling::SamplingHandler; // Import trait for method availability
 use turbomcp_protocol::types::{Content, CreateMessageRequest, Role, SamplingMessage, TextContent};
+use uuid::Uuid;
 
 /// Sampling Logic Operations
 ///
@@ -53,8 +54,11 @@ impl SamplingLogic {
                 _meta: None, // TurboMCP 2.0: removed metadata, use _meta
             };
 
+            // Generate request ID for this outgoing request
+            let request_id = Uuid::new_v4().to_string();
+
             // Process the sampling request through TurboMCP
-            match handler.handle_create_message(request).await {
+            match handler.handle_create_message(request_id, request).await {
                 Ok(result) => {
                     tracing::info!(
                         "Sampling request completed successfully for server: {}",

@@ -66,6 +66,7 @@ impl ContextAwareSamplingHandler {
 impl SamplingHandler for ContextAwareSamplingHandler {
     async fn handle_create_message(
         &self,
+        request_id: String,
         request: CreateMessageRequest,
     ) -> Result<CreateMessageResult, Box<dyn std::error::Error + Send + Sync>> {
         // Set the server context in task-local storage before delegating
@@ -74,7 +75,7 @@ impl SamplingHandler for ContextAwareSamplingHandler {
 
         CURRENT_SERVER_CONTEXT
             .scope(context, async move {
-                inner.handle_create_message(request).await
+                inner.handle_create_message(request_id, request).await
             })
             .await
     }
@@ -315,13 +316,13 @@ impl StudioSamplingHandler {
 impl SamplingHandler for StudioSamplingHandler {
     async fn handle_create_message(
         &self,
+        request_id: String,
         request: CreateMessageRequest,
     ) -> Result<CreateMessageResult, Box<dyn std::error::Error + Send + Sync>> {
         let start = Instant::now();
-        let request_id = Uuid::new_v4().to_string();
 
         tracing::info!(
-            "🎯 Received sampling request from server (request_id: {})",
+            "🎯 Received sampling request from server (request_id: {} from JSON-RPC)",
             request_id
         );
 

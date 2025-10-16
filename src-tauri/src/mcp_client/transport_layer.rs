@@ -27,7 +27,9 @@ use turbomcp_transport::streamable_http_client::{
 };
 
 #[cfg(feature = "websocket")]
-use turbomcp_transport::websocket::WebSocketTransport;
+use turbomcp_transport::websocket_bidirectional::{
+    WebSocketBidirectionalConfig, WebSocketBidirectionalTransport,
+};
 
 #[cfg(feature = "tcp")]
 use turbomcp_transport::tcp::TcpTransport;
@@ -508,10 +510,50 @@ impl TransportLayer {
             _ => std::collections::HashMap::new(),
         };
 
+        // Parse URL to separate base_url and endpoint_path
+        // Examples:
+        // - "http://localhost:8080/mcp" → base_url: "http://localhost:8080", endpoint_path: "/mcp"
+        // - "http://localhost:8080" → base_url: "http://localhost:8080", endpoint_path: "" (will use default)
+        let parsed_url = url::Url::parse(url).map_err(|e| {
+            let error_msg = format!("Invalid HTTP URL '{}': {}", url, e);
+            tracing::error!("{}", error_msg);
+            McpStudioError::ConnectionFailed(error_msg)
+        })?;
+
+        let base_url = format!(
+            "{}://{}",
+            parsed_url.scheme(),
+            parsed_url.host_str().ok_or_else(|| {
+                let error_msg = format!("Missing host in HTTP URL: {}", url);
+                tracing::error!("{}", error_msg);
+                McpStudioError::ConnectionFailed(error_msg)
+            })?
+        );
+
+        // Add port if present (and not default for scheme)
+        let base_url = if let Some(port) = parsed_url.port() {
+            format!("{}:{}", base_url, port)
+        } else {
+            base_url
+        };
+
+        // Extract path as endpoint_path, default to "/mcp" if empty
+        let endpoint_path = if parsed_url.path().is_empty() || parsed_url.path() == "/" {
+            "/mcp".to_string()
+        } else {
+            parsed_url.path().to_string()
+        };
+
+        tracing::info!(
+            "🔗 Parsed HTTP URL: base_url='{}', endpoint_path='{}'",
+            base_url,
+            endpoint_path
+        );
+
         // Create HTTP/SSE transport (MCP 2025-06-18 compliant)
         let config = StreamableHttpClientConfig {
-            base_url: url.to_string(),
-            endpoint_path: "/mcp".to_string(),
+            base_url,
+            endpoint_path,
             timeout: std::time::Duration::from_secs(30),
             headers: custom_headers, // Use custom headers from configuration
             ..Default::default()
@@ -534,7 +576,7 @@ impl TransportLayer {
         .await
     }
 
-    /// Initialize TurboMCP client for WebSocket transport
+    /// Initialize TurboMCP client for WebSocket bidirectional transport
     #[cfg(feature = "websocket")]
     async fn initialize_websocket_client(
         connection: &Arc<ManagedConnection>,
@@ -542,18 +584,58 @@ impl TransportLayer {
         _headers: &std::collections::HashMap<String, String>,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
-    ) -> McpResult<Client<WebSocketTransport>> {
-        tracing::info!("Establishing TurboMCP WebSocket connection to: {}", url);
+    ) -> McpResult<Client<WebSocketBidirectionalTransport>> {
+        tracing::info!(
+            "🔗 Initializing TurboMCP WebSocket bidirectional transport for URL: {}",
+            url
+        );
 
-        // Create WebSocket transport
-        let transport = WebSocketTransport::new(url).await.map_err(|e| {
+        // Create WebSocket bidirectional config with enterprise settings
+        // Note: Headers are not supported by WebSocket bidirectional transport
+        use turbomcp_transport::websocket_bidirectional::ReconnectConfig;
+
+        let reconnect_config = ReconnectConfig::new()
+            .with_enabled(true)
+            .with_max_retries(5)
+            .with_initial_delay(std::time::Duration::from_millis(500))
+            .with_max_delay(std::time::Duration::from_secs(30))
+            .with_backoff_factor(2.0);
+
+        let config = WebSocketBidirectionalConfig::client(url.to_string())
+            .with_keep_alive_interval(std::time::Duration::from_secs(30))
+            .with_elicitation_timeout(std::time::Duration::from_secs(120))
+            .with_max_concurrent_elicitations(10)
+            .with_reconnect_config(reconnect_config);
+
+        tracing::info!(
+            "🔗 WebSocket config: keep_alive=30s, elicitation_timeout=120s, max_elicitations=10, reconnect=enabled"
+        );
+
+        // Create bidirectional transport
+        let transport = WebSocketBidirectionalTransport::new(config)
+            .await
+            .map_err(|e| {
+                let error_msg = format!(
+                    "Failed to create WebSocket bidirectional transport for {}: {}",
+                    connection.config.name, e
+                );
+                tracing::error!("{}", error_msg);
+                McpStudioError::ConnectionFailed(error_msg)
+            })?;
+
+        // Connect the transport
+        transport.connect().await.map_err(|e| {
             let error_msg = format!(
-                "Failed to create WebSocket transport for {}: {}",
+                "Failed to connect WebSocket bidirectional transport for {}: {}",
                 connection.config.name, e
             );
             tracing::error!("{}", error_msg);
             McpStudioError::ConnectionFailed(error_msg)
         })?;
+
+        tracing::info!(
+            "✅ WebSocket bidirectional transport connected successfully"
+        );
 
         // Build client with enterprise connection config
         let connection_config = Configuration::create_enterprise_connection_config();
@@ -564,7 +646,7 @@ impl TransportLayer {
         Initialization::finalize_client_initialization(
             client,
             connection,
-            "WebSocket",
+            "WebSocket Bidirectional",
             sampling_handler,
             elicitation_handler,
         )

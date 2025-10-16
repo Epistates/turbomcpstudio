@@ -56,27 +56,53 @@ fn is_user_action_error(error: &turbomcp_protocol::Error) -> bool {
     // Check JSON-RPC error code
     // HandlerError codes should be properly preserved by TurboMCP
     let code = error.jsonrpc_error_code();
+    let message = error.to_string().to_lowercase();
 
-    // Removed diagnostic logging - bug fixed in TurboMCP 2.0.0-rc.1+
-
+    // Check for direct handler error codes
     match code {
         -1 => {
             // HandlerError::UserCancelled (MCP 2025-06-18 spec compliant)
             tracing::info!("User action detected: UserCancelled (-1, MCP spec)");
-            true
+            return true;
         }
         -32801 => {
             // HandlerError::Timeout
             tracing::info!("User action detected: HandlerTimeout (-32801)");
-            true
+            return true;
         }
         -32602 => {
             // HandlerError::InvalidInput
             tracing::info!("User action detected: InvalidInput (-32602)");
-            true
+            return true;
         }
-        _ => false,
+        -32002 => {
+            // ServerError::HandlerError (generic wrapper)
+            // Check message for nested bidirectional operation errors
+            if message.contains("sampling") || message.contains("elicitation") {
+                if message.contains("timeout") || message.contains("cancelled") {
+                    tracing::info!(
+                        "User action detected: Bidirectional operation timeout/cancellation (-32002)"
+                    );
+                    return true;
+                }
+            }
+        }
+        _ => {}
     }
+
+    // Additional message-based detection for sampling/elicitation errors
+    // This handles cases where the error code is wrapped but message reveals user action
+    if message.contains("sampling request failed") || message.contains("elicitation failed") {
+        tracing::info!("User action detected: Bidirectional operation failed (message-based detection)");
+        return true;
+    }
+
+    if message.contains("request timeout") && (message.contains("sampling") || message.contains("elicitation")) {
+        tracing::info!("User action detected: Bidirectional operation timeout (message-based detection)");
+        return true;
+    }
+
+    false
 }
 
 impl McpOperations {

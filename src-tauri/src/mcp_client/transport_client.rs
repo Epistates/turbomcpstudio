@@ -18,7 +18,7 @@ use turbomcp_transport::stdio::StdioTransport;
 use turbomcp_transport::streamable_http_client::StreamableHttpClientTransport;
 
 #[cfg(feature = "websocket")]
-use turbomcp_transport::websocket::WebSocketTransport;
+use turbomcp_transport::websocket_bidirectional::WebSocketBidirectionalTransport;
 
 #[cfg(feature = "tcp")]
 use turbomcp_transport::tcp::TcpTransport;
@@ -40,7 +40,7 @@ pub enum McpTransportClient {
     Http(Client<StreamableHttpClientTransport>),
 
     #[cfg(feature = "websocket")]
-    WebSocket(Client<WebSocketTransport>),
+    WebSocket(Client<WebSocketBidirectionalTransport>),
 
     #[cfg(feature = "tcp")]
     Tcp(Client<TcpTransport>),
@@ -506,6 +506,31 @@ impl McpTransportClient {
             McpTransportClient::Tcp(client) => client.has_resource_update_handler(),
             #[cfg(feature = "unix")]
             McpTransportClient::Unix(client) => client.has_resource_update_handler(),
+        }
+    }
+
+    /// Gracefully shutdown the MCP client and disconnect transport
+    ///
+    /// **CRITICAL**: Always call this before dropping the client to ensure:
+    /// - WebSocket close frames are sent
+    /// - Reconnection tasks are stopped
+    /// - Background tasks are cleaned up
+    /// - Resources are released properly
+    ///
+    /// Without calling shutdown(), WebSocket reconnection tasks will continue
+    /// running even after the client is dropped!
+    pub async fn shutdown(&self) -> Result<(), Box<Error>> {
+        match self {
+            McpTransportClient::Stdio(client) => client.shutdown().await,
+            McpTransportClient::ChildProcess(client) => client.shutdown().await,
+            #[cfg(feature = "http")]
+            McpTransportClient::Http(client) => client.shutdown().await,
+            #[cfg(feature = "websocket")]
+            McpTransportClient::WebSocket(client) => client.shutdown().await,
+            #[cfg(feature = "tcp")]
+            McpTransportClient::Tcp(client) => client.shutdown().await,
+            #[cfg(feature = "unix")]
+            McpTransportClient::Unix(client) => client.shutdown().await,
         }
     }
 }

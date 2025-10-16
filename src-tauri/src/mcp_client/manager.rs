@@ -285,10 +285,23 @@ impl McpClientManager {
             // Update status
             *connection.status.write() = ConnectionStatus::Disconnected;
 
-            // Clean up TurboMCP client - it will handle process termination automatically
-            if let Some(_client) = connection.client.write().take() {
+            // ✅ CRITICAL FIX: Call shutdown() before dropping client
+            // This ensures WebSocket reconnection tasks are stopped and resources cleaned up
+            let client_opt = connection.client.write().take();
+            if let Some(client) = client_opt {
                 tracing::debug!(
-                    "TurboMCP client cleaned up for server: {}",
+                    "Shutting down TurboMCP client for server: {}",
+                    connection.config.name
+                );
+
+                // Call shutdown() to gracefully disconnect transport
+                // This is CRITICAL for WebSocket - stops reconnection tasks and sends close frames
+                if let Err(e) = client.shutdown().await {
+                    tracing::warn!("Error during client shutdown for {}: {}", connection.config.name, e);
+                }
+
+                tracing::debug!(
+                    "TurboMCP client shut down successfully for server: {}",
                     connection.config.name
                 );
                 // TurboMCP ChildProcessTransport will automatically terminate the process when dropped
