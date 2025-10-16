@@ -160,7 +160,24 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
           npm_config_registry: 'https://registry.npmjs.org/'
         with:
-          args: ${{ matrix.args }} ${{ startsWith(matrix.os, 'macos') && '--bundles app dmg' || '' }}
+          args: >-
+            ${{ matrix.args }}
+            --bundles
+            ${{ startsWith(matrix.os, 'macos') && 'app,dmg' || startsWith(matrix.os, 'windows') && 'nsis,msi' || startsWith(matrix.os, 'ubuntu') && 'deb,appimage' || '' }}
+
+      - name: Debug - List build outputs
+        if: always()
+        shell: bash
+        run: |
+          echo "=== Build target: ${{ matrix.rust_target }} ==="
+          if [ -d "src-tauri/target/${{ matrix.rust_target }}/release/bundle" ]; then
+            echo "Bundle directory found:"
+            find "src-tauri/target/${{ matrix.rust_target }}/release/bundle" -type f | head -20
+          else
+            echo "No bundle directory found at src-tauri/target/${{ matrix.rust_target }}/release/bundle"
+            echo "Available targets:"
+            ls -la src-tauri/target/ 2>/dev/null || echo "src-tauri/target/ not found"
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
