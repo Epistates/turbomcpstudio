@@ -160,10 +160,7 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
           npm_config_registry: 'https://registry.npmjs.org/'
         with:
-          args: >-
-            ${{ matrix.args }}
-            --bundles
-            ${{ startsWith(matrix.os, 'macos') && 'app,dmg' || startsWith(matrix.os, 'windows') && 'nsis,msi' || startsWith(matrix.os, 'ubuntu') && 'deb,appimage' || '' }}
+          args: ${{ matrix.args }}
 
       - name: Debug - List build outputs
         if: always()
@@ -207,7 +204,6 @@ jobs:
             artifacts/**/*.dmg
             artifacts/**/*.deb
             artifacts/**/*.AppImage
-            artifacts/**/*.app.tar.gz
             artifacts/**/*.exe
             artifacts/**/*.msi
             artifacts/**/updater.json
