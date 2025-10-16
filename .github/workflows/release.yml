@@ -49,30 +49,7 @@ jobs:
               repo: context.repo.repo,
               tag_name: '${{ steps.get_version.outputs.version }}',
               name: 'TurboMCP Studio ${{ steps.get_version.outputs.version }}',
-              body: `# TurboMCP Studio ${{ steps.get_version.outputs.version }}
-
-## Installation
-
-Download the appropriate installer for your platform:
-- **macOS**: \\`.dmg\\` file (Universal binary for Intel and Apple Silicon)
-- **Windows**: \\`.msi\\` or \\`.exe\\` installer
-- **Linux**: \\`.AppImage\\` (universal), \\`.deb\\` (Debian/Ubuntu), or \\`.rpm\\` (Fedora/RHEL)
-
-## What's New
-
-See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
-
-## Requirements
-
-- macOS: 11.0 (Big Sur) or later
-- Windows: Windows 10 (1809+) or Windows 11
-- Linux: Modern Linux distribution with GTK 3.24+
-
-## Notes
-
-- First release of TurboMCP Studio
-- Native desktop application for Model Context Protocol development
-- Powered by TurboMCP for enterprise-grade MCP operations`,
+              body: 'See CHANGELOG.md for release notes.',
               draft: true,
               prerelease: false
             });
