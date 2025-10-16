@@ -32,17 +32,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
-
       - name: Run cargo-audit
-        run: cargo audit --deny warnings
-        working-directory: src-tauri
+        uses: actions-rust-lang/audit@v1
+        with:
+          # Deny vulnerabilities with warnings or higher severity
+          denyWarnings: true
+          # Only audit the src-tauri directory
+          working-directory: src-tauri
 
   clippy:
     name: Clippy

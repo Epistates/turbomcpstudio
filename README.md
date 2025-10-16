@@ -52,7 +52,7 @@ A native desktop application for developing, testing, and debugging Model Contex
 - 🔜 **Protocol Analysis** - Flow visualization and message replay
 - 🔜 **Team Collaboration** - Shared workspaces and version control
 
-<img src="static/screenshot.png" alt="TurboMCP Studio" width="200"/>
+<img src="static/screenshot.png" alt="TurboMCP Studio" style="width: 100%; max-width: 100%; margin: 20px 0;"/>
 
 ## Installation
 
