@@ -17,7 +17,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use sysinfo::System;
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::error::TrySendError;  // Issue #20: For bounded channel backpressure
+use tokio::sync::mpsc::error::TrySendError; // Issue #20: For bounded channel backpressure
 use uuid::Uuid;
 
 /// Monitoring Loop Operations
@@ -35,7 +35,7 @@ impl MonitoringLoop {
     /// 4. Automatically marks failed connections as errors
     pub fn start_monitoring(
         connections: Arc<DashMap<Uuid, Arc<ManagedConnection>>>,
-        event_sender: mpsc::Sender<ConnectionEvent>,  // Issue #20: Changed to bounded
+        event_sender: mpsc::Sender<ConnectionEvent>, // Issue #20: Changed to bounded
         system: Arc<RwLock<System>>,
     ) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
@@ -165,10 +165,12 @@ impl MonitoringLoop {
                                             *connection.status.write() = ConnectionStatus::Error;
                                             *connection.error_count.lock() += 1;
 
-                                            let _ = event_sender_clone.send(ConnectionEvent::StatusChanged {
-                                                server_id,
-                                                status: ConnectionStatus::Error,
-                                            });
+                                            let _ = event_sender_clone
+                                                .send(ConnectionEvent::StatusChanged {
+                                                    server_id,
+                                                    status: ConnectionStatus::Error,
+                                                })
+                                                .await;
                                         }
                                     }
                                     Err(e) => {
@@ -176,10 +178,12 @@ impl MonitoringLoop {
                                         *connection.status.write() = ConnectionStatus::Error;
                                         *connection.error_count.lock() += 1;
 
-                                        let _ = event_sender_clone.send(ConnectionEvent::StatusChanged {
-                                            server_id,
-                                            status: ConnectionStatus::Error,
-                                        });
+                                        let _ = event_sender_clone
+                                            .send(ConnectionEvent::StatusChanged {
+                                                server_id,
+                                                status: ConnectionStatus::Error,
+                                            })
+                                            .await;
                                     }
                                 }
                             });

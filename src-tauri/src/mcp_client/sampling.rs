@@ -42,6 +42,11 @@ use turbomcp_client::sampling::SamplingHandler;
 use turbomcp_protocol::types::{CreateMessageRequest, CreateMessageResult};
 use uuid::Uuid;
 
+/// Type alias for response channel senders to reduce type complexity
+type ResponseChannelSender = tokio::sync::oneshot::Sender<
+    Result<CreateMessageResult, Box<dyn std::error::Error + Send + Sync>>,
+>;
+
 /// Context-aware sampling handler wrapper
 ///
 /// This wrapper sets the server context in task-local storage before delegating
@@ -107,7 +112,7 @@ pub struct StudioSamplingHandler {
 
     /// Response channels for async communication (supports both success and rejection)
     /// Uses Box<dyn Error> for errors to preserve error type information (e.g., HandlerError::UserCancelled)
-    response_channels: Arc<DashMap<String, tokio::sync::oneshot::Sender<Result<CreateMessageResult, Box<dyn std::error::Error + Send + Sync>>>>>,
+    response_channels: Arc<DashMap<String, ResponseChannelSender>>,
 
     /// LLM configuration manager for actual LLM calls
     llm_config: Arc<LLMConfigManager>,
@@ -227,11 +232,14 @@ impl StudioSamplingHandler {
                     tracing::error!("❌ LLM call failed: {} for request: {}", e, request_id);
                     // Use HandlerError::Generic for LLM failures (retryable)
                     let llm_error = HandlerError::Generic {
-                        message: format!("LLM call failed: {}", e)
+                        message: format!("LLM call failed: {}", e),
                     };
                     let boxed_error: Box<dyn std::error::Error + Send + Sync> = Box::new(llm_error);
                     if tx.send(Err(boxed_error)).is_err() {
-                        tracing::error!("❌ Failed to send LLM error (channel closed): {}", request_id);
+                        tracing::error!(
+                            "❌ Failed to send LLM error (channel closed): {}",
+                            request_id
+                        );
                     }
                 }
             }
@@ -409,12 +417,14 @@ impl SamplingHandler for StudioSamplingHandler {
                 self.response_channels.remove(&request_id);
                 // User didn't respond in time (5 minute timeout)
                 // HandlerError::Timeout maps to JSON-RPC -32801
-                Box::new(HandlerError::Timeout { timeout_seconds: 300 }) as Box<dyn std::error::Error + Send + Sync>
+                Box::new(HandlerError::Timeout {
+                    timeout_seconds: 300,
+                }) as Box<dyn std::error::Error + Send + Sync>
             })?
             .map_err(|_| {
                 // Channel closed before response - internal error
                 Box::new(HandlerError::Generic {
-                    message: "Channel closed before receiving response".to_string()
+                    message: "Channel closed before receiving response".to_string(),
                 }) as Box<dyn std::error::Error + Send + Sync>
             })?;
 
@@ -464,7 +474,8 @@ impl SamplingHandler for StudioSamplingHandler {
                     let msg_id = Uuid::new_v4();
 
                     // Create JSON-RPC error response for logging
-                    let error_code = if let Some(handler_err) = error.downcast_ref::<HandlerError>() {
+                    let error_code = if let Some(handler_err) = error.downcast_ref::<HandlerError>()
+                    {
                         handler_err.into_jsonrpc_error().code
                     } else {
                         -32603 // Internal error default

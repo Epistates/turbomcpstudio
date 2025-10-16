@@ -169,8 +169,8 @@ impl ElicitationHandler for StudioElicitationHandler {
         self.response_channels.insert(request_id_str.clone(), tx);
 
         // Serialize schema for event (typed schema → Value for JSON)
-        let schema_value = serde_json::to_value(request.schema())
-            .unwrap_or_else(|_| serde_json::Value::Null);
+        let schema_value =
+            serde_json::to_value(request.schema()).unwrap_or_else(|_| serde_json::Value::Null);
 
         // Convert timeout to seconds for display
         let timeout_secs = request.timeout().map(|d| d.as_secs());
@@ -192,24 +192,26 @@ impl ElicitationHandler for StudioElicitationHandler {
                 message: format!("Failed to emit event: {}", e),
             })?;
 
-        tracing::info!("Emitted elicitation_requested event for: {}", request_id_str);
+        tracing::info!(
+            "Emitted elicitation_requested event for: {}",
+            request_id_str
+        );
 
         // Use timeout from request (Duration) or default to 5 minutes
         let timeout_duration = request.timeout().unwrap_or(Duration::from_secs(300));
 
-        let response =
-            tokio::time::timeout(timeout_duration, rx)
-                .await
-                .map_err(|_| {
-                    self.pending_requests.remove(&request_id_str);
-                    self.response_channels.remove(&request_id_str);
-                    HandlerError::Timeout {
-                        timeout_seconds: timeout_duration.as_secs(),
-                    }
-                })?
-                .map_err(|_| HandlerError::Generic {
-                    message: "Channel closed before receiving response".to_string(),
-                })?;
+        let response = tokio::time::timeout(timeout_duration, rx)
+            .await
+            .map_err(|_| {
+                self.pending_requests.remove(&request_id_str);
+                self.response_channels.remove(&request_id_str);
+                HandlerError::Timeout {
+                    timeout_seconds: timeout_duration.as_secs(),
+                }
+            })?
+            .map_err(|_| HandlerError::Generic {
+                message: "Channel closed before receiving response".to_string(),
+            })?;
 
         tracing::info!(
             "Received elicitation response for: {} - action: {:?}",

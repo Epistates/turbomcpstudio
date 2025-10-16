@@ -78,13 +78,13 @@ fn is_user_action_error(error: &turbomcp_protocol::Error) -> bool {
         -32002 => {
             // ServerError::HandlerError (generic wrapper)
             // Check message for nested bidirectional operation errors
-            if message.contains("sampling") || message.contains("elicitation") {
-                if message.contains("timeout") || message.contains("cancelled") {
-                    tracing::info!(
-                        "User action detected: Bidirectional operation timeout/cancellation (-32002)"
-                    );
-                    return true;
-                }
+            if (message.contains("sampling") || message.contains("elicitation"))
+                && (message.contains("timeout") || message.contains("cancelled"))
+            {
+                tracing::info!(
+                    "User action detected: Bidirectional operation timeout/cancellation (-32002)"
+                );
+                return true;
             }
         }
         _ => {}
@@ -93,12 +93,18 @@ fn is_user_action_error(error: &turbomcp_protocol::Error) -> bool {
     // Additional message-based detection for sampling/elicitation errors
     // This handles cases where the error code is wrapped but message reveals user action
     if message.contains("sampling request failed") || message.contains("elicitation failed") {
-        tracing::info!("User action detected: Bidirectional operation failed (message-based detection)");
+        tracing::info!(
+            "User action detected: Bidirectional operation failed (message-based detection)"
+        );
         return true;
     }
 
-    if message.contains("request timeout") && (message.contains("sampling") || message.contains("elicitation")) {
-        tracing::info!("User action detected: Bidirectional operation timeout (message-based detection)");
+    if message.contains("request timeout")
+        && (message.contains("sampling") || message.contains("elicitation"))
+    {
+        tracing::info!(
+            "User action detected: Bidirectional operation timeout (message-based detection)"
+        );
         return true;
     }
 
@@ -208,8 +214,7 @@ impl McpOperations {
                             // Return immediately with clear user-action error
                             return Err(McpStudioError::ToolCallFailed(format!(
                                 "Tool call '{}' rejected by user: {}",
-                                tool_name,
-                                err
+                                tool_name, err
                             )));
                         }
                     }

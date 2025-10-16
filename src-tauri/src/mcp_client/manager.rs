@@ -297,7 +297,11 @@ impl McpClientManager {
                 // Call shutdown() to gracefully disconnect transport
                 // This is CRITICAL for WebSocket - stops reconnection tasks and sends close frames
                 if let Err(e) = client.shutdown().await {
-                    tracing::warn!("Error during client shutdown for {}: {}", connection.config.name, e);
+                    tracing::warn!(
+                        "Error during client shutdown for {}: {}",
+                        connection.config.name,
+                        e
+                    );
                 }
 
                 tracing::debug!(
@@ -459,7 +463,7 @@ impl McpClientManager {
         use tokio::sync::mpsc::error::TrySendError;
 
         match self.event_sender.try_send(event) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(TrySendError::Full(_)) => {
                 tracing::warn!("Event channel full, dropping event (backpressure active)");
                 // Event dropped - frontend likely paused/slow

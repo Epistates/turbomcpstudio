@@ -633,9 +633,7 @@ impl TransportLayer {
             McpStudioError::ConnectionFailed(error_msg)
         })?;
 
-        tracing::info!(
-            "✅ WebSocket bidirectional transport connected successfully"
-        );
+        tracing::info!("✅ WebSocket bidirectional transport connected successfully");
 
         // Build client with enterprise connection config
         let connection_config = Configuration::create_enterprise_connection_config();
