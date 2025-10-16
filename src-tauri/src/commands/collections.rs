@@ -113,7 +113,7 @@ pub async fn export_collection(
         "exported_at": chrono::Utc::now().to_rfc3339(),
         "collection": collection,
         "metadata": {
-            "exported_by": "MCP Studio",
+            "exported_by": "TurboMCP Studio",
             "version": env!("CARGO_PKG_VERSION")
         }
     });
@@ -460,7 +460,7 @@ pub async fn create_collection_from_template(
         },
         created_at: now,
         updated_at: now,
-        created_by: Some("MCP Studio".to_string()),
+        created_by: Some("TurboMCP Studio".to_string()),
         version: "1.0.0".to_string(),
         last_run: None,
         run_count: 0,

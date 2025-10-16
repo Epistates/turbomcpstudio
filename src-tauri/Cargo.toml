@@ -2,7 +2,7 @@
 name = "turbomcpstudio"
 version = "0.1.0"
 description = "TurboMCP Studio - Native desktop application for Model Context Protocol development"
-authors = ["MCP Studio Team"]
+authors = ["TurboMCP Studio Team"]
 edition = "2021"
 
 [lib]
