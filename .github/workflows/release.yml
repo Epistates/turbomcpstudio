@@ -186,4 +186,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ needs.create-release.outputs.version }}
           draft: true
-          files: artifacts/**/*
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.deb
+            artifacts/**/*.AppImage
+            artifacts/**/*.app.tar.gz
+            artifacts/**/*.exe
+            artifacts/**/*.msi
+            artifacts/**/updater.json
