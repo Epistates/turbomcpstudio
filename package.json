@@ -1,7 +1,7 @@
 {
   "name": "turbomcpstudio",
   "version": "0.1.0",
-  "description": "TurboMCP Studio - Native desktop application for Model Context Protocol development - the Postman for MCP",
+  "description": "TurboMCP Studio - Native desktop application for Model Context Protocol development",
   "type": "module",
   "packageManager": "pnpm@9.12.0",
   "scripts": {

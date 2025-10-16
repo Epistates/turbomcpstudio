@@ -174,7 +174,7 @@
       icon: '📱',
       default_base_url: 'http://localhost:1337/v1',
       requires_api_key: false,
-      description: 'Open-source ChatGPT alternative running locally'
+      description: 'Local LLM provider'
     },
     {
       id: 'custom',

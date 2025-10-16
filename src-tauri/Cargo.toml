@@ -1,7 +1,7 @@
 [package]
 name = "turbomcpstudio"
 version = "0.1.0"
-description = "TurboMCP Studio - Native desktop application for Model Context Protocol development - the Postman for MCP"
+description = "TurboMCP Studio - Native desktop application for Model Context Protocol development"
 authors = ["MCP Studio Team"]
 edition = "2021"
 
@@ -35,11 +35,11 @@ reqwest = { version = "0.12", features = ["json"] }
 # LLM Provider SDKs
 async-openai = "0.24"  # Official OpenAI SDK for Rust
 
-# TurboMCP integration - using local repo with error handling fix
-turbomcp = { path = "../../turbomcp/crates/turbomcp" }
-turbomcp-client = { path = "../../turbomcp/crates/turbomcp-client" }
-turbomcp-transport = { path = "../../turbomcp/crates/turbomcp-transport", features = ["stdio", "http", "websocket", "tcp", "unix", "compression", "tls"] }
-turbomcp-protocol = { path = "../../turbomcp/crates/turbomcp-protocol" }
+# TurboMCP integration - v2.0.0-rc.2
+turbomcp = "2.0.0-rc.2"
+turbomcp-client = "2.0.0-rc.2"
+turbomcp-transport = { version = "2.0.0-rc.2", features = ["stdio", "http", "websocket", "tcp", "unix", "compression", "tls"] }
+turbomcp-protocol = "2.0.0-rc.2"
 
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }

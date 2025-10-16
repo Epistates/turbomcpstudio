@@ -1,7 +1,7 @@
 <!--
-  World-Class Collections Manager - The "Postman for MCP" Interface
+  Collections Manager
 
-  This component provides the revolutionary Collections UI that leapfrogs MCP Inspector:
+  This component provides the Collections UI that powers:
   - Cross-server workflows with variable passing
   - Visual workflow designer with drag-and-drop
   - Real-time execution monitoring

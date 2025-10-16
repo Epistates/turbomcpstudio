@@ -64,7 +64,7 @@ jobs:
 
             ## Notes
 
-            - First release of MCP Studio - "Postman for MCP"
+            - First release of TurboMCP Studio
             - Native desktop application for Model Context Protocol development
             - Powered by TurboMCP for enterprise-grade MCP operations
           draft: true
@@ -154,17 +154,6 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-
-      # CRITICAL: Handle TurboMCP dependencies
-      # Option 1: Use git dependencies (requires Cargo.toml changes)
-      # Option 2: Clone TurboMCP repo and use local paths
-      # For now, we'll use Option 2 since local paths are in Cargo.toml
-
-      - name: Clone TurboMCP (temporary solution)
-        run: |
-          git clone https://github.com/Epistates/turbomcp.git ../turbomcp
-          cd ../turbomcp
-          git checkout main
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile

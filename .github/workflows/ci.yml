@@ -51,12 +51,6 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      - name: Clone TurboMCP (temporary solution)
-        run: |
-          git clone https://github.com/Epistates/turbomcp.git ../turbomcp
-          cd ../turbomcp
-          git checkout main
-
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
@@ -92,12 +86,6 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
-
-      - name: Clone TurboMCP (temporary solution)
-        run: |
-          git clone https://github.com/Epistates/turbomcp.git ../turbomcp
-          cd ../turbomcp
-          git checkout main
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2

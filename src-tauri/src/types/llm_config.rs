@@ -685,7 +685,7 @@ impl Default for LLMConfiguration {
             },
         );
 
-        // Jan - Open-source ChatGPT alternative
+        // Jan - Local LLM provider
         providers.insert(
             "jan".to_string(),
             LLMProviderConfig {

@@ -4,8 +4,6 @@
 
 # TurboMCP Studio
 
-**The Postman for Model Context Protocol (MCP)**
-
 A native desktop application for developing, testing, and debugging Model Context Protocol servers.
 
 [![Release](https://img.shields.io/github/v/release/Epistates/turbomcpstudio)](https://github.com/Epistates/turbomcpstudio/releases)
