@@ -688,7 +688,7 @@
               onclick={() => toggleStar(selectedCollection!)}
               class="p-2 text-gray-400 hover:text-yellow-500 rounded"
             >
-              <Star size={16} class="{selectedCollection.starred ? 'text-yellow-500 fill-current' : ''}" />
+              <Star size={16} class={selectedCollection.starred ? 'text-yellow-500 fill-current' : ''} />
             </button>
 
             {#if selectedCollection.type === 'workflow'}

@@ -83,7 +83,7 @@
       aria-invalid={error ? 'true' : undefined}
       oninput={handleInput}
       onchange={handleChange}
-    />
+    ></textarea>
   {:else if type === 'select' && options}
     <select
       {id}

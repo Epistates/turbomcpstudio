@@ -243,13 +243,14 @@
 
   // Load platform on component mount
   $effect(() => {
-    platform().then(p => {
+    try {
+      const p = platform();
       currentPlatform = p;
       logger.debug(`Platform detected: ${p}`);
-    }).catch(err => {
+    } catch (err) {
       logger.error(`Failed to detect platform: ${err}`);
       currentPlatform = 'unknown';
-    });
+    }
   });
 
   // ✅ NEW: Proper lifecycle management with cleanup

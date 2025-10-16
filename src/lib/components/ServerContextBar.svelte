@@ -668,7 +668,7 @@
   .status-disconnected { color: var(--mcp-text-tertiary); }
 </style>
 
-<script context="module">
+<script module>
   function getStatusColor(status: string) {
     switch (status?.toLowerCase()) {
       case 'connected': return 'status-connected';

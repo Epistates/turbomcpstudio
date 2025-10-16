@@ -437,7 +437,7 @@
               <div class="text-xs text-gray-600 dark:text-gray-400 mb-2">
                 Audio: {item.mimeType || 'unknown'}
               </div>
-              <audio src={item.data} controls class="w-full" />
+              <audio src={item.data} controls class="w-full"></audio>
             </div>
           {:else if item.type === 'resource_link'}
             <ResourceLink
