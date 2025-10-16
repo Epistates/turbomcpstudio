@@ -24,6 +24,11 @@ tauri-plugin-dialog = "2.0"
 tauri-plugin-http = "2.0"
 tauri-plugin-clipboard-manager = "2.0"
 
+# Plugin system
+tauri-plugin-single-instance = "2.0"
+tauri-plugin-window-state = "2.0"
+tauri-plugin-os = "2.0"
+
 # HTTP client for LLM API requests
 reqwest = { version = "0.12", features = ["json"] }
 
@@ -49,6 +54,7 @@ serde_json = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1.0"
+url = "2.5"  # URL parsing for HTTP transport
 
 # Error handling
 thiserror = "1.0"

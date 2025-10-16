@@ -541,7 +541,7 @@ dependencies = [
  "sha1",
  "sync_wrapper",
  "tokio",
- "tokio-tungstenite 0.28.0",
+ "tokio-tungstenite",
  "tower",
  "tower-layer",
  "tower-service",
@@ -4363,6 +4363,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "os_info"
+version = "3.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0e1ac5fde8d43c34139135df8ea9ee9465394b2d8d20f032d38998f64afffc3"
+dependencies = [
+ "log",
+ "plist",
+ "serde",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "os_pipe"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6547,6 +6559,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sys-locale"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eab9a99a024a169fe8a903cf9d4a3b3601109bcc13bd9e3c6fff259138626c4"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "sysinfo"
 version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6913,6 +6934,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-os"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77a1c77ebf6f20417ab2a74e8c310820ba52151406d0c80fbcea7df232e3f6ba"
+dependencies = [
+ "gethostname",
+ "log",
+ "os_info",
+ "serde",
+ "serde_json",
+ "serialize-to-javascript",
+ "sys-locale",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "tauri-plugin-process"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6944,6 +6983,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-single-instance"
+version = "2.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb9cac815bf11c4a80fb498666bcdad66d65b89e3ae24669e47806febb76389c"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "thiserror 2.0.17",
+ "tracing",
+ "windows-sys 0.60.2",
+ "zbus 5.11.0",
+]
+
+[[package]]
 name = "tauri-plugin-sql"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6960,6 +7014,21 @@ dependencies = [
  "thiserror 2.0.17",
  "time",
  "tokio",
+]
+
+[[package]]
+name = "tauri-plugin-window-state"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d5f6fe3291bfa609c7e0b0ee3bedac294d94c7018934086ce782c1d0f2a468e"
+dependencies = [
+ "bitflags 2.9.4",
+ "log",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -7281,18 +7350,6 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "489a59b6730eda1b0171fcfda8b121f4bee2b35cba8645ca35c5f7ba3eb736c1"
-dependencies = [
- "futures-util",
- "log",
- "tokio",
- "tungstenite 0.27.0",
-]
-
-[[package]]
-name = "tokio-tungstenite"
 version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d25a406cddcc431a75d3d9afc6a7c0f7428d4891dd973e4d54c56b46127bf857"
@@ -7300,7 +7357,7 @@ dependencies = [
  "futures-util",
  "log",
  "tokio",
- "tungstenite 0.28.0",
+ "tungstenite",
 ]
 
 [[package]]
@@ -7596,23 +7653,6 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tungstenite"
-version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eadc29d668c91fcc564941132e17b28a7ceb2f3ebf0b9dae3e03fd7a6748eb0d"
-dependencies = [
- "bytes",
- "data-encoding",
- "http",
- "httparse",
- "log",
- "rand 0.9.2",
- "sha1",
- "thiserror 2.0.17",
- "utf-8",
-]
-
-[[package]]
-name = "tungstenite"
 version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8628dcc84e5a09eb3d8423d6cb682965dea9133204e8fb3efee74c2a0c259442"
@@ -7630,7 +7670,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7658,7 +7698,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-client"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7676,7 +7716,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-macros"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7689,7 +7729,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-protocol"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.2"
 dependencies = [
  "ahash 0.8.12",
  "arc-swap",
@@ -7721,7 +7761,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-server"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7751,7 +7791,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-transport"
-version = "2.0.0-rc.1"
+version = "2.0.0-rc.2"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -7780,7 +7820,7 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tokio-rustls",
- "tokio-tungstenite 0.27.0",
+ "tokio-tungstenite",
  "tokio-util",
  "tower",
  "tower-http",
@@ -7817,9 +7857,12 @@ dependencies = [
  "tauri-plugin-http",
  "tauri-plugin-log",
  "tauri-plugin-opener",
+ "tauri-plugin-os",
  "tauri-plugin-process",
  "tauri-plugin-shell",
+ "tauri-plugin-single-instance",
  "tauri-plugin-sql",
+ "tauri-plugin-window-state",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
@@ -7828,6 +7871,7 @@ dependencies = [
  "turbomcp-client",
  "turbomcp-protocol",
  "turbomcp-transport",
+ "url",
  "uuid",
 ]
 

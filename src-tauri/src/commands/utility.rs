@@ -17,6 +17,21 @@ pub struct AppPaths {
     pub log_directory: String,
 }
 
+/// System information response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemInfo {
+    /// Operating system (e.g., "linux", "windows", "macos")
+    pub os: String,
+    /// OS family (e.g., "unix", "windows")
+    pub family: String,
+    /// OS architecture (e.g., "x86_64", "aarch64", "arm")
+    pub arch: String,
+    /// OS version
+    pub version: String,
+    /// System locale
+    pub locale: String,
+}
+
 /// Get the application data and log directories using Tauri's native path APIs
 #[tauri::command]
 pub async fn get_app_paths(app_handle: tauri::AppHandle) -> Result<AppPaths, String> {
@@ -166,6 +181,26 @@ pub async fn llm_completion_request(
         }
         Err(e) => Err(format!("Failed to complete LLM request: {}", e)),
     }
+}
+
+/// Get system information including OS details
+/// Uses tauri-plugin-os to retrieve platform information
+#[tauri::command]
+pub async fn get_system_info() -> Result<SystemInfo, String> {
+    // Get OS platform information using the os plugin
+    let platform = tauri_plugin_os::platform().to_string();
+    let arch = tauri_plugin_os::arch().to_string();
+    let os_version = tauri_plugin_os::version().to_string();
+    let family = tauri_plugin_os::family().to_string();
+    let locale = tauri_plugin_os::locale();
+
+    Ok(SystemInfo {
+        os: platform,
+        arch,
+        version: os_version,
+        family,
+        locale: locale.unwrap_or_else(|| "unknown".to_string()),
+    })
 }
 
 /// Issue #18 fix: Gracefully shutdown background monitoring tasks
