@@ -54,9 +54,9 @@ jobs:
 ## Installation
 
 Download the appropriate installer for your platform:
-- **macOS**: \`.dmg\` file (Universal binary for Intel and Apple Silicon)
-- **Windows**: \`.msi\` or \`.exe\` installer
-- **Linux**: \`.AppImage\` (universal), \`.deb\` (Debian/Ubuntu), or \`.rpm\` (Fedora/RHEL)
+- **macOS**: \\`.dmg\\` file (Universal binary for Intel and Apple Silicon)
+- **Windows**: \\`.msi\\` or \\`.exe\\` installer
+- **Linux**: \\`.AppImage\\` (universal), \\`.deb\\` (Debian/Ubuntu), or \\`.rpm\\` (Fedora/RHEL)
 
 ## What's New
 
