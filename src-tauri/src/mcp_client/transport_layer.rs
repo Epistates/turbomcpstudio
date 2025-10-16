@@ -34,7 +34,7 @@ use turbomcp_transport::websocket_bidirectional::{
 #[cfg(feature = "tcp")]
 use turbomcp_transport::tcp::TcpTransport;
 
-#[cfg(feature = "unix")]
+#[cfg(unix)]
 use turbomcp_transport::unix::UnixTransport;
 
 use super::configuration::Configuration;
@@ -112,7 +112,7 @@ impl TransportLayer {
                 )
                 .await
             }
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             TransportConfig::Unix { path } => {
                 tracing::info!("Unix socket transport connection to: {}", path);
                 Self::connect_unix(
@@ -340,7 +340,7 @@ impl TransportLayer {
     }
 
     /// Connect to Unix socket MCP server using TurboMCP 1.0.8
-    #[cfg(feature = "unix")]
+    #[cfg(unix)]
     async fn connect_unix(
         connection: Arc<ManagedConnection>,
         path: &str,
@@ -688,7 +688,7 @@ impl TransportLayer {
     }
 
     /// Initialize TurboMCP client for Unix socket transport using TurboMCP 1.0.8
-    #[cfg(feature = "unix")]
+    #[cfg(unix)]
     async fn initialize_unix_client(
         connection: &Arc<ManagedConnection>,
         path: &str,

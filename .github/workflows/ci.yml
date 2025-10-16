@@ -182,5 +182,5 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Tauri app (no bundle)
-        run: pnpm run tauri build -- --no-bundle
+      - name: Build Tauri app
+        run: pnpm run tauri build

@@ -3,6 +3,7 @@
   import { uiStore } from '$lib/stores/uiStore';
   import { createModalEscapeHandler, createModalOutsideClickHandler, globalModalManager } from '$lib/utils/modalHelpers';
   import { createLogger } from '$lib/utils/logger';
+  import { platform } from '@tauri-apps/plugin-os';
 
   // Initialize scoped logger
   const logger = createLogger('AddServerModal');
@@ -193,43 +194,63 @@
     })()
   );
 
-  const transportTypes = [
-    { 
-      id: 'stdio', 
-      name: 'STDIO', 
+  const allTransportTypes = [
+    {
+      id: 'stdio',
+      name: 'STDIO',
       description: 'Local process communication',
       icon: Database,
       example: 'node server.js'
     },
-    { 
-      id: 'http', 
-      name: 'HTTP/SSE', 
+    {
+      id: 'http',
+      name: 'HTTP/SSE',
       description: 'HTTP with Server-Sent Events',
       icon: Globe,
       example: 'https://api.example.com/mcp'
     },
-    { 
-      id: 'websocket', 
-      name: 'WebSocket', 
+    {
+      id: 'websocket',
+      name: 'WebSocket',
       description: 'Real-time bidirectional communication',
       icon: Wifi,
       example: 'wss://ws.example.com/mcp'
     },
-    { 
-      id: 'tcp', 
-      name: 'TCP', 
+    {
+      id: 'tcp',
+      name: 'TCP',
       description: 'Raw TCP socket connection',
       icon: Network,
       example: 'localhost:8080'
     },
-    { 
-      id: 'unix', 
-      name: 'Unix Socket', 
+    {
+      id: 'unix',
+      name: 'Unix Socket',
       description: 'Local Unix domain socket',
       icon: HardDrive,
       example: '/tmp/mcp.sock'
     },
   ];
+
+  // Filter out Unix socket support on Windows
+  let currentPlatform = $state<string | null>(null);
+  let transportTypes = $derived.by(() => {
+    if (currentPlatform === 'windows') {
+      return allTransportTypes.filter(t => t.id !== 'unix');
+    }
+    return allTransportTypes;
+  });
+
+  // Load platform on component mount
+  $effect(() => {
+    platform().then(p => {
+      currentPlatform = p;
+      logger.debug(`Platform detected: ${p}`);
+    }).catch(err => {
+      logger.error(`Failed to detect platform: ${err}`);
+      currentPlatform = 'unknown';
+    });
+  });
 
   // ✅ NEW: Proper lifecycle management with cleanup
   let templateUnsubscribe: (() => void) | null = null;

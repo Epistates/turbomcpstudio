@@ -23,7 +23,7 @@ use turbomcp_transport::websocket_bidirectional::WebSocketBidirectionalTransport
 #[cfg(feature = "tcp")]
 use turbomcp_transport::tcp::TcpTransport;
 
-#[cfg(feature = "unix")]
+#[cfg(unix)]
 use turbomcp_transport::unix::UnixTransport;
 
 /// Transport-agnostic MCP client wrapper
@@ -45,7 +45,7 @@ pub enum McpTransportClient {
     #[cfg(feature = "tcp")]
     Tcp(Client<TcpTransport>),
 
-    #[cfg(feature = "unix")]
+    #[cfg(unix)]
     Unix(Client<UnixTransport>),
 }
 
@@ -106,7 +106,7 @@ impl McpTransportClient {
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.call_tool(tool_name, parameters).await,
 
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client.call_tool(tool_name, parameters).await,
         }
     }
@@ -131,7 +131,7 @@ impl McpTransportClient {
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.list_tools().await,
 
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client.list_tools().await,
         }
     }
@@ -156,7 +156,7 @@ impl McpTransportClient {
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.list_prompts().await,
 
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client.list_prompts().await,
         }
     }
@@ -207,7 +207,7 @@ impl McpTransportClient {
                 Ok(serde_json::to_value(result)?)
             }
 
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => {
                 let result = client.get_prompt(name, arguments).await?;
                 Ok(serde_json::to_value(result)?)
@@ -235,7 +235,7 @@ impl McpTransportClient {
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.list_resources().await,
 
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client.list_resources().await,
         }
     }
@@ -275,7 +275,7 @@ impl McpTransportClient {
                 Ok(serde_json::to_value(result)?)
             }
 
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => {
                 let result = client.read_resource(uri).await?;
                 Ok(serde_json::to_value(result)?)
@@ -299,7 +299,7 @@ impl McpTransportClient {
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(_) => "tcp",
 
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(_) => "unix",
         }
     }
@@ -340,7 +340,7 @@ impl McpTransportClient {
                 .await
                 .map(|response| response.completion.values),
 
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client
                 .complete(completion_name, partial_input)
                 .await
@@ -371,7 +371,7 @@ impl McpTransportClient {
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.set_elicitation_handler(handler),
 
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client.set_elicitation_handler(handler),
         }
     }
@@ -394,7 +394,7 @@ impl McpTransportClient {
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.set_progress_handler(handler),
 
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client.set_progress_handler(handler),
         }
     }
@@ -417,7 +417,7 @@ impl McpTransportClient {
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.set_log_handler(handler),
 
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client.set_log_handler(handler),
         }
     }
@@ -440,7 +440,7 @@ impl McpTransportClient {
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.set_resource_update_handler(handler),
 
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client.set_resource_update_handler(handler),
         }
     }
@@ -456,7 +456,7 @@ impl McpTransportClient {
             McpTransportClient::WebSocket(client) => client.has_elicitation_handler(),
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.has_elicitation_handler(),
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client.has_elicitation_handler(),
         }
     }
@@ -472,7 +472,7 @@ impl McpTransportClient {
             McpTransportClient::WebSocket(client) => client.has_progress_handler(),
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.has_progress_handler(),
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client.has_progress_handler(),
         }
     }
@@ -488,7 +488,7 @@ impl McpTransportClient {
             McpTransportClient::WebSocket(client) => client.has_log_handler(),
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.has_log_handler(),
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client.has_log_handler(),
         }
     }
@@ -504,7 +504,7 @@ impl McpTransportClient {
             McpTransportClient::WebSocket(client) => client.has_resource_update_handler(),
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.has_resource_update_handler(),
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client.has_resource_update_handler(),
         }
     }
@@ -529,7 +529,7 @@ impl McpTransportClient {
             McpTransportClient::WebSocket(client) => client.shutdown().await,
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.shutdown().await,
-            #[cfg(feature = "unix")]
+            #[cfg(unix)]
             McpTransportClient::Unix(client) => client.shutdown().await,
         }
     }
