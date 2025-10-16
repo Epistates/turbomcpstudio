@@ -59,7 +59,10 @@ impl Database {
                     tracing::info!("✅ Cleared active profile state for fresh startup (in-memory)");
                 }
                 Err(e) => {
-                    tracing::warn!("⚠️ Failed to clear active profile state (non-critical): {}", e);
+                    tracing::warn!(
+                        "⚠️ Failed to clear active profile state (non-critical): {}",
+                        e
+                    );
                 }
             }
 
@@ -138,7 +141,10 @@ impl Database {
                                 tracing::info!("✅ Cleared active profile state for fresh startup");
                             }
                             Err(e) => {
-                                tracing::warn!("⚠️ Failed to clear active profile state (non-critical): {}", e);
+                                tracing::warn!(
+                                    "⚠️ Failed to clear active profile state (non-critical): {}",
+                                    e
+                                );
                             }
                         }
 
@@ -207,7 +213,10 @@ impl Database {
         )
         .execute(&self.pool)
         .await?;
-        tracing::info!("server_configs table created successfully ({:?})", step_start.elapsed());
+        tracing::info!(
+            "server_configs table created successfully ({:?})",
+            step_start.elapsed()
+        );
 
         // Enhanced Collections table with workflow support
         tracing::info!("Creating enhanced collections table");
@@ -580,7 +589,10 @@ impl Database {
             .await?;
 
         if profile_result.rows_affected() > 0 {
-            log::info!("✅ Removed server from {} profile(s)", profile_result.rows_affected());
+            log::info!(
+                "✅ Removed server from {} profile(s)",
+                profile_result.rows_affected()
+            );
         } else {
             log::debug!("ℹ️ Server was not part of any profiles");
         }
@@ -614,10 +626,16 @@ impl Database {
             .execute(&self.pool)
             .await?;
 
-        log::debug!("📊 DELETE query result: rows_affected = {}", result.rows_affected());
+        log::debug!(
+            "📊 DELETE query result: rows_affected = {}",
+            result.rows_affected()
+        );
 
         if result.rows_affected() == 0 {
-            log::warn!("⚠️ No rows affected - server {} may not exist in database", id);
+            log::warn!(
+                "⚠️ No rows affected - server {} may not exist in database",
+                id
+            );
         } else {
             log::info!("✅ Successfully deleted server configuration from database");
         }
@@ -992,7 +1010,10 @@ impl Database {
                     Ok(())
                 } else {
                     // Other errors should be logged but not fail startup
-                    tracing::warn!("⚠️ Failed to clear active profile state: {} (non-critical)", e);
+                    tracing::warn!(
+                        "⚠️ Failed to clear active profile state: {} (non-critical)",
+                        e
+                    );
                     Ok(())
                 }
             }

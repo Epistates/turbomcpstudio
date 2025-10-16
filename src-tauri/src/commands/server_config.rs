@@ -446,23 +446,22 @@ pub async fn delete_server_config(
     server_id: String,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    log::debug!("🗑️ delete_server_config called with server_id: {}", server_id);
+    log::debug!(
+        "🗑️ delete_server_config called with server_id: {}",
+        server_id
+    );
 
     // Try to get database, return graceful error if not ready
-    let app_state = app_handle
-        .try_state::<AppState>()
-        .ok_or_else(|| {
-            log::error!("❌ AppState not initialized");
-            "AppState not yet initialized. Please try again in a moment.".to_string()
-        })?;
+    let app_state = app_handle.try_state::<AppState>().ok_or_else(|| {
+        log::error!("❌ AppState not initialized");
+        "AppState not yet initialized. Please try again in a moment.".to_string()
+    })?;
 
     let db_lock = app_state.database.read().await;
-    let database = db_lock
-        .as_ref()
-        .ok_or_else(|| {
-            log::error!("❌ Database not initialized");
-            "Database not yet initialized. Please try again in a moment.".to_string()
-        })?;
+    let database = db_lock.as_ref().ok_or_else(|| {
+        log::error!("❌ Database not initialized");
+        "Database not yet initialized. Please try again in a moment.".to_string()
+    })?;
 
     log::debug!("📊 Database connection acquired");
 
@@ -474,14 +473,14 @@ pub async fn delete_server_config(
     log::debug!("🔑 Parsed UUID: {}", uuid);
     log::debug!("🗄️ Calling database.delete_server_config...");
 
-    database
-        .delete_server_config(uuid)
-        .await
-        .map_err(|e| {
-            log::error!("❌ Database deletion failed: {}", e);
-            format!("Failed to delete server config: {}", e)
-        })?;
+    database.delete_server_config(uuid).await.map_err(|e| {
+        log::error!("❌ Database deletion failed: {}", e);
+        format!("Failed to delete server config: {}", e)
+    })?;
 
-    log::info!("✅ Successfully deleted server configuration: {}", server_id);
+    log::info!(
+        "✅ Successfully deleted server configuration: {}",
+        server_id
+    );
     Ok(())
 }
