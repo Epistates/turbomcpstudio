@@ -44,14 +44,6 @@ A native desktop application for developing, testing, and debugging Model Contex
 - ✅ **Protocol Inspector** - Real-time protocol message viewing
 - ✅ **Settings** - Configure application preferences and themes
 
-### Coming Soon
-
-- 🔜 **Advanced Tool Testing** - Auto-generated forms from JSON schemas
-- 🔜 **Collections** - Multi-server operation chains and workflows
-- 🔜 **Testing Framework** - Contract testing and load testing
-- 🔜 **Protocol Analysis** - Flow visualization and message replay
-- 🔜 **Team Collaboration** - Shared workspaces and version control
-
 <img src="static/screenshot.png" alt="TurboMCP Studio" style="width: 100%; max-width: 100%; margin: 20px 0;"/>
 
 ## Installation
