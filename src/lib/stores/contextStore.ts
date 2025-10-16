@@ -149,13 +149,31 @@ function createContextStore() {
      * 1. Current selection (if still valid)
      * 2. First server from active profile
      * 3. First connected server
+     *
+     * @param mode - 'selector' (default) auto-selects a server, 'filter' respects null selection
      */
-    autoSelectServer() {
+    autoSelectServer(mode: 'selector' | 'filter' = 'selector') {
       const currentContext = get(context);
+
+      // In filter mode, respect user's decision to view all servers (don't force selection)
+      if (mode === 'filter') {
+        // If current selection is valid, keep it (user explicitly chose to filter)
+        if (currentContext.selectedServer && currentContext.connectionStatus === 'connected') {
+          logger.debug('[Filter Mode] Keeping current selection:', currentContext.selectedServer.config.name);
+          return;
+        }
+
+        // Otherwise, clear selection to show all servers
+        logger.debug('[Filter Mode] Allowing null selection to show all servers');
+        this.clearSelection();
+        return;
+      }
+
+      // Selector mode: Auto-select a server (required for operational tabs)
 
       // If current selection is valid, keep it
       if (currentContext.selectedServer && currentContext.connectionStatus === 'connected') {
-        logger.debug('Keeping current selection:', currentContext.selectedServer.config.name);
+        logger.debug('[Selector Mode] Keeping current selection:', currentContext.selectedServer.config.name);
         return;
       }
 
@@ -169,7 +187,7 @@ function createContextStore() {
           const firstProfileServer = currentContext.availableServers.find(s => s.id === firstProfileServerId);
 
           if (firstProfileServer) {
-            logger.debug('Auto-selecting first server from profile:', firstProfileServer.config.name);
+            logger.debug('[Selector Mode] Auto-selecting first server from profile:', firstProfileServer.config.name);
             this.selectServer(firstProfileServer.id);
             return;
           }
@@ -179,13 +197,13 @@ function createContextStore() {
       // Fall back to first connected server
       if (currentContext.availableServers.length > 0) {
         const firstServer = currentContext.availableServers[0];
-        logger.debug('Auto-selecting first connected server:', firstServer.config.name);
+        logger.debug('[Selector Mode] Auto-selecting first connected server:', firstServer.config.name);
         this.selectServer(firstServer.id);
         return;
       }
 
       // No servers available
-      logger.debug('No servers available for auto-selection');
+      logger.debug('[Selector Mode] No servers available for auto-selection');
       this.clearSelection();
     },
 

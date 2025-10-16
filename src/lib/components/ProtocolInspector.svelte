@@ -3,7 +3,7 @@
 	import { createLogger } from '$lib/utils/logger';
 	import { listen } from '@tauri-apps/api/event';
 	import { onMount } from 'svelte';
-	import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
+	import { contextStore } from '$lib/stores/contextStore';
 	import { Search, Download, Trash2, Filter, ChevronRight, ChevronDown, Clock, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-svelte';
 	import JsonViewer from './ui/JsonViewer.svelte';
 
@@ -21,9 +21,13 @@
 		processing_time_ms: number | null;
 	}
 
-	// Internal state - subscribe to serverStore like ToolExplorer
-	let servers: ServerInfo[] = $state([]);
-	let selectedServerId: string | undefined = $state(undefined);
+	// ✅ Use contextStore for server selection (no local state, no manual sync)
+	const context = $derived($contextStore);
+	const selectedServer = $derived(context.selectedServer);
+	const selectedServerId = $derived(context.selectedServerId);
+	const serverName = $derived(selectedServer?.config.name || 'No Server Selected');
+
+	// Component state
 	let messages = $state<MessageHistory[]>([]);
 	let filter = $state<'all' | 'ClientToServer' | 'ServerToClient'>('all');
 	let searchTerm = $state('');
@@ -33,41 +37,7 @@
 	let sortBy = $state<'timestamp' | 'size' | 'latency' | 'direction'>('timestamp');
 	let sortOrder = $state<'asc' | 'desc'>('desc');
 
-
-	// Subscribe to serverStore to get selected server
-	$effect(() => {
-		const unsubscribe = serverStore.subscribe((state: any) => {
-			// ✅ FIXED: Convert Map to array
-			servers = state.servers instanceof Map
-				? Array.from(state.servers.values())
-				: [];
-			const globalSelectedId = state.selectedServerId;
-
-			// Sync with global selection
-			if (globalSelectedId && selectedServerId !== globalSelectedId) {
-				selectedServerId = globalSelectedId;
-			}
-			// Auto-select first connected server if none selected
-			else if (!selectedServerId && state.servers instanceof Map && state.servers.size > 0) {
-				// ✅ FIXED: Convert Map to array with explicit type
-				const serverList: ServerInfo[] = Array.from(state.servers.values());
-				const connected = serverList.filter((s: any) => s.status === 'connected');
-				selectedServerId = connected.length > 0 ? connected[0].id : serverList[0].id;
-			}
-		});
-
-		return unsubscribe;
-	});
-
-	const selectedServer = $derived(
-		servers.find(s => s.id === selectedServerId)
-	);
-
-	const serverName = $derived(
-		selectedServer?.config.name || 'No Server Selected'
-	);
-
-	// Reload messages when selected server changes
+	// Simple effect: reload messages when server changes
 	$effect(() => {
 		if (selectedServerId) {
 			loadMessages();

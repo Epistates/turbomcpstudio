@@ -2,8 +2,8 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { serverStore, type ServerInfo } from '$lib/stores/serverStore';
+  import { contextStore } from '$lib/stores/contextStore';
   import { uiStore } from '$lib/stores/uiStore';
-  import { createCapabilityStore } from '$lib/utils/serverStore';
   import { createLogger } from '$lib/utils/logger';
 
   // Initialize scoped logger
@@ -57,9 +57,12 @@
     selectedServerId: string | undefined;
   }
 
-  // Optimized reactive store for servers with resources capability
-  const resourceServersStore = createCapabilityStore('resources');
-  let selectedServerId: string | undefined = $state(undefined);
+  // ✅ Use contextStore for server selection (no local state, no manual sync)
+  const context = $derived($contextStore);
+  const selectedServer = $derived(context.selectedServer);
+  const selectedServerId = $derived(context.selectedServerId);
+
+  // Component state
   let resources: any[] = $state([]);
   let loading = $state(false);
   let searchQuery = $state('');
@@ -74,40 +77,10 @@
   let isHistoricalResult = $state(false);
   let filterType = $state('all');
 
-  // ✅ FIXED: Use $derived instead of manual subscription to prevent infinite loops
-  const serverData = $derived($resourceServersStore);
-  const serverState = $derived($serverStore);
-  const globalSelectedId = $derived(serverState.selectedServerId);
-
-  // ✅ FIXED: Derive server list reactively
-  const serverList = $derived(
-    serverData?.servers instanceof Map
-      ? Array.from(serverData.servers.values())
-      : (Array.isArray(serverData?.servers) ? serverData.servers : [])
-  );
-
-  // ✅ FIXED: Single effect for server selection logic with proper dependency tracking
+  // Simple effect: reload resources when server changes
   $effect(() => {
-    // Only run logic if we have valid server data
-    if (!serverData || !serverList) return;
-
-    // Sync with global selection if it's a valid resources server
-    if (globalSelectedId && serverList.some(s => s.id === globalSelectedId)) {
-      if (selectedServerId !== globalSelectedId) {
-        selectedServerId = globalSelectedId;
-        loadResources(); // Safe: next effect run will early-return due to equality check above
-      }
-      return; // Exit early if synced with global
-    }
-
-    // Auto-manage selection: pick first server if none selected or current is invalid
-    const currentServerValid = selectedServerId && serverList.find(s => s.id === selectedServerId);
-
-    if (!currentServerValid && serverList.length > 0) {
-      selectedServerId = serverList[0].id;
-      if (selectedServerId) {
-        loadResources();
-      }
+    if (selectedServerId) {
+      loadResources();
     }
   });
 
@@ -227,7 +200,7 @@
 
     const startTime = Date.now();
     const executionId = crypto.randomUUID();
-    const serverInfo = serverData?.servers?.find(s => s.id === selectedServerId);
+    const serverInfo = context.availableServers.find((s: ServerInfo) => s.id === selectedServerId);
 
     contentLoading = true;
     resourceContent = '';
@@ -293,7 +266,7 @@
 
     const startTime = Date.now();
     const executionId = crypto.randomUUID();
-    const serverInfo = serverData?.servers?.find(s => s.id === selectedServerId);
+    const serverInfo = context.availableServers.find((s: ServerInfo) => s.id === selectedServerId);
 
     contentLoading = true;
     resourceContent = '';
@@ -397,13 +370,6 @@
       resourceParameters = { ...execution.parameters };
       showParameterForm = true;
     }
-  }
-
-  function selectServer(serverId: string) {
-    selectedServerId = serverId;
-    // Update global store so other components stay in sync
-    serverStore.selectServer(serverId);
-    loadResources();
   }
 
   function extractNameFromUri(uri: string): string {
@@ -557,23 +523,6 @@
           <RefreshCw size={16} class={loading ? 'animate-spin' : ''} />
         </button>
       </div>
-
-      <!-- Server Selection -->
-      {#if (serverData?.servers || []).length > 1}
-        <div class="mb-3">
-          <label class="block text-xs font-medium text-gray-700 mb-1" for="resource-server-select">Server</label>
-          <select
-            bind:value={selectedServerId}
-            onchange={(e) => selectServer(e.currentTarget.value)}
-            class="form-select text-sm"
-            id="resource-server-select"
-          >
-            {#each serverData?.servers || [] as server}
-              <option value={server.id}>{server.config.name}</option>
-            {/each}
-          </select>
-        </div>
-      {/if}
 
       <!-- Search -->
       <div class="relative mb-3">

@@ -256,7 +256,7 @@
       if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
         mcpConfig.headers = config.transport_config.headers;
       }
-    } else if (config.transport_config?.type === 'websocket') {
+    } else if (config.transport_config?.type === 'webSocket') {  // ✅ FIXED: camelCase
       mcpConfig.url = config.transport_config.url;
       mcpConfig.transport = 'websocket';
       if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
@@ -475,7 +475,7 @@
                     </div>
                   {/if}
 
-                {:else if selectedServer.config.transport_config?.type === 'http' || selectedServer.config.transport_config?.type === 'websocket'}
+                {:else if selectedServer.config.transport_config?.type === 'http' || selectedServer.config.transport_config?.type === 'webSocket'}  <!-- ✅ FIXED: camelCase -->
                   <div>
                     <label class="text-sm font-medium text-gray-700">URL</label>
                     <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">

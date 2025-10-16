@@ -2,8 +2,8 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { serverStore, type ServerInfo, type ToolExecution } from '$lib/stores/serverStore';
+  import { contextStore } from '$lib/stores/contextStore';
   import { uiStore } from '$lib/stores/uiStore';
-  import { filterServersByCapability } from '$lib/utils/serverCapabilities';
   import { createLogger } from '$lib/utils/logger';
   import {
     FileText,
@@ -55,7 +55,12 @@
   }
 
 
-  let selectedServerId: string | undefined = $state(undefined);
+  // ✅ Use contextStore for server selection (no local state, no manual sync)
+  const context = $derived($contextStore);
+  const selectedServer = $derived(context.selectedServer);
+  const selectedServerId = $derived(context.selectedServerId);
+
+  // Component state
   let prompts: PromptTemplate[] = $state([]);
   let loading = $state(false);
   let searchQuery = $state('');
@@ -67,21 +72,8 @@
   let savedPrompts: Array<{id: string; name: string; template: PromptTemplate; arguments: Record<string, any>}> = $state([]);
   let isHistoricalResult = $state(false);
 
-  // ✅ FIXED: Use $derived instead of manual subscription to prevent infinite loops
+  // ✅ Execution history from serverStore
   const serverStoreState = $derived($serverStore);
-  const globalSelectedId = $derived(serverStoreState.selectedServerId);
-
-  // ✅ FIXED: Derive servers list reactively
-  const allServers = $derived(
-    serverStoreState.servers instanceof Map
-      ? Array.from(serverStoreState.servers.values())
-      : []
-  );
-
-  // ✅ FIXED: Filter to only show connected servers that support prompts
-  const servers = $derived(filterServersByCapability(allServers, 'prompts'));
-
-  // All execution history, reactive to serverStoreState changes
   const allExecutionHistory = $derived(
     serverStoreState?.toolExecutions?.filter((e: any) => e.tool.startsWith('prompt:')) || []
   );
@@ -93,28 +85,10 @@
       : allExecutionHistory
   );
 
-  // Selected server info
-  const selectedServer = $derived(
-    servers.find(s => s.id === selectedServerId)
-  );
-
-  // ✅ FIXED: Single effect for server selection logic with proper dependency tracking
+  // Simple effect: reload prompts when server changes
   $effect(() => {
-    // Validate that the globally selected server exists in our filtered list and supports prompts
-    if (globalSelectedId && servers.some(s => s.id === globalSelectedId)) {
-      if (selectedServerId !== globalSelectedId) {
-        selectedServerId = globalSelectedId;
-        loadPrompts();
-      }
-      return; // Exit early if synced with global
-    }
-
-    // Auto-select first connected server if none selected
-    if (!selectedServerId && servers.length > 0) {
-      selectedServerId = servers[0].id;
-      if (selectedServerId) {
-        loadPrompts();
-      }
+    if (selectedServerId) {
+      loadPrompts();
     }
   });
 
@@ -332,10 +306,6 @@
     promptArguments = { ...saved.arguments };
   }
 
-  function selectServer(serverId: string) {
-    serverStore.selectServer(serverId);
-  }
-
   function clearHistory() {
     serverStore.clearExecutionHistory();
   }
@@ -380,23 +350,6 @@
           <RefreshCw size={16} class={loading ? 'animate-spin' : ''} />
         </button>
       </div>
-
-      <!-- Server Selection -->
-      {#if servers.length > 1}
-        <div class="mb-3">
-          <label for="prompt-server-select" class="block text-xs font-medium text-gray-700 mb-1">Server</label>
-          <select
-            id="prompt-server-select"
-            bind:value={selectedServerId}
-            onchange={(e) => selectServer(e.currentTarget.value)}
-            class="form-select text-sm"
-          >
-            {#each servers as server}
-              <option value={server.id}>{server.config.name}</option>
-            {/each}
-          </select>
-        </div>
-      {/if}
 
       <!-- Search -->
       <div class="relative">

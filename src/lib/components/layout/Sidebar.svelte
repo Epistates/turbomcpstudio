@@ -55,7 +55,7 @@
     { id: 'sampling', label: 'Sampling', icon: MessageSquare },
     { id: 'elicitation', label: 'Elicitation', icon: Activity },
     { id: 'protocol', label: 'Protocol', icon: Network },
-    { id: 'collections', label: 'Collections', icon: Layers3 },
+    // { id: 'collections', label: 'Collections', icon: Layers3 }, // TODO: Enable for v2 with multi-server UI
   ];
 
   function navigateTo(view: View) {

@@ -13,10 +13,12 @@ export interface ServerConfig {
   updated_at: string;
 }
 
+// ✅ CRITICAL: Match Rust's camelCase serialization (#[serde(rename_all = "camelCase")])
+// Rust expects: stdio, http, webSocket (camelCase!), tcp, unix
 export type TransportConfig =
   | { type: 'stdio'; command: string; args: string[]; working_directory?: string }
   | { type: 'http'; url: string; headers: Record<string, string> }
-  | { type: 'websocket'; url: string; headers: Record<string, string> }
+  | { type: 'webSocket'; url: string; headers: Record<string, string> }  // ✅ camelCase!
   | { type: 'tcp'; host: string; port: number }
   | { type: 'unix'; path: string };
 
@@ -342,14 +344,18 @@ function createServerStore() {
       );
     },
 
-    // ✅ FIXED: Disconnect from a server with timeout
+    // ✅ FIXED: Disconnect from a server with timeout and better error handling
     async disconnectServer(serverId: string) {
       try {
+        logger.info(`🔌 Disconnecting server: ${serverId}`);
+
         await withTimeout(
-          invoke('disconnect_server', { serverId }),
+          () => invoke('disconnect_server', { serverId }),
           15000,
-          'Disconnect timed out'
+          'Disconnect timed out after 15 seconds'
         );
+
+        logger.info(`✅ Server disconnected successfully: ${serverId}`);
 
         // ✅ NEW: Update Map
         update(state => {
@@ -368,12 +374,14 @@ function createServerStore() {
           };
         });
       } catch (error) {
-        logger.error('❌ Failed to disconnect server:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error(`❌ Failed to disconnect server ${serverId}:`, errorMessage);
         update(state => ({
           ...state,
-          error: `Failed to disconnect: ${error}`
+          error: `Failed to disconnect: ${errorMessage}`
         }));
-        throw error;
+        // Don't throw - allow disconnect to fail gracefully (server might already be disconnected)
+        // Just log the error and update state
       }
     },
 

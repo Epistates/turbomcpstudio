@@ -7,7 +7,8 @@
 <script lang="ts">
 	import { samplingStore, replayTemplates, type PendingSamplingRequest, type CompletedSamplingRequest } from '$lib/stores/samplingStore';
 	import { uiStore } from '$lib/stores/uiStore';
-	import { Clock, CheckCircle2, XCircle, AlertCircle, ExternalLink, FolderOpen, Trash2 } from 'lucide-svelte';
+	import { contextStore } from '$lib/stores/contextStore';
+	import { Clock, CheckCircle2, XCircle, AlertCircle, ExternalLink, FolderOpen, Trash2, Filter } from 'lucide-svelte';
 
 	// Reactive store access
 	const pending = $derived($samplingStore.pending);
@@ -15,6 +16,31 @@
 	const templates = $derived($replayTemplates);
 	const loading = $derived($samplingStore.loading);
 	const error = $derived($samplingStore.error);
+
+	// Context filtering
+	const context = $derived($contextStore);
+	const selectedServerId = $derived(context.selectedServerId);
+	const selectedServer = $derived(context.selectedServer);
+
+	// Filter requests by selected server (if any)
+	const filteredPending = $derived(
+		selectedServerId
+			? pending.filter(r => r.serverId === selectedServerId)
+			: pending
+	);
+
+	const filteredHistory = $derived(
+		selectedServerId
+			? history.filter(r => r.serverId === selectedServerId)
+			: history
+	);
+
+	// Visual feedback message
+	const filterMessage = $derived(
+		selectedServerId && selectedServer
+			? `Filtered to: ${selectedServer.config.name}`
+			: 'Showing all servers'
+	);
 
 	// Helper functions
 	function formatTimeAgo(timestamp: string): string {
@@ -72,6 +98,10 @@
 				</p>
 			</div>
 			<div class="flex items-center gap-4">
+				<div class="flex items-center gap-2 text-sm">
+					<Filter size={16} class="text-gray-500 dark:text-gray-400" />
+					<span class="text-gray-600 dark:text-gray-400">{filterMessage}</span>
+				</div>
 				<div class="text-sm">
 					<span class="text-gray-600 dark:text-gray-400">Mode:</span>
 					<span class="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded font-medium">
@@ -103,25 +133,25 @@
 					<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
 						Pending Requests
 					</h2>
-					{#if pending.length > 0}
+					{#if filteredPending.length > 0}
 						<span class="ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded text-sm font-medium">
-							{pending.length}
+							{filteredPending.length}
 						</span>
 					{/if}
 				</div>
 			</div>
 
 			<div class="divide-y divide-gray-200 dark:divide-gray-700">
-				{#if pending.length === 0}
+				{#if filteredPending.length === 0}
 					<div class="px-6 py-12 text-center">
 						<Clock size={48} class="mx-auto text-gray-400 dark:text-gray-600 mb-3" />
 						<p class="text-gray-600 dark:text-gray-400">No pending sampling requests</p>
 						<p class="text-sm text-gray-500 dark:text-gray-500 mt-1">
-							Requests will appear here when servers need LLM inference
+							{selectedServerId ? 'No requests from the selected server' : 'Requests will appear here when servers need LLM inference'}
 						</p>
 					</div>
 				{:else}
-					{#each pending as request}
+					{#each filteredPending as request}
 						<div class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
 							<div class="flex items-start justify-between gap-4">
 								<div class="flex-1 min-w-0">
@@ -170,13 +200,13 @@
 					<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
 						Completed Requests
 					</h2>
-					{#if history.length > 0}
+					{#if filteredHistory.length > 0}
 						<span class="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-sm font-medium">
-							{history.length}
+							{filteredHistory.length}
 						</span>
 					{/if}
 				</div>
-				{#if history.length > 0}
+				{#if filteredHistory.length > 0}
 					<button
 						onclick={() => samplingStore.clearHistory()}
 						class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -187,16 +217,16 @@
 			</div>
 
 			<div class="divide-y divide-gray-200 dark:divide-gray-700">
-				{#if history.length === 0}
+				{#if filteredHistory.length === 0}
 					<div class="px-6 py-12 text-center">
 						<CheckCircle2 size={48} class="mx-auto text-gray-400 dark:text-gray-600 mb-3" />
 						<p class="text-gray-600 dark:text-gray-400">No completed requests</p>
 						<p class="text-sm text-gray-500 dark:text-gray-500 mt-1">
-							Approved and rejected requests will appear here
+							{selectedServerId ? 'No completed requests from the selected server' : 'Approved and rejected requests will appear here'}
 						</p>
 					</div>
 				{:else}
-					{#each history.slice(0, 10) as request}
+					{#each filteredHistory.slice(0, 10) as request}
 						{@const StatusIcon = getStatusIcon(request.status)}
 						<div class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
 							<!-- Header with status and time -->
@@ -287,10 +317,10 @@
 							</div>
 						</div>
 					{/each}
-					{#if history.length > 10}
+					{#if filteredHistory.length > 10}
 						<div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 text-center">
 							<p class="text-sm text-gray-600 dark:text-gray-400">
-								Showing 10 of {history.length} completed requests
+								Showing 10 of {filteredHistory.length} completed requests
 							</p>
 						</div>
 					{/if}
@@ -346,10 +376,10 @@
 									</div>
 								</div>
 								<div class="flex items-center gap-2">
-									{#if pending.length > 0}
+									{#if filteredPending.length > 0}
 										<button
 											onclick={async () => {
-												const firstPending = pending[0];
+												const firstPending = filteredPending[0];
 												try {
 													await samplingStore.useReplayTemplate(firstPending.requestId, template.id);
 												} catch (e) {

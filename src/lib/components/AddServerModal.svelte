@@ -45,32 +45,30 @@
     logger.debug(`📍 currentStep changed to: ${currentStep}`);
   });
 
-  // ✅ FIXED: Force reset showJsonImport when modal opens + Auto-detect clipboard
+  // ✅ FIXED: Force reset JSON import state when modal opens + Auto-detect clipboard
   // 🎯 UX FLOW: JSON import appears as overlay on top of regular modal
   //   - If clipboard has MCP config → show JSON import overlay (can cancel to reveal regular form)
   //   - If user cancels JSON import → return to regular 3-step form underneath
   //   - If user completes JSON import → close both modals
   $effect(() => {
     if (showModal) {
-      logger.debug('🔓 Modal opened - forcing state reset');
+      logger.debug('🔓 Modal opened - resetting JSON import state');
       showJsonImport = false;  // Start with regular form (may be overridden by clipboard detection)
-      modalError = null;       // Clear any previous errors
-      connectAfterAdding = false; // Reset connection option
+      clipboardDetected = false;
+      jsonConfig = '';
+      jsonError = '';
 
-      // ✅ NEW: Auto-detect MCP config in clipboard using Tauri clipboard API
+      // ✅ Auto-detect MCP config in clipboard using Tauri clipboard API
       autoDetectClipboard();
     } else {
-      // ✅ FIXED: Reset state when modal actually closes
-      logger.debug('🔒 Modal closed - resetting all state');
-      currentStep = 1;
+      // ✅ FIXED: Clean up JSON import state when modal closes
+      // (Form data is already reset synchronously in closeModal())
+      logger.debug('🔒 Modal closed - cleaning up JSON import state');
       showJsonImport = false;
       clipboardDetected = false;
       jsonConfig = '';
       jsonError = '';
-      modalError = null;
-      testResult = null;
       modalHiddenForPicker = false;
-      connectAfterAdding = false;
     }
   });
 
@@ -89,10 +87,13 @@
   let detectedServerCount = $state(0);
 
   // Form data
+  // ✅ FIXED: Internal UI state uses lowercase 'websocket', maps to camelCase 'webSocket' when creating config
+  type UITransportType = 'stdio' | 'http' | 'websocket' | 'tcp' | 'unix';
+
   let formData = $state({
     name: '',
     description: '',
-    transportType: 'stdio' as TransportConfig['type'],
+    transportType: 'stdio' as UITransportType,
     stdio: {
       command: '',
       args: [] as string[],
@@ -153,7 +154,7 @@
         if (!url.trim()) return null;
         return existingServers.find(s => {
           // Type guard for url-based transports
-          if (s.config.transport_config.type !== 'http' && s.config.transport_config.type !== 'websocket') return false;
+          if (s.config.transport_config.type !== 'http' && s.config.transport_config.type !== 'webSocket') return false;  // ✅ camelCase
           return s.config.transport_config.url === url;
         });
       } else if (formData.transportType === 'tcp') {
@@ -329,18 +330,65 @@
     }
   }
 
-  // ✅ FIXED: Simplified close - state reset now handled by $effect
+  // ✅ FIXED: Comprehensive form data reset (prevents duplicate detection on just-added servers)
+  function resetFormData() {
+    logger.debug('🔄 Resetting all form data');
+
+    // Reset basic info
+    formData.name = '';
+    formData.description = '';
+
+    // Reset transport type (back to default)
+    formData.transportType = 'stdio';
+
+    // Reset all transport-specific configs
+    formData.stdio.command = '';
+    formData.stdio.args = [];
+    formData.stdio.workingDirectory = '';
+
+    formData.http.url = '';
+    formData.http.headers = {};
+
+    formData.websocket.url = '';
+    formData.websocket.headers = {};
+
+    formData.tcp.host = '';
+    formData.tcp.port = 8080;
+
+    formData.unix.path = '';
+
+    formData.environmentVariables = {};
+
+    // Reset UI helpers
+    argsInput = '';
+    headerPairs = [{ key: '', value: '' }];
+    envPairs = [{ key: '', value: '' }];
+
+    // Reset state
+    currentStep = 1;
+    testResult = null;
+    modalError = null;
+    connectAfterAdding = false;
+
+    // ✅ NEW: Reset JSON import state too (complete cleanup)
+    showJsonImport = false;
+    jsonConfig = '';
+    jsonError = '';
+    clipboardDetected = false;
+    detectedServerName = '';
+    detectedServerCount = 0;
+  }
+
+  // ✅ FIXED: Close modal with comprehensive state reset
   function closeModal() {
     logger.info(`🚪 Closing modal - currentStep was: ${currentStep}`);
 
-    // ✅ CRITICAL FIX: Reset form data SYNCHRONOUSLY before closing modal
+    // ✅ CRITICAL FIX: Reset ALL form data SYNCHRONOUSLY before closing modal
     // This prevents duplicate detection from firing on the just-added server
-    formData.name = '';
-    formData.description = '';
-    modalError = null;
+    resetFormData();
 
     uiStore.closeModal('addServer');
-    // Full state reset happens automatically in $effect when showModal becomes false
+    // Additional cleanup happens in $effect when showModal becomes false
   }
 
   function nextStep() {
@@ -355,7 +403,7 @@
     }
   }
 
-  function selectTransport(type: TransportConfig['type']) {
+  function selectTransport(type: UITransportType) {
     formData.transportType = type;
     nextStep();
   }
@@ -363,7 +411,8 @@
   function useTemplate(template: ServerConfig) {
     formData.name = template.name;
     formData.description = template.description || '';
-    formData.transportType = template.transport_config.type;
+    // ✅ FIXED: Map config type (webSocket) to UI type (websocket)
+    formData.transportType = template.transport_config.type === 'webSocket' ? 'websocket' : template.transport_config.type;
     
     switch (template.transport_config.type) {
       case 'stdio':
@@ -377,7 +426,7 @@
         formData.http.headers = template.transport_config.headers || {};
         headerPairs = Object.entries(formData.http.headers).map(([key, value]) => ({ key, value }));
         break;
-      case 'websocket':
+      case 'webSocket':  // ✅ FIXED: camelCase to match type
         formData.websocket.url = template.transport_config.url || '';
         formData.websocket.headers = template.transport_config.headers || {};
         headerPairs = Object.entries(formData.websocket.headers).map(([key, value]) => ({ key, value }));
@@ -648,28 +697,36 @@
         throw new Error('Invalid config: no servers defined in "mcpServers"');
       }
 
-      // ✅ NEW: Both single and multiple servers go through the same flow
-      // Import and connect all servers directly (no form navigation)
-      await importAndConnectServers(config.mcpServers);
+      // ✅ FIXED: Import servers without auto-connecting
+      // User can connect manually from the sidebar when ready
+      await importServers(config.mcpServers);
     } catch (error) {
       jsonError = `Failed to import config: ${error}`;
     }
   }
 
-  async function importAndConnectServers(serversConfig: Record<string, any>) {
-    // ✅ NEW: Set loading state for the import button
+  // ✅ FIXED: Add servers without auto-connecting (respects user's workflow choice)
+  async function importServers(serversConfig: Record<string, any>) {
+    // ✅ Set loading state for the import button
     uiStore.setModalLoading('addServer', true);
 
     try {
       const serverNames = Object.keys(serversConfig);
-      logger.info(`🚀 Importing and connecting ${serverNames.length} server(s)...`);
+      logger.info(`📥 Importing ${serverNames.length} server(s) (add only, no auto-connect)...`);
 
       const importPromises = serverNames.map(async (name) => {
         const serverConfig = serversConfig[name];
 
-        // Build ServerConfig for each server
-        const config = await convertMCPConfigToServerConfig(name, serverConfig);
-        return serverStore.connectServer(config);
+        // ✅ FIXED: Build transport config only (no DB creation yet)
+        const transport = buildTransportConfigFromMCP(serverConfig);
+
+        // ✅ Create server config once (not twice!)
+        return serverStore.createServerConfig(
+          name,
+          serverConfig.description || undefined,
+          transport,
+          serverConfig.env || {}
+        );
       });
 
       const results = await Promise.allSettled(importPromises);
@@ -678,21 +735,27 @@
 
       if (successful > 0) {
         const message = serverNames.length === 1
-          ? `Successfully connected to ${serverNames[0]}`
-          : `Successfully imported and connected ${successful}/${serverNames.length} server(s)`;
+          ? `Added ${serverNames[0]} (not connected)`
+          : `Added ${successful}/${serverNames.length} server(s) (not connected)`;
         uiStore.showSuccess(message);
       }
       if (failed > 0) {
         const message = serverNames.length === 1
-          ? `Failed to connect to ${serverNames[0]}`
-          : `Failed to import ${failed} server(s)`;
+          ? `Failed to add ${serverNames[0]}`
+          : `Failed to add ${failed} server(s)`;
         uiStore.showError(message);
       }
 
       // Close modals on success (even partial success)
       if (successful > 0) {
+        // ✅ FIXED: Close JSON import overlay first, then close main modal after brief delay
         showJsonImport = false;
-        closeModal();
+
+        // Small delay to ensure JSON modal closes before main modal
+        // This prevents UI glitches and ensures clean state reset
+        setTimeout(() => {
+          closeModal();
+        }, 100);
       }
     } catch (error) {
       jsonError = `Failed to import servers: ${error}`;
@@ -702,11 +765,10 @@
     }
   }
 
-  async function convertMCPConfigToServerConfig(name: string, mcpConfig: any): Promise<ServerConfig> {
-    let transport: TransportConfig;
-
+  // ✅ FIXED: Only build the transport config object, don't create in DB yet
+  function buildTransportConfigFromMCP(mcpConfig: any): TransportConfig {
     if (mcpConfig.command) {
-      transport = {
+      return {
         type: 'stdio',
         command: mcpConfig.command,
         args: mcpConfig.args || [],
@@ -715,39 +777,32 @@
     } else if (mcpConfig.url) {
       const url = mcpConfig.url.toLowerCase();
       if (url.startsWith('ws://') || url.startsWith('wss://')) {
-        transport = {
-          type: 'websocket',
+        return {
+          type: 'webSocket',  // ✅ camelCase to match Rust serialization
           url: mcpConfig.url,
           headers: mcpConfig.headers || {},
         };
       } else {
-        transport = {
+        return {
           type: 'http',
           url: mcpConfig.url,
           headers: mcpConfig.headers || {},
         };
       }
     } else if (mcpConfig.host && mcpConfig.port) {
-      transport = {
+      return {
         type: 'tcp',
         host: mcpConfig.host,
         port: mcpConfig.port,
       };
     } else if (mcpConfig.path) {
-      transport = {
+      return {
         type: 'unix',
         path: mcpConfig.path,
       };
     } else {
-      throw new Error(`Unable to determine transport type for server: ${name}`);
+      throw new Error(`Unable to determine transport type for config`);
     }
-
-    return await serverStore.createServerConfig(
-      name,
-      mcpConfig.description || undefined,
-      transport,
-      mcpConfig.env || {}
-    );
   }
 
   // ✅ FIXED: Test configuration with proper loading state
@@ -800,7 +855,7 @@
         break;
       case 'websocket':
         transport = {
-          type: 'websocket',
+          type: 'webSocket',  // ✅ FIXED: camelCase to match Rust serialization
           url: formData.websocket.url,
           headers: formData.websocket.headers,
         };
@@ -970,7 +1025,7 @@
               <p class="text-sm text-blue-800 dark:text-blue-200 mt-1">
                 Found <strong>{detectedServerName}</strong> ready to import.
                 {#if detectedServerCount > 1}
-                  <span class="text-xs block mt-1 opacity-90">All {detectedServerCount} servers will be imported and connected.</span>
+                  <span class="text-xs block mt-1 opacity-90">All {detectedServerCount} servers will be added (connect manually when ready).</span>
                 {/if}
               </p>
               <div class="flex gap-2 mt-3">
@@ -1032,7 +1087,7 @@
             <div class="grid grid-cols-1 gap-3">
               {#each transportTypes as transport}
                 <button
-                  onclick={() => selectTransport(transport.id as TransportConfig['type'])}
+                  onclick={() => selectTransport(transport.id as UITransportType)}
                   class="transport-option-button"
                 >
                   <div class="flex items-start">
@@ -1527,7 +1582,7 @@
               <div class="flex-1 min-w-0">
                 <h4 class="font-semibold text-blue-900 mb-1 text-sm sm:text-base">Configuration Auto-Detected</h4>
                 <p class="text-xs sm:text-sm text-blue-800">
-                  Found <strong>{detectedServerName}</strong> in your clipboard. You can edit the configuration below before importing.
+                  Found <strong>{detectedServerName}</strong> in your clipboard. You can edit the configuration below before adding.
                 </p>
               </div>
             </div>
@@ -1544,9 +1599,9 @@
           ></textarea>
           <p class="text-xs text-gray-500 mt-2 flex-shrink-0">
             {#if detectedServerCount > 1}
-              Multiple servers detected. All {detectedServerCount} servers will be imported and connected automatically.
+              Multiple servers detected. All {detectedServerCount} servers will be added (connect manually when ready).
             {:else if detectedServerCount === 1}
-              Single server configuration detected. You can edit before importing.
+              Single server configuration detected. You can edit before adding.
             {:else}
               Paste a valid MCP server configuration in JSON format using the <code>mcpServers</code> schema.
             {/if}
@@ -1589,13 +1644,13 @@
               {#if modalLoading}
                 <div class="flex items-center justify-center">
                   <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                  <span class="hidden sm:inline">Importing...</span>
-                  <span class="sm:hidden">Importing...</span>
+                  <span class="hidden sm:inline">Adding...</span>
+                  <span class="sm:hidden">Adding...</span>
                 </div>
               {:else}
-                <Play size={16} class="mr-2" />
-                <span class="hidden sm:inline">{detectedServerCount > 1 ? 'Import & Connect All' : 'Import Configuration'}</span>
-                <span class="sm:hidden">{detectedServerCount > 1 ? 'Connect All' : 'Import'}</span>
+                <Check size={16} class="mr-2" />
+                <span class="hidden sm:inline">{detectedServerCount > 1 ? 'Add All Servers' : 'Add Server'}</span>
+                <span class="sm:hidden">Add</span>
               {/if}
             </button>
           </div>

@@ -361,8 +361,9 @@ impl HITLSamplingManager {
             })?;
 
         // Process with real LLM
+        // Use the pending request's ID as the request_id for tracking
         let response = handler
-            .handle_create_message(pending_request.request.clone())
+            .handle_create_message(pending_request.id.clone(), pending_request.request.clone())
             .await
             .map_err(|e| McpStudioError::TurboMcpError(format!("LLM sampling failed: {}", e)))?;
 

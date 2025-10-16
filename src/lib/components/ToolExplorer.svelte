@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { serverStore, type ServerInfo, type ToolDefinition, type ToolExecution } from '$lib/stores/serverStore';
+  import { contextStore } from '$lib/stores/contextStore';
   import { uiStore } from '$lib/stores/uiStore';
   import DynamicForm from '$lib/components/ui/DynamicForm.svelte';
   import JsonViewer from '$lib/components/ui/JsonViewer.svelte';
@@ -10,9 +11,6 @@
 
   // Initialize scoped logger
   const logger = createLogger('ToolExplorer');
-
-  import { filterServersByCapability } from '$lib/utils/serverCapabilities';
-
 
   interface ValidationResult {
     isValid: boolean;
@@ -37,16 +35,20 @@
     Bookmark
   } from 'lucide-svelte';
 
-  let servers: ServerInfo[] = $state([]);
-  let selectedServerId: string | undefined = $state(undefined);
+  // ✅ Use contextStore for server selection (no local state, no manual sync)
+  const context = $derived($contextStore);
+  const selectedServer = $derived(context.selectedServer);
+  const selectedServerId = $derived(context.selectedServerId);
+
+  // Component state
   let tools: ToolDefinition[] = $state([]);
   let loading = $state(false);
+  let loadingPromise: Promise<void> | null = null; // Track in-flight load
   let searchQuery = $state('');
   let jsonSearchTerm = $state('');
   let selectedTool: ToolDefinition | null = $state(null);
   let toolParameters = $state<Record<string, any>>({});
   let toolResult: any = $state(null);
-  let executionHistory: ToolExecution[] = $state([]);
   let expandedTool: string | null = $state(null);
   let executing = $state(false);
   let isHistoricalResult = $state(false);
@@ -54,78 +56,48 @@
   let showValidationErrors = $state(false);
   let persistedToolSelection: { name: string; serverId: string } | undefined = $state(undefined);
 
-  // Subscribe to stores
+  // ✅ Subscribe to stores for execution history and persisted selection
+  const serverStoreState = $derived($serverStore);
+  const executionHistory = $derived(() => {
+    const toolName = selectedTool?.name;
+    if (toolName) {
+      // Filter by specific tool when one is selected
+      return selectedServerId
+        ? serverStoreState.toolExecutions.filter((e: any) =>
+            e.serverId === selectedServerId &&
+            e.tool === toolName &&
+            !e.tool.startsWith('prompt:')
+          )
+        : serverStoreState.toolExecutions.filter((e: any) =>
+            e.tool === toolName &&
+            !e.tool.startsWith('prompt:')
+          );
+    } else {
+      // Show all history when no tool is selected
+      return selectedServerId
+        ? serverStoreState.toolExecutions.filter((e: any) =>
+            e.serverId === selectedServerId &&
+            !e.tool.startsWith('prompt:')
+          )
+        : serverStoreState.toolExecutions.filter((e: any) =>
+            !e.tool.startsWith('prompt:')
+          );
+    }
+  });
+
+  // Subscribe to persisted tool selection from uiStore
   $effect(() => {
-    const unsubscribeServers = serverStore.subscribe((state: any) => {
-      // ✅ FIXED: Convert Map to array before filtering with explicit type
-      const allServers: ServerInfo[] = state.servers instanceof Map
-        ? Array.from(state.servers.values())
-        : [];
-      // Filter to only show connected servers that support tools
-      const connectedServers = filterServersByCapability(allServers, 'tools');
-      servers = connectedServers;
-
-      // Sync with global server selection if it's valid for tools
-      const globalSelectedId = state.selectedServerId;
-      if (globalSelectedId && connectedServers.some((s: any) => s.id === globalSelectedId)) {
-        if (selectedServerId !== globalSelectedId) {
-          selectedServerId = globalSelectedId;
-          // Clear current tool selection when switching servers
-          selectedTool = null;
-          toolParameters = {};
-          toolResult = null;
-          loadTools();
-        }
-      }
-      // Only update selectedServerId if current selection is no longer valid
-      else if (selectedServerId && !connectedServers.find((s: any) => s.id === selectedServerId)) {
-        // Current selection is invalid, pick first available
-        selectedServerId = connectedServers.length > 0 ? connectedServers[0].id : undefined;
-      } else if (!selectedServerId && connectedServers.length > 0) {
-        // No selection and servers available, auto-select first
-        selectedServerId = connectedServers[0].id;
-      }
-
-      // Update execution history from store - FIXED: Show all history when no tool selected
-      if (selectedTool) {
-        // Filter by specific tool when one is selected
-        const toolName = selectedTool.name;
-        executionHistory = selectedServerId
-          ? state.toolExecutions.filter((e: any) =>
-              e.serverId === selectedServerId &&
-              e.tool === toolName &&
-              !e.tool.startsWith('prompt:') // Exclude prompt executions
-            )
-          : state.toolExecutions.filter((e: any) =>
-              e.tool === toolName &&
-              !e.tool.startsWith('prompt:') // Exclude prompt executions
-            );
-      } else {
-        // Show all history when no tool is selected (THIS IS THE KEY FIX)
-        executionHistory = selectedServerId
-          ? state.toolExecutions.filter((e: any) =>
-              e.serverId === selectedServerId &&
-              !e.tool.startsWith('prompt:') // Exclude prompt executions
-            )
-          : state.toolExecutions.filter((e: any) =>
-              !e.tool.startsWith('prompt:') // Exclude prompt executions
-            );
-      }
-    });
-
-    const unsubscribeUi = uiStore.subscribe((state: any) => {
+    const unsubscribe = uiStore.subscribe((state: any) => {
       persistedToolSelection = state.selectedTool;
     });
-
-    return () => {
-      unsubscribeServers();
-      unsubscribeUi();
-    };
+    return unsubscribe;
   });
 
   // Load tools when server selection changes
+  // Don't track executing here - it causes issues with sampling/elicitation
   $effect(() => {
     if (selectedServerId) {
+      logger.debug(`[loadTools effect] Server changed to: ${selectedServerId}`);
       loadTools();
     }
   });
@@ -143,10 +115,6 @@
 
   // Note: Execution history is now updated in the subscription above whenever selectedTool or store state changes
 
-  const selectedServer = $derived(
-    servers.find(s => s.id === selectedServerId)
-  );
-
   const filteredTools = $derived(
     tools.filter(tool => 
       !searchQuery || 
@@ -157,17 +125,35 @@
 
   async function loadTools() {
     if (!selectedServerId) return;
-    
-    loading = true;
-    try {
-      tools = await serverStore.listTools(selectedServerId);
-    } catch (error) {
-      logger.error('Failed to load tools:', error);
-      uiStore.showError(`Failed to load tools: ${error}`);
-      tools = [];
-    } finally {
-      loading = false;
+
+    // ✅ Prevent concurrent loadTools() calls
+    if (loadingPromise) {
+      logger.debug('Load already in progress, waiting for existing promise');
+      return loadingPromise;
     }
+
+    loading = true;
+    logger.debug('Loading tools for server:', selectedServerId);
+
+    // Create and track the loading promise
+    loadingPromise = (async () => {
+      try {
+        // ✅ FIX: Trust TurboMCP to handle concurrent requests properly
+        // No timeout - let the backend manage request queueing
+        tools = await serverStore.listTools(selectedServerId);
+        logger.debug(`✅ Loaded ${tools.length} tools successfully`);
+      } catch (error) {
+        logger.error('❌ Failed to load tools:', error);
+        uiStore.showError(`Failed to load tools: ${error}`);
+        tools = [];
+      } finally {
+        loading = false;
+        loadingPromise = null; // Clear the promise
+        logger.debug('Loading state reset to false');
+      }
+    })();
+
+    return loadingPromise;
   }
 
 
@@ -227,26 +213,36 @@
       }
     });
 
+    logger.debug(`🚀 Setting executing = true (calling tool: ${selectedTool.name})`);
     executing = true;
     try {
+      logger.debug(`📞 Calling serverStore.callTool for: ${selectedTool.name}`);
       const result = await serverStore.callTool(
         selectedServerId,
         selectedTool.name,
         cleanedParameters
       );
 
+      logger.debug(`✅ Tool ${selectedTool.name} completed successfully`);
       toolResult = result;
       isHistoricalResult = false;
 
       uiStore.showSuccess(`Tool "${selectedTool.name}" executed successfully`);
     } catch (error) {
-      logger.error('Tool execution failed:', error);
+      logger.error(`❌ Tool ${selectedTool.name} execution failed:`, error);
       const errorResult = { error: String(error) };
       toolResult = errorResult;
       isHistoricalResult = false;
       uiStore.showError(`Tool execution failed: ${error}`);
     } finally {
+      logger.debug(`🏁 Setting executing = false (tool: ${selectedTool.name} finished)`);
       executing = false;
+
+      // ✅ FIX P2: Ensure tools list remains accessible after execution
+      // Reset loading state to prevent stuck UI (especially after sampling/elicitation)
+      loading = false;
+
+      logger.debug('Tool execution complete, state reset');
     }
   }
 
@@ -257,17 +253,6 @@
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text);
     uiStore.showSuccess('Copied to clipboard');
-  }
-
-  function selectServer(serverId: string) {
-    selectedServerId = serverId;
-    // Update global store so other components stay in sync
-    serverStore.selectServer(serverId);
-    // Clear current tool selection when switching servers
-    selectedTool = null;
-    toolParameters = {};
-    toolResult = null;
-    loadTools();
   }
 
   function rerunFromHistory(historyItem: ToolExecution) {
@@ -361,23 +346,6 @@
         </button>
       </div>
 
-      <!-- Server Selection -->
-      {#if servers.length > 0}
-        <div class="mb-4">
-          <label class="form-label" for="server-select">Server</label>
-          <select
-            value={selectedServerId}
-            onchange={(e) => selectServer((e.target as HTMLSelectElement).value)}
-            class="form-input"
-            id="server-select"
-          >
-            {#each servers as server}
-              <option value={server.id}>{server.config.name || 'Unnamed Server'}</option>
-            {/each}
-          </select>
-        </div>
-      {/if}
-
       <!-- Search -->
       <div class="relative">
         <Search size={16} class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
@@ -395,8 +363,8 @@
       {#if !selectedServer}
         <div class="p-4 text-center">
           <Database size={32} class="mx-auto text-gray-400 dark:text-gray-500 mb-2" />
-          <p class="text-sm text-gray-600 dark:text-gray-400">No connected servers</p>
-          <p class="text-xs text-gray-500 dark:text-gray-500">Connect to an MCP server to see available tools</p>
+          <p class="text-sm text-gray-600 dark:text-gray-400">No server selected</p>
+          <p class="text-xs text-gray-500 dark:text-gray-500">Use the server selector above to choose a server with tools capability</p>
         </div>
       {:else if loading}
         <div class="p-4 text-center">
@@ -493,7 +461,7 @@
           <p class="text-gray-600 dark:text-gray-400 mb-4">
             Choose a tool from the list to see its parameters and execute it
           </p>
-          {#if servers.length === 0}
+          {#if context.availableServers.length === 0}
             <button
               onclick={() => uiStore.openModal('addServer')}
               class="btn-primary"
@@ -637,7 +605,7 @@
         </div>
 
         <!-- Execution History -->
-        {#if executionHistory.length > 0}
+        {#if executionHistory().length > 0}
           <div class="border-t border-gray-200">
             <div class="p-4">
               <div class="flex items-center justify-between mb-3">
@@ -645,11 +613,11 @@
                   <History size={16} class="mr-2" />
                   Recent Executions
                 </h3>
-                <span class="text-xs text-gray-500">{executionHistory.length} executions</span>
+                <span class="text-xs text-gray-500">{executionHistory().length} executions</span>
               </div>
-              
+
               <div class="space-y-2 max-h-48 overflow-y-auto">
-                {#each executionHistory.slice(0, 5) as item}
+                {#each executionHistory().slice(0, 5) as item}
                   <button
                     onclick={() => rerunFromHistory(item)}
                     class="w-full p-3 text-left bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded border border-gray-200 dark:border-gray-700 transition-colors"

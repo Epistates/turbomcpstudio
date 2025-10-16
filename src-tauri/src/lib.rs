@@ -30,6 +30,19 @@ pub struct AppState {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Single-instance plugin MUST be initialized first to work properly
+        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+            tracing::info!("Single instance plugin triggered");
+            tracing::debug!("Arguments: {:?}", args);
+            tracing::debug!("Current directory: {:?}", cwd);
+
+            // Focus the main window when another instance is attempted
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_focus();
+                let _ = window.unminimize();
+                tracing::info!("✅ Focused main window for single instance");
+            }
+        }))
         // Initialize logging with tauri-plugin-log
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -53,6 +66,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        // Window state plugin - remembers window position and size
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // OS info plugin - provides system information
+        .plugin(tauri_plugin_os::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
 
@@ -447,6 +464,7 @@ pub fn run() {
             commands::llm_completion_request,
             // Application utility commands
             commands::get_app_paths,
+            commands::get_system_info,
             commands::shutdown_background_tasks,  // Issue #18 fix
             // Server Profile commands (enterprise server management)
             commands::create_server_profile,

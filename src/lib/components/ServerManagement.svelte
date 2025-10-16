@@ -498,7 +498,7 @@
       if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
         mcpConfig.headers = config.transport_config.headers;
       }
-    } else if (config.transport_config?.type === 'websocket') {
+    } else if (config.transport_config?.type === 'webSocket') {  // ✅ FIXED: camelCase
       mcpConfig.url = config.transport_config.url;
       mcpConfig.transport = 'websocket';
       if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
@@ -577,7 +577,7 @@
       return getExecutableName(server.config.transport_config.command);
     } else if (server.config.transport_config?.type === 'http') {
       return server.config.transport_config.url;
-    } else if (server.config.transport_config?.type === 'websocket') {
+    } else if (server.config.transport_config?.type === 'webSocket') {  // ✅ FIXED: camelCase
       return server.config.transport_config.url;
     } else {
       return getTransportLabel(server);

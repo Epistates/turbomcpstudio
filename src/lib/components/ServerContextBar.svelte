@@ -31,10 +31,14 @@
   // Props
   interface Props {
     requiredCapability?: 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | null;
+    mode?: 'selector' | 'filter';
     compact?: boolean;
   }
 
-  let { requiredCapability = null, compact = false }: Props = $props();
+  let { requiredCapability = null, mode = 'selector', compact = false }: Props = $props();
+
+  // Derived label based on mode
+  const label = $derived(mode === 'filter' ? '🔍 Filter:' : '🎯 Testing:');
 
   // Reactive context
   const context = $derived($contextStore) as ServerContext;
@@ -160,13 +164,19 @@
     if (server.capabilities?.elicitation) badges.push('E');
     return badges;
   }
+
+  // Clear selection (for filter mode)
+  function clearSelection() {
+    contextStore.clearSelection();
+    isDropdownOpen = false;
+  }
 </script>
 
 <div class="server-context-bar" class:compact bind:this={dropdownRef}>
   {#if selectedServer}
     <!-- Selected Server Display -->
     <div class="server-display">
-      <span class="server-label" class:compact>🎯 Testing:</span>
+      <span class="server-label" class:compact>{label}</span>
 
       <button class="server-selector" onclick={toggleDropdown}>
         <span class="server-status {statusConfig().color}">
@@ -183,6 +193,11 @@
 
       {#if !compact}
         <div class="server-actions">
+          {#if mode === 'filter'}
+            <button class="action-btn clear" onclick={clearSelection} title="Clear Filter">
+              <span>Clear</span>
+            </button>
+          {/if}
           {#if context.connectionStatus === 'error'}
             <button class="action-btn reconnect" onclick={handleReconnect} title="Reconnect">
               <RefreshCw size={14} />

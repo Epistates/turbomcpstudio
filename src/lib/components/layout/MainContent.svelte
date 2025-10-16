@@ -32,14 +32,14 @@
   );
 
   // ✅ NEW: Check if current view should show server context bar (operational views)
+  // NOTE: Collections disabled for v1 (requires multi-server UI design)
   const showContextBar = $derived(
     currentView === 'tools' ||
     currentView === 'resources' ||
     currentView === 'prompts' ||
     currentView === 'sampling' ||
     currentView === 'elicitation' ||
-    currentView === 'protocol' ||
-    currentView === 'collections'
+    currentView === 'protocol'
   );
 
   // ✅ NEW: Get required capability for current view (for filtering servers)
@@ -54,10 +54,22 @@
     }
   });
 
+  // ✅ NEW: Get ServerContextBar mode based on current view
+  const contextBarMode = $derived(() => {
+    switch (currentView) {
+      case 'sampling':
+      case 'elicitation':
+        return 'filter';  // Optional filter mode for monitoring tabs
+      default:
+        return 'selector';  // Required selection mode for operational tabs
+    }
+  });
+
   // ✅ NEW: Auto-select server when context bar is shown
+  // Pass mode to respect filter vs selector behavior
   $effect(() => {
     if (showContextBar) {
-      contextStore.autoSelectServer();
+      contextStore.autoSelectServer(contextBarMode());
     }
   });
 
@@ -93,7 +105,7 @@
 
   <!-- ✅ NEW: Server Context Bar for Operational Views -->
   {#if showContextBar}
-    <ServerContextBar requiredCapability={requiredCapability()} />
+    <ServerContextBar requiredCapability={requiredCapability()} mode={contextBarMode()} />
   {/if}
 
   <!-- Dynamic Content Area -->
@@ -115,6 +127,8 @@
     {:else if currentView === 'protocol'}
       <ProtocolInspector />
     {:else if currentView === 'collections'}
+      <!-- NOTE: Collections view disabled in Sidebar for v1 but code preserved -->
+      <!-- TODO: Enable in v2 with proper multi-server UI design -->
       <CollectionsManager />
     {:else if currentView === 'settings'}
       <Settings />

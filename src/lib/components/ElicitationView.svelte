@@ -7,7 +7,8 @@
 <script lang="ts">
 	import { elicitationStore, elicitationReplayTemplates, type ActiveElicitationRequest, type CompletedElicitationRequest } from '$lib/stores/elicitationStore';
 	import { uiStore } from '$lib/stores/uiStore';
-	import { Clock, CheckCircle2, XCircle, AlertCircle, ExternalLink, MessageCircle, FolderOpen, Trash2 } from 'lucide-svelte';
+	import { contextStore } from '$lib/stores/contextStore';
+	import { Clock, CheckCircle2, XCircle, AlertCircle, ExternalLink, MessageCircle, FolderOpen, Trash2, Filter } from 'lucide-svelte';
 
 	// Reactive store access
 	const active = $derived($elicitationStore.active);
@@ -15,6 +16,31 @@
 	const templates = $derived($elicitationReplayTemplates);
 	const loading = $derived($elicitationStore.loading);
 	const error = $derived($elicitationStore.error);
+
+	// Context filtering
+	const context = $derived($contextStore);
+	const selectedServerId = $derived(context.selectedServerId);
+	const selectedServer = $derived(context.selectedServer);
+
+	// Filter requests by selected server (if any)
+	const filteredActive = $derived(
+		selectedServerId
+			? active.filter(r => r.serverId === selectedServerId)
+			: active
+	);
+
+	const filteredHistory = $derived(
+		selectedServerId
+			? history.filter(r => r.serverId === selectedServerId)
+			: history
+	);
+
+	// Visual feedback message
+	const filterMessage = $derived(
+		selectedServerId && selectedServer
+			? `Filtered to: ${selectedServer.config.name}`
+			: 'Showing all servers'
+	);
 
 	// Helper functions
 	function formatTimeAgo(timestamp: string): string {
@@ -73,6 +99,10 @@
 				</p>
 			</div>
 			<div class="flex items-center gap-4">
+				<div class="flex items-center gap-2 text-sm">
+					<Filter size={16} class="text-gray-500 dark:text-gray-400" />
+					<span class="text-gray-600 dark:text-gray-400">{filterMessage}</span>
+				</div>
 				<div class="text-sm">
 					<span class="text-gray-600 dark:text-gray-400">Mode:</span>
 					<span class="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded font-medium">
@@ -104,25 +134,25 @@
 					<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
 						Active Requests
 					</h2>
-					{#if active.length > 0}
+					{#if filteredActive.length > 0}
 						<span class="ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded text-sm font-medium">
-							{active.length}
+							{filteredActive.length}
 						</span>
 					{/if}
 				</div>
 			</div>
 
 			<div class="divide-y divide-gray-200 dark:divide-gray-700">
-				{#if active.length === 0}
+				{#if filteredActive.length === 0}
 					<div class="px-6 py-12 text-center">
 						<MessageCircle size={48} class="mx-auto text-gray-400 dark:text-gray-600 mb-3" />
 						<p class="text-gray-600 dark:text-gray-400">No active elicitation requests</p>
 						<p class="text-sm text-gray-500 dark:text-gray-500 mt-1">
-							When a server requests user input, it will appear here
+							{selectedServerId ? 'No requests from the selected server' : 'When a server requests user input, it will appear here'}
 						</p>
 					</div>
 				{:else}
-					{#each active as request}
+					{#each filteredActive as request}
 						<div class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
 							<div class="flex items-start justify-between gap-4">
 								<div class="flex-1 min-w-0">
@@ -174,13 +204,13 @@
 					<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
 						Completed Requests
 					</h2>
-					{#if history.length > 0}
+					{#if filteredHistory.length > 0}
 						<span class="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-sm font-medium">
-							{history.length}
+							{filteredHistory.length}
 						</span>
 					{/if}
 				</div>
-				{#if history.length > 0}
+				{#if filteredHistory.length > 0}
 					<button
 						onclick={() => elicitationStore.clearHistory()}
 						class="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
@@ -191,16 +221,16 @@
 			</div>
 
 			<div class="divide-y divide-gray-200 dark:divide-gray-700">
-				{#if history.length === 0}
+				{#if filteredHistory.length === 0}
 					<div class="px-6 py-12 text-center">
 						<CheckCircle2 size={48} class="mx-auto text-gray-400 dark:text-gray-600 mb-3" />
 						<p class="text-gray-600 dark:text-gray-400">No completed requests</p>
 						<p class="text-sm text-gray-500 dark:text-gray-500 mt-1">
-							Accepted, declined, and cancelled requests will appear here
+							{selectedServerId ? 'No completed requests from the selected server' : 'Accepted, declined, and cancelled requests will appear here'}
 						</p>
 					</div>
 				{:else}
-					{#each history.slice(0, 10) as request}
+					{#each filteredHistory.slice(0, 10) as request}
 						{@const StatusIcon = getStatusIcon(request.status)}
 						<div class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
 							<!-- Header with status and time -->
@@ -285,10 +315,10 @@
 							</div>
 						</div>
 					{/each}
-					{#if history.length > 10}
+					{#if filteredHistory.length > 10}
 						<div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 text-center">
 							<p class="text-sm text-gray-600 dark:text-gray-400">
-								Showing 10 of {history.length} completed requests
+								Showing 10 of {filteredHistory.length} completed requests
 							</p>
 						</div>
 					{/if}
@@ -344,10 +374,10 @@
 									</div>
 								</div>
 								<div class="flex items-center gap-2">
-									{#if active.length > 0}
+									{#if filteredActive.length > 0}
 										<button
 											onclick={async () => {
-												const firstActive = active[0];
+												const firstActive = filteredActive[0];
 												try {
 													await elicitationStore.useReplayTemplate(firstActive.id, template.id);
 												} catch (e) {
