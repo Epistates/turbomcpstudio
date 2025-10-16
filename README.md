@@ -56,39 +56,7 @@ A native desktop application for developing, testing, and debugging Model Contex
 
 ### Download Pre-built Binaries
 
-Download the latest release for your platform:
-
-**[→ Download Latest Release](https://github.com/Epistates/turbomcpstudio/releases/latest)**
-
-#### macOS
-- **Universal DMG** (Intel + Apple Silicon): `TurboMCP-Studio_x.x.x_universal.dmg`
-- **Intel DMG**: `TurboMCP-Studio_x.x.x_x64.dmg`
-- **Apple Silicon DMG**: `TurboMCP-Studio_x.x.x_aarch64.dmg`
-
-Requirements: macOS 11.0 (Big Sur) or later
-
-#### Windows
-- **MSI Installer**: `TurboMCP-Studio_x.x.x_x64_en-US.msi` (recommended)
-- **EXE Installer**: `TurboMCP-Studio_x.x.x_x64-setup.exe`
-
-Requirements: Windows 10 (1809+) or Windows 11
-
-#### Linux
-- **AppImage** (universal): `turbomcp-studio_x.x.x_amd64.AppImage`
-  ```bash
-  chmod +x turbomcp-studio_x.x.x_amd64.AppImage
-  ./turbomcp-studio_x.x.x_amd64.AppImage
-  ```
-- **DEB Package** (Debian/Ubuntu):
-  ```bash
-  sudo dpkg -i turbomcp-studio_x.x.x_amd64.deb
-  ```
-- **RPM Package** (Fedora/RHEL):
-  ```bash
-  sudo rpm -i turbomcp-studio-x.x.x-1.x86_64.rpm
-  ```
-
-Requirements: Modern Linux distribution with GTK 3.24+
+Pre-built binaries are COMING SOON!
 
 ## Building from Source
 
@@ -188,18 +156,126 @@ pnpm run tauri dev
 
 ### Production Build
 
+#### Quick Build (Local Testing)
+
+For local testing without creating installers:
+
 ```bash
-# Build optimized production binary (no installer)
+# macOS: Build app bundle only (faster, no DMG)
+pnpm run tauri:build
+
+# All platforms: Build executable without installers
 pnpm run tauri build -- --no-bundle
 
-# Build with installers for your platform
+# Executable location: src-tauri/target/release/turbomcpstudio(.exe)
+```
+
+#### Platform-Specific Builds
+
+<details>
+<summary><b>macOS</b></summary>
+
+```bash
+# Build for your current architecture
 pnpm run tauri build
 
+# Build for specific architecture
+pnpm run tauri build -- --target aarch64-apple-darwin  # Apple Silicon
+pnpm run tauri build -- --target x86_64-apple-darwin   # Intel
+
 # Output locations:
-# macOS:   src-tauri/target/release/bundle/dmg/
-# Windows: src-tauri/target/release/bundle/msi/ and .../nsis/
-# Linux:   src-tauri/target/release/bundle/appimage/, deb/, rpm/
+# - App Bundle: src-tauri/target/[arch]/release/bundle/macos/TurboMCP Studio.app
+# - DMG Installer: src-tauri/target/[arch]/release/bundle/dmg/TurboMCP Studio_*.dmg
 ```
+
+**Note**: Unsigned builds will show a Gatekeeper warning. To bypass:
+```bash
+# Right-click app → "Open" → "Open"
+# Or remove quarantine attribute:
+xattr -d com.apple.quarantine "TurboMCP Studio.app"
+```
+
+</details>
+
+<details>
+<summary><b>Windows</b></summary>
+
+```bash
+# Build installers (MSI and NSIS)
+pnpm run tauri build
+
+# Build MSI only
+pnpm run tauri build -- --bundles msi
+
+# Build NSIS installer only
+pnpm run tauri build -- --bundles nsis
+
+# Output locations:
+# - MSI: src-tauri/target/release/bundle/msi/TurboMCP Studio_*.msi
+# - NSIS: src-tauri/target/release/bundle/nsis/TurboMCP Studio_*-setup.exe
+# - Executable: src-tauri/target/release/turbomcpstudio.exe
+```
+
+**Requirements**:
+- MSI requires [WiX Toolset v3](https://wixtoolset.org/docs/wix3/)
+- NSIS requires [NSIS](https://nsis.sourceforge.io/Download)
+
+**Installation via Package Manager**:
+```powershell
+# Using Chocolatey
+choco install wixtoolset nsis
+
+# Using Scoop
+scoop install wixtoolset nsis
+```
+
+</details>
+
+<details>
+<summary><b>Linux</b></summary>
+
+```bash
+# Build all Linux formats (AppImage, DEB, RPM)
+pnpm run tauri build
+
+# Build specific format
+pnpm run tauri build -- --bundles appimage  # Universal format
+pnpm run tauri build -- --bundles deb       # Debian/Ubuntu
+pnpm run tauri build -- --bundles rpm       # Fedora/RHEL
+
+# Output locations:
+# - AppImage: src-tauri/target/release/bundle/appimage/turbomcp-studio_*.AppImage
+# - DEB: src-tauri/target/release/bundle/deb/turbomcp-studio_*.deb
+# - RPM: src-tauri/target/release/bundle/rpm/turbomcp-studio-*.rpm
+```
+
+**Running AppImage**:
+```bash
+chmod +x turbomcp-studio_*.AppImage
+./turbomcp-studio_*.AppImage
+```
+
+**Installing DEB**:
+```bash
+sudo dpkg -i turbomcp-studio_*.deb
+# If dependencies missing:
+sudo apt-get install -f
+```
+
+**Installing RPM**:
+```bash
+sudo rpm -i turbomcp-studio-*.rpm
+# Or with dnf:
+sudo dnf install turbomcp-studio-*.rpm
+```
+
+</details>
+
+#### Build Notes
+
+- **macOS**: Unsigned builds will show a Gatekeeper warning (see Runtime Issues below for bypass)
+- **Windows**: MSI creation requires WiX Toolset, NSIS installer requires NSIS
+- **Linux**: AppImage requires FUSE, or use DEB/RPM formats instead
 
 ### Type Checking
 
@@ -378,13 +454,45 @@ Before submitting:
 ### Build Errors
 
 **Error**: "could not find `turbomcp` in the crate root"
-- **Solution**: Clone TurboMCP to `../turbomcp` or update Cargo.toml dependencies
+- **Solution**: TurboMCP is automatically fetched from crates.io. If using git dependency, ensure `../turbomcp` exists or update `src-tauri/Cargo.toml`
 
 **Error**: "webkit2gtk not found" (Linux)
-- **Solution**: Install webkit2gtk-4.1-dev package (see Prerequisites)
+- **Solution**: Install required system dependencies:
+  ```bash
+  # Debian/Ubuntu
+  sudo apt-get install libwebkit2gtk-4.1-dev build-essential libssl-dev librsvg2-dev
+
+  # Fedora/RHEL
+  sudo dnf install webkit2gtk4.1-devel openssl-devel
+  ```
 
 **Error**: "VCRUNTIME140.dll was not found" (Windows)
-- **Solution**: Install Visual Studio C++ Redistributable
+- **Solution**: Install [Visual Studio C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+
+**Error**: "DMG bundling failed" (macOS)
+- **Solution**: This is a known Tauri issue on local builds. Use `pnpm run tauri:build` instead, which builds the .app bundle without DMG
+
+**Error**: "WiX Toolset not found" (Windows)
+- **Solution**: Install WiX for MSI creation:
+  ```powershell
+  # Chocolatey
+  choco install wixtoolset
+
+  # Or download from https://wixtoolset.org/
+  ```
+
+**Error**: "Failed to bundle project" (Linux)
+- **Solution**: Ensure all dependencies are installed (see Prerequisites) and you have sufficient disk space
+
+**Error**: "Permission denied" building AppImage (Linux)
+- **Solution**:
+  ```bash
+  # Install FUSE for AppImage
+  sudo apt-get install fuse libfuse2
+
+  # Or use DEB/RPM format instead:
+  pnpm run tauri build -- --bundles deb
+  ```
 
 ### Runtime Issues
 

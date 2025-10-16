@@ -33,6 +33,7 @@ debug.log
 *-test-server
 
 # Keep only public-facing documentation
+*.new
 *.md
 !README.md
 !CHANGELOG.md
