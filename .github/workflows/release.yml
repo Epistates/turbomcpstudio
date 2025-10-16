@@ -160,6 +160,29 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
           npm_config_registry: 'https://registry.npmjs.org/'
         with:
-          releaseId: ${{ needs.create-release.outputs.release_id }}
-          releaseDraft: true
           args: ${{ matrix.args }} ${{ startsWith(matrix.os, 'macos') && '--bundles app dmg' || '' }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-artifacts
+          path: src-tauri/target/*/release/bundle/
+          retention-days: 1
+
+  upload-release:
+    name: Upload Release Assets
+    needs: [create-release, build-tauri]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ needs.create-release.outputs.version }}
+          draft: true
+          files: artifacts/**/*
