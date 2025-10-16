@@ -374,7 +374,10 @@ impl TransportLayer {
         }
     }
 
+    /// Stub for non-Unix platforms (Windows, etc.)
+    /// Frontend filters out Unix transport on non-Unix systems, so this is defensive code
     #[cfg(not(unix))]
+    #[allow(dead_code)]
     async fn connect_unix(
         _connection: Arc<ManagedConnection>,
         _path: &str,

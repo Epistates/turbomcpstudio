@@ -13,13 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Upcoming changes
 
-## [0.1.0] - 2025-01-11
+## [0.1.0] - 2025-10-16
 
 ### Added
 
-Initial release of TurboMCP Studio.
+Initial release of TurboMCP Studio - Enterprise-grade desktop application for Model Context Protocol development and testing.
 
-#### Features
+#### Core Features
 
 - **Native Desktop Application**: Built with Tauri 2.0 for macOS, Windows, and Linux
 - **Enterprise UI**: Complete design system with light/dark themes and responsive layouts
@@ -29,6 +29,14 @@ Initial release of TurboMCP Studio.
 - **Prompt Designer**: Create and test MCP prompts
 - **Protocol Inspector**: Real-time protocol message viewing
 - **Settings Management**: Configure application preferences and themes
+- **Sampling & Elicitation**: Handle MCP sampling requests and user input elicitation
+- **System Monitoring**: Real-time health dashboard with connection status tracking
+
+#### Platform Support
+
+- **macOS**: Universal binary for Intel and Apple Silicon with full Unix socket support
+- **Windows**: Native x64 build with TCP, HTTP/SSE, and WebSocket transports
+- **Linux**: x64 build with full Unix socket and network transport support
 
 #### Technology Stack
 
@@ -53,11 +61,18 @@ Three-layer architecture for optimal performance:
 - **Developer Experience**: Fast development with hot module replacement
 - **Cross-Platform**: Single codebase for macOS, Windows, and Linux
 
+### Fixed
+
+- Cross-platform Unix socket handling with OS-specific compilation guards
+- Platform-aware transport filtering (Unix sockets hidden on Windows)
+- TypeScript type safety and null checking
+- Release workflow permissions and Tauri 2.0 compatibility
+
 ### Known Limitations
 
-- **MCP Protocol**: Core protocol operations are scaffolded, full implementation in progress
 - **Testing Framework**: Automated tests not yet implemented
 - **Collections**: Advanced workflow features coming in future releases
+- **UI Warnings**: 161 non-critical Svelte checker warnings (CSS and accessibility false positives)
 
 ### Requirements
 

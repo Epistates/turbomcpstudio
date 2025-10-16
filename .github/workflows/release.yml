@@ -40,39 +40,47 @@ jobs:
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/github-script@v7
         with:
-          tag_name: ${{ steps.get_version.outputs.version }}
-          release_name: TurboMCP Studio ${{ steps.get_version.outputs.version }}
-          body: |
-            # TurboMCP Studio ${{ steps.get_version.outputs.version }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: release } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: '${{ steps.get_version.outputs.version }}',
+              name: 'TurboMCP Studio ${{ steps.get_version.outputs.version }}',
+              body: `# TurboMCP Studio ${{ steps.get_version.outputs.version }}
 
-            ## Installation
+## Installation
 
-            Download the appropriate installer for your platform:
-            - **macOS**: `.dmg` file (Universal binary for Intel and Apple Silicon)
-            - **Windows**: `.msi` or `.exe` installer
-            - **Linux**: `.AppImage` (universal), `.deb` (Debian/Ubuntu), or `.rpm` (Fedora/RHEL)
+Download the appropriate installer for your platform:
+- **macOS**: \`.dmg\` file (Universal binary for Intel and Apple Silicon)
+- **Windows**: \`.msi\` or \`.exe\` installer
+- **Linux**: \`.AppImage\` (universal), \`.deb\` (Debian/Ubuntu), or \`.rpm\` (Fedora/RHEL)
 
-            ## What's New
+## What's New
 
-            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
 
-            ## Requirements
+## Requirements
 
-            - macOS: 11.0 (Big Sur) or later
-            - Windows: Windows 10 (1809+) or Windows 11
-            - Linux: Modern Linux distribution with GTK 3.24+
+- macOS: 11.0 (Big Sur) or later
+- Windows: Windows 10 (1809+) or Windows 11
+- Linux: Modern Linux distribution with GTK 3.24+
 
-            ## Notes
+## Notes
 
-            - First release of TurboMCP Studio
-            - Native desktop application for Model Context Protocol development
-            - Powered by TurboMCP for enterprise-grade MCP operations
-          draft: true
-          prerelease: false
+- First release of TurboMCP Studio
+- Native desktop application for Model Context Protocol development
+- Powered by TurboMCP for enterprise-grade MCP operations`,
+              draft: true,
+              prerelease: false
+            });
+
+            const fs = require('fs');
+            const outputFile = process.env.GITHUB_OUTPUT;
+            fs.appendFileSync(outputFile, `upload_url=${release.upload_url}\n`);
+            fs.appendFileSync(outputFile, `release_id=${release.id}\n`);
 
   build-tauri:
     name: Build ${{ matrix.platform }}
@@ -158,6 +166,10 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
+
+      - name: Install macOS dependencies
+        if: startsWith(matrix.os, 'macos')
+        run: brew install create-dmg
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
