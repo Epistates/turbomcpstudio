@@ -32,38 +32,44 @@
   const recentActivity = $derived(() => {
     return toolExecutions
       .slice(0, 10)
-      .map(exec => ({
-        ...exec,
-        timestamp: new Date(exec.timestamp),
-        timeAgo: getTimeAgo(new Date(exec.timestamp))
-      }));
+      .map(exec => {
+        const timestampDate = typeof exec.timestamp === 'string'
+          ? new Date(exec.timestamp)
+          : exec.timestamp;
+        const timestampStr = timestampDate.toISOString();
+        return {
+          ...exec,
+          timestamp: timestampStr,
+          timeAgo: getTimeAgo(timestampDate)
+        };
+      });
   });
 
   // Most Used Tools (by frequency)
   const mostUsedTools = $derived(() => {
-    const toolCounts = new Map<string, { count: number; serverName: string; lastUsed: Date }>();
+    const toolCounts = new Map<string, { count: number; serverName: string; lastUsed: string }>();
 
     toolExecutions.forEach(exec => {
       const key = `${exec.serverName}::${exec.tool}`;
       const existing = toolCounts.get(key);
       if (existing) {
         existing.count++;
-        if (new Date(exec.timestamp) > existing.lastUsed) {
-          existing.lastUsed = new Date(exec.timestamp);
+        if (new Date(exec.timestamp) > new Date(existing.lastUsed)) {
+          existing.lastUsed = new Date(exec.timestamp).toISOString();
         }
       } else {
         toolCounts.set(key, {
           count: 1,
           serverName: exec.serverName,
-          lastUsed: new Date(exec.timestamp)
+          lastUsed: new Date(exec.timestamp).toISOString()
         });
       }
     });
 
     return Array.from(toolCounts.entries())
       .map(([key, data]) => {
-        const [serverName, toolName] = key.split('::');
-        return { toolName, serverName, ...data };
+        const [, toolName] = key.split('::');
+        return { toolName, ...data };
       })
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
@@ -191,9 +197,9 @@
   <div class="welcome-header">
     <div class="welcome-content">
       <h1 class="welcome-title">
-        {#if profileState.activeProfile}
+        {#if profileState.activeProfile?.profile}
           <Zap size={28} class="text-blue-600" />
-          {profileState.activeProfile.profile.name}
+          {profileState.activeProfile.profile.name || 'Active Profile'}
         {:else}
           Welcome back!
         {/if}

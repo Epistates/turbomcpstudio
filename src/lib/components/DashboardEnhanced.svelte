@@ -208,10 +208,11 @@
           <span class="activity-label">Data Transferred</span>
           <span class="activity-value">{formatBytes(metrics().totalData)}</span>
         </div>
-        {#if metrics().mostActive}
+        {#if metrics().mostActive?.config?.name}
+          {@const mostActive = metrics().mostActive}
           <div class="activity-stat">
             <span class="activity-label">Most Active Server</span>
-            <span class="activity-value text-primary">{metrics().mostActive.config.name}</span>
+            <span class="activity-value text-primary">{mostActive?.config?.name}</span>
             <span class="activity-detail">{metrics().mostActiveRequests} requests</span>
           </div>
         {/if}

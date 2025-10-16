@@ -179,7 +179,9 @@
       {#if hasActiveFilters}
         <span class="filter-badge">{selectedStatuses.size + selectedTransports.size}</span>
       {/if}
-      <ChevronDown size={14} class="chevron" class:rotated={showFilters} />
+      <div class="chevron" class:rotated={showFilters}>
+        <ChevronDown size={14} />
+      </div>
     </button>
 
     <div class="sort-controls">
