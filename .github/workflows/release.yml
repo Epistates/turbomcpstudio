@@ -165,9 +165,10 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}-artifacts
-          path: src-tauri/target/*/release/bundle/
+          name: ${{ matrix.rust_target }}-artifacts
+          path: src-tauri/target/${{ matrix.rust_target }}/release/bundle/
           retention-days: 1
+          if-no-files-found: warn
 
   upload-release:
     name: Upload Release Assets
