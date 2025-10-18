@@ -479,6 +479,9 @@ pub fn run() {
             commands::activate_profile,
             commands::deactivate_profile,
             commands::get_active_profile,
+            // Client Installation commands
+            commands::detect_installed_clients,
+            commands::install_servers_to_client,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

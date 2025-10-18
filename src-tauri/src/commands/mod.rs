@@ -27,6 +27,9 @@ pub mod collections;
 pub mod profiles;
 pub mod workflows;
 
+// Client Installation
+pub mod client_install;
+
 // Development & Debugging
 pub mod database;
 pub mod protocol_inspector;
@@ -36,6 +39,7 @@ pub mod step_editor;
 pub mod utility;
 
 // Re-export all commands for easy registration in lib.rs
+pub use client_install::*;
 pub use collections::*;
 pub use elicitation::*;
 pub use mcp_prompts::*;
