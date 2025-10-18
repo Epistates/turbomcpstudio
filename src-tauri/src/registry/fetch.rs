@@ -12,10 +12,13 @@ const CACHE_DURATION: Duration = Duration::from_secs(24 * 60 * 60); // 24 hours
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct CacheMetadata {
+    version: u32, // Cache format version
     last_updated: SystemTime,
     etag: Option<String>,
     servers: HashMap<String, RegistryServer>,
 }
+
+const CACHE_VERSION: u32 = 2; // Increment this to invalidate old caches
 
 /// Fetches the Docker MCP registry
 pub async fn fetch_registry() -> Result<HashMap<String, RegistryServer>> {
@@ -184,11 +187,20 @@ fn load_from_cache() -> Result<Option<CacheMetadata>> {
     // Load from cache
     let json = std::fs::read_to_string(&cache_file)?;
 
-    // Try to parse as new format, if it fails, delete old cache and return None
+    // Try to parse as new format, if it fails or version mismatch, delete old cache and return None
     match serde_json::from_str::<CacheMetadata>(&json) {
-        Ok(metadata) => Ok(Some(metadata)),
+        Ok(metadata) => {
+            // Check cache version
+            if metadata.version != CACHE_VERSION {
+                // Version mismatch, clear cache
+                let _ = std::fs::remove_file(&cache_file);
+                Ok(None)
+            } else {
+                Ok(Some(metadata))
+            }
+        }
         Err(_) => {
-            // Old format detected, delete it
+            // Old format or corrupted, delete it
             let _ = std::fs::remove_file(&cache_file);
             Ok(None)
         }
@@ -200,6 +212,7 @@ fn save_to_cache(servers: &HashMap<String, RegistryServer>, etag: Option<String>
     let cache_file = get_cache_file()?;
 
     let metadata = CacheMetadata {
+        version: CACHE_VERSION,
         last_updated: SystemTime::now(),
         etag,
         servers: servers.clone(),
