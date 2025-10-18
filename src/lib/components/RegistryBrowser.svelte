@@ -157,11 +157,15 @@
   }
 
   function openConfigModal(serverName: string) {
+    console.log('Opening config modal for:', serverName);
     selectedServer = servers[serverName] || null;
+    console.log('Selected server:', selectedServer);
     showConfigModal = true;
+    console.log('showConfigModal set to:', showConfigModal);
   }
 
   function closeConfigModal() {
+    console.log('Closing config modal');
     showConfigModal = false;
     selectedServer = null;
   }
@@ -369,6 +373,14 @@
 <!-- Config Modal -->
 {#if showConfigModal && selectedServer}
   <ServerConfigModal server={selectedServer} onClose={closeConfigModal} />
+{:else if showConfigModal}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg">
+      <p class="text-red-600">Error: selectedServer is null but modal is open</p>
+      <p class="text-sm text-gray-600 mt-2">showConfigModal: {showConfigModal}</p>
+      <button onclick={closeConfigModal} class="mt-4 px-4 py-2 bg-blue-600 text-white rounded">Close</button>
+    </div>
+  </div>
 {/if}
 
 <style>

@@ -45,16 +45,16 @@
   let selectedClients: Set<string> = new Set();
   let generatedConfigs: Map<string, { config: any; json: string; notes: string[] }> = new Map();
 
-  // Extract configuration schema
-  $: config = server.config || {};
-  $: parameters = config.parameters || {};
-  $: secrets = config.secrets || [];
+  // Extract configuration schema - handle both ServerInfo and RegistryServer
+  $: config = server?.config || {};
+  $: parameters = config?.parameters || {};
+  $: secrets = config?.secrets || [];
 
   // Initialize default values
   $: {
-    if (parameters.properties) {
+    if (server && parameters?.properties) {
       Object.entries(parameters.properties).forEach(([name, prop]: [string, any]) => {
-        if (prop.default !== undefined && !(name in parameterValues)) {
+        if (prop?.default !== undefined && !(name in parameterValues)) {
           parameterValues[name] = prop.default;
         }
       });
@@ -234,6 +234,7 @@
   }
 </script>
 
+{#if server}
 <div
   class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
   onclick={onClose}
@@ -248,7 +249,7 @@
   >
     <div class="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-700">
       <div class="flex items-start gap-4 flex-1">
-        {#if server.about?.icon}
+        {#if server?.about?.icon}
           <img
             src={server.about.icon}
             alt={server.about.title}
@@ -602,3 +603,4 @@
     </div>
   </div>
 </div>
+{/if}

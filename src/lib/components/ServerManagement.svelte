@@ -1092,7 +1092,10 @@
                     Copy JSON
                   </button>
                   <button
-                    onclick={() => handleDeleteServer(server.id, server.config.name)}
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteServer(server.id, server.config.name);
+                    }}
                     disabled={deletingServers.has(server.id)}
                     class="text-sm py-2 px-3 bg-white dark:bg-gray-700 text-red-600 dark:text-red-400 border border-gray-300 dark:border-gray-600 rounded hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -1380,7 +1383,10 @@
                   </button>
 
                   <button
-                    onclick={() => handleDeleteServer(server.id, server.config.name)}
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteServer(server.id, server.config.name);
+                    }}
                     disabled={deletingServers.has(server.id)}
                     class="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                     title={deletingServers.has(server.id) ? 'Deleting...' : 'Delete'}
