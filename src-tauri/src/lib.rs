@@ -5,6 +5,7 @@ mod hitl_sampling;
 mod llm_config;
 mod llm_providers;
 mod mcp_client;
+mod registry;
 mod types;
 mod workflow_engine;
 use database::Database;
@@ -482,6 +483,16 @@ pub fn run() {
             // Client Installation commands
             commands::detect_installed_clients,
             commands::install_servers_to_client,
+            // Docker MCP Registry commands
+            commands::fetch_registry_catalog,
+            commands::refresh_registry_catalog,
+            commands::search_registry_servers,
+            commands::filter_registry_by_category,
+            commands::get_registry_categories,
+            commands::generate_client_config,
+            commands::get_server_details,
+            commands::add_server_from_registry,
+            commands::check_docker_available,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

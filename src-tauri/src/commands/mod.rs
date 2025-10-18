@@ -30,6 +30,9 @@ pub mod workflows;
 // Client Installation
 pub mod client_install;
 
+// Registry Integration
+pub mod registry;
+
 // Development & Debugging
 pub mod database;
 pub mod protocol_inspector;
@@ -47,6 +50,7 @@ pub use mcp_resources::*;
 pub use mcp_tools::*;
 pub use profiles::*;
 pub use protocol_inspector::*;
+pub use registry::*;
 pub use sampling::*;
 pub use server_config::*;
 pub use server_lifecycle::*;
