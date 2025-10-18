@@ -1,18 +1,19 @@
 <script lang="ts">
   import { serverStore, getServerStatus, type ServerInfo } from '$lib/stores/serverStore';
   import { uiStore } from '$lib/stores/uiStore';
-  import { 
-    Play, 
-    Square, 
-    Settings, 
-    Activity, 
-    Cpu, 
+  import {
+    Play,
+    Square,
+    Settings,
+    Activity,
+    Cpu,
     MemoryStick,
     Clock,
     MessageCircle,
     AlertCircle,
     CheckCircle,
-    Zap
+    Zap,
+    Copy
   } from 'lucide-svelte';
 
   interface Props {
@@ -23,6 +24,15 @@
 
   // Get safe status once to avoid multiple function calls
   const safeStatus = $derived(getServerStatus(server));
+
+  // Copy animation state
+  let isCopied = $state(false);
+  let copyTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  function resetCopyState() {
+    isCopied = false;
+    copyTimeoutId = null;
+  }
 
   function getStatusColor(status: string) {
     switch (status) {
@@ -107,6 +117,74 @@
       uiStore.setView(view as any);
     }
   }
+
+  // Convert server config to standard MCP JSON format
+  function serverToMcpJson(srv: ServerInfo): string {
+    const config = srv.config;
+    const mcpConfig: any = {};
+
+    if (config.transport_config?.type === 'stdio') {
+      mcpConfig.command = config.transport_config.command;
+      if (config.transport_config.args && config.transport_config.args.length > 0) {
+        mcpConfig.args = config.transport_config.args;
+      }
+      if (config.environment_variables && Object.keys(config.environment_variables).length > 0) {
+        mcpConfig.env = config.environment_variables;
+      }
+    } else if (config.transport_config?.type === 'http') {
+      mcpConfig.url = config.transport_config.url;
+      mcpConfig.transport = 'http';
+      if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
+        mcpConfig.headers = config.transport_config.headers;
+      }
+    } else if (config.transport_config?.type === 'webSocket') {
+      mcpConfig.url = config.transport_config.url;
+      mcpConfig.transport = 'websocket';
+      if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
+        mcpConfig.headers = config.transport_config.headers;
+      }
+    } else if (config.transport_config?.type === 'tcp') {
+      mcpConfig.host = config.transport_config.host;
+      mcpConfig.port = config.transport_config.port;
+      mcpConfig.transport = 'tcp';
+    } else if (config.transport_config?.type === 'unix') {
+      mcpConfig.path = config.transport_config.path;
+      mcpConfig.transport = 'unix';
+    }
+
+    // Wrap in mcpServers format
+    const fullConfig = {
+      mcpServers: {
+        [config.name]: mcpConfig
+      }
+    };
+
+    return JSON.stringify(fullConfig, null, 2);
+  }
+
+  async function handleCopyJson(e: Event) {
+    e.stopPropagation();
+    try {
+      const jsonConfig = serverToMcpJson(server);
+      await navigator.clipboard.writeText(jsonConfig);
+
+      // Clear any existing timeout
+      if (copyTimeoutId) {
+        clearTimeout(copyTimeoutId);
+      }
+
+      // Show animation feedback
+      isCopied = true;
+      copyTimeoutId = setTimeout(() => {
+        isCopied = false;
+        copyTimeoutId = null;
+      }, 2000);
+
+      uiStore.showSuccess(`Copied "${server.config.name}" configuration to clipboard`);
+    } catch (error) {
+      uiStore.showError('Failed to copy to clipboard');
+    }
+  }
 </script>
 
 <div
@@ -172,6 +250,18 @@
           <Square size={16} />
         {:else}
           <Play size={16} />
+        {/if}
+      </button>
+
+      <button
+        onclick={handleCopyJson}
+        class="p-2 rounded-lg transition-all {isCopied ? 'bg-green-50 text-green-600' : 'text-gray-600 hover:bg-gray-50'}"
+        title="Copy configuration JSON"
+      >
+        {#if isCopied}
+          <CheckCircle size={16} />
+        {:else}
+          <Copy size={16} />
         {/if}
       </button>
 

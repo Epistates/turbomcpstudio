@@ -9,6 +9,7 @@
   import { TIMEOUTS } from '$lib/constants/timeouts';
   import Button from './ui/Button.svelte';
   import ProfileEditor from './ProfileEditor.svelte';
+  import InstallClientModal from './InstallClientModal.svelte';
   import {
     Plus,
     Play,
@@ -25,6 +26,8 @@
     Copy,
     LayoutGrid,
     List,
+    Download,
+    Upload,
   } from 'lucide-svelte';
 
   // Initialize scoped logger
@@ -60,6 +63,48 @@
 
   // ✅ NEW: Track delete operations to prevent concurrent deletes
   let deletingServers = $state<Set<string>>(new Set());
+
+  // Copy animation state for export all button
+  let exportAllCopied = $state(false);
+
+  function resetExportAllCopyState() {
+    exportAllCopied = false;
+  }
+
+  // Copy animation state for export profile button (keyed by profileId)
+  let exportProfileCopied = $state<Map<string, boolean>>(new Map());
+
+  function setProfileCopied(profileId: string) {
+    exportProfileCopied = new Map(exportProfileCopied);
+    exportProfileCopied.set(profileId, true);
+    setTimeout(() => {
+      exportProfileCopied = new Map(exportProfileCopied);
+      exportProfileCopied.delete(profileId);
+    }, 2000);
+  }
+
+  // Copy animation state for individual server copy buttons (keyed by serverId)
+  let serverCopied = $state<Map<string, boolean>>(new Map());
+
+  function setServerCopied(serverId: string) {
+    serverCopied = new Map(serverCopied);
+    serverCopied.set(serverId, true);
+    setTimeout(() => {
+      serverCopied = new Map(serverCopied);
+      serverCopied.delete(serverId);
+    }, 2000);
+  }
+
+  // Install client modal state
+  let showInstallModal = $state(false);
+
+  function openInstallModal() {
+    showInstallModal = true;
+  }
+
+  function closeInstallModal() {
+    showInstallModal = false;
+  }
 
   onMount(async () => {
     await Promise.all([
@@ -201,6 +246,113 @@
   function handleConfigureServer(serverId: string) {
     serverStore.selectServer(serverId);
     uiStore.openModal('serverConfig');
+  }
+
+  // Helper to extract just the MCP config object (without mcpServers wrapper)
+  function extractMcpConfig(server: ServerInfo): Record<string, any> {
+    const config = server.config;
+    const mcpConfig: any = {};
+
+    if (config.transport_config?.type === 'stdio') {
+      mcpConfig.command = config.transport_config.command;
+      if (config.transport_config.args && config.transport_config.args.length > 0) {
+        mcpConfig.args = config.transport_config.args;
+      }
+      if (config.environment_variables && Object.keys(config.environment_variables).length > 0) {
+        mcpConfig.env = config.environment_variables;
+      }
+    } else if (config.transport_config?.type === 'http') {
+      mcpConfig.url = config.transport_config.url;
+      mcpConfig.transport = 'http';
+      if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
+        mcpConfig.headers = config.transport_config.headers;
+      }
+    } else if (config.transport_config?.type === 'webSocket') {
+      mcpConfig.url = config.transport_config.url;
+      mcpConfig.transport = 'websocket';
+      if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
+        mcpConfig.headers = config.transport_config.headers;
+      }
+    } else if (config.transport_config?.type === 'tcp') {
+      mcpConfig.host = config.transport_config.host;
+      mcpConfig.port = config.transport_config.port;
+      mcpConfig.transport = 'tcp';
+    } else if (config.transport_config?.type === 'unix') {
+      mcpConfig.path = config.transport_config.path;
+      mcpConfig.transport = 'unix';
+    }
+
+    return mcpConfig;
+  }
+
+  // Export all servers to MCP JSON format
+  async function handleExportAllServers() {
+    if (servers.length === 0) {
+      uiStore.showError('No servers to export');
+      return;
+    }
+
+    try {
+      const mcpServersConfig: Record<string, any> = {};
+
+      // Build config for all servers
+      for (const server of servers) {
+        mcpServersConfig[server.config.name] = extractMcpConfig(server);
+      }
+
+      const fullConfig = {
+        mcpServers: mcpServersConfig
+      };
+
+      const jsonString = JSON.stringify(fullConfig, null, 2);
+      await navigator.clipboard.writeText(jsonString);
+
+      // Show animation feedback
+      exportAllCopied = true;
+      setTimeout(resetExportAllCopyState, 2000);
+
+      uiStore.showSuccess(`Exported ${servers.length} server${servers.length !== 1 ? 's' : ''} to clipboard`);
+      logger.debug('📋 Exported all servers:', jsonString);
+    } catch (error) {
+      logger.error('Failed to export servers:', error);
+      uiStore.showError('Failed to export servers');
+    }
+  }
+
+  // Export servers for a specific profile to MCP JSON format
+  async function handleExportProfileServers(profileId: string, profileName: string) {
+    try {
+      // Get servers in this profile
+      const profileServerIds = localProfileServerMap.get(profileId) || new Set();
+      if (profileServerIds.size === 0) {
+        uiStore.showError(`No servers in profile "${profileName}"`);
+        return;
+      }
+
+      const profileServers = servers.filter(s => profileServerIds.has(s.id));
+      const mcpServersConfig: Record<string, any> = {};
+
+      // Build config for profile servers
+      for (const server of profileServers) {
+        mcpServersConfig[server.config.name] = extractMcpConfig(server);
+      }
+
+      const fullConfig = {
+        mcpServers: mcpServersConfig
+      };
+
+      const jsonString = JSON.stringify(fullConfig, null, 2);
+      await navigator.clipboard.writeText(jsonString);
+
+      // Show animation feedback for this profile
+      setProfileCopied(profileId);
+
+      uiStore.showSuccess(`Exported ${profileServers.length} server${profileServers.length !== 1 ? 's' : ''} from "${profileName}" to clipboard`);
+      logger.debug('📋 Exported profile servers:', jsonString);
+    } catch (error) {
+      logger.error('Failed to export profile servers:', error);
+      uiStore.showError('Failed to export profile servers');
+    }
   }
 
   // ✅ FIXED: Delete with timeout, loading state, and proper cleanup
@@ -527,6 +679,10 @@
     try {
       const jsonConfig = serverToMcpJson(server);
       await navigator.clipboard.writeText(jsonConfig);
+
+      // Show animation feedback for this server
+      setServerCopied(server.id);
+
       uiStore.showSuccess(`Copied "${server.config.name}" configuration to clipboard`);
       logger.debug('📋 Copied MCP config:', jsonConfig);
     } catch (error) {
@@ -595,9 +751,20 @@
           Manage MCP servers and organize them into profiles
         </p>
       </div>
-      <Button variant="primary" leftIcon={Plus} onclick={() => uiStore.openModal('addServer')}>
-        Add Server
-      </Button>
+      <div class="flex gap-2">
+        <Button variant="primary" leftIcon={Plus} onclick={() => uiStore.openModal('addServer')}>
+          Add Server
+        </Button>
+        <Button
+          variant="secondary"
+          leftIcon={Upload}
+          onclick={openInstallModal}
+          disabled={servers.length === 0}
+          title="Export servers to clipboard or install to client applications"
+        >
+          Export
+        </Button>
+      </div>
     </div>
   </div>
 
@@ -679,6 +846,22 @@
                     <Edit size={12} class="inline mr-1" />
                     Edit
                   </button>
+
+                  <button
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      handleExportProfileServers(profile.id, profile.name);
+                    }}
+                    title="Export profile servers to clipboard"
+                    class="text-xs py-1.5 px-2 rounded transition-all {exportProfileCopied.has(profile.id) ? 'bg-green-100 dark:bg-green-900 border border-green-300 dark:border-green-600 text-green-600 dark:text-green-400' : 'bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'}"
+                  >
+                    {#if exportProfileCopied.has(profile.id)}
+                      <CheckCircle size={12} class="inline" />
+                    {:else}
+                      <Download size={12} class="inline" />
+                    {/if}
+                  </button>
+
                   <button
                     onclick={(e) => {
                       e.stopPropagation();
@@ -737,22 +920,39 @@
             {/if}
           </div>
 
-          <!-- View Toggle -->
-          <div class="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+          <!-- Toolbar Actions -->
+          <div class="flex items-center gap-2">
+            <!-- Export All Button -->
             <button
-              onclick={() => viewMode = 'card'}
-              class="px-3 py-1.5 rounded transition-colors {viewMode === 'card' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
-              title="Card View"
+              onclick={handleExportAllServers}
+              disabled={servers.length === 0}
+              class="flex items-center px-3 py-1.5 rounded transition-all {servers.length === 0 ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed' : exportAllCopied ? 'bg-green-50 dark:bg-green-900 text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}"
+              title="Export all servers to clipboard"
             >
-              <LayoutGrid size={16} />
+              {#if exportAllCopied}
+                <CheckCircle size={16} />
+              {:else}
+                <Download size={16} />
+              {/if}
             </button>
-            <button
-              onclick={() => viewMode = 'list'}
-              class="px-3 py-1.5 rounded transition-colors {viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
-              title="List View (Compact)"
-            >
-              <List size={16} />
-            </button>
+
+            <!-- View Toggle -->
+            <div class="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+              <button
+                onclick={() => viewMode = 'card'}
+                class="px-3 py-1.5 rounded transition-colors {viewMode === 'card' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
+                title="Card View"
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button
+                onclick={() => viewMode = 'list'}
+                class="px-3 py-1.5 rounded transition-colors {viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}"
+                title="List View (Compact)"
+              >
+                <List size={16} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -868,10 +1068,14 @@
                   </button>
                   <button
                     onclick={() => handleCopyServerJson(server)}
-                    class="text-sm py-2 px-3 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600"
+                    class="text-sm py-2 px-3 rounded transition-all {serverCopied.has(server.id) ? 'bg-green-100 dark:bg-green-900 border border-green-300 dark:border-green-600 text-green-700 dark:text-green-300' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}"
                     title="Copy MCP JSON configuration"
                   >
-                    <Copy size={14} class="inline mr-1" />
+                    {#if serverCopied.has(server.id)}
+                      <CheckCircle size={14} class="inline mr-1" />
+                    {:else}
+                      <Copy size={14} class="inline mr-1" />
+                    {/if}
                     Copy JSON
                   </button>
                   <button
@@ -1144,10 +1348,14 @@
 
                   <button
                     onclick={() => handleCopyServerJson(server)}
-                    class="p-1.5 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    class="p-1.5 rounded transition-all {serverCopied.has(server.id) ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400' : 'text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'}"
                     title="Copy JSON"
                   >
-                    <Copy size={14} />
+                    {#if serverCopied.has(server.id)}
+                      <CheckCircle size={14} />
+                    {:else}
+                      <Copy size={14} />
+                    {/if}
                   </button>
 
                   <button
@@ -1191,3 +1399,12 @@
     }}
   />
 {/if}
+
+<!-- Install Client Modal -->
+<InstallClientModal
+  isOpen={showInstallModal}
+  onClose={closeInstallModal}
+  servers={servers}
+  profiles={profiles}
+  localProfileServerMap={localProfileServerMap}
+/>
