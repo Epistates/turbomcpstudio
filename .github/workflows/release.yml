@@ -1,31 +1,21 @@
 name: Release Build
 
-# Temporarily disabled - requires Apple Developer Account credentials for code signing
-# To enable: uncomment the 'on' section below and configure required GitHub secrets
-# See README.md for required secrets: APPLE_CERTIFICATE, APPLE_ID, etc.
+# Triggered by version tags (v*.*.*)
+# Builds Linux and Windows releases without code signing
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
-      enable_release:
-        description: 'Type "ENABLE" to run this workflow (requires Apple Developer credentials)'
-        required: true
-        type: string
       version:
         description: 'Version to release (e.g., v0.1.0)'
         required: true
         type: string
 
-# Original triggers (disabled until code signing is configured):
-# on:
-#   push:
-#     tags:
-#       - 'v*.*.*'
-#   workflow_dispatch:
-#     inputs:
-#       version:
-#         description: 'Version to release (e.g., v0.1.0)'
-#         required: true
-#         type: string
+# Apple builds temporarily disabled - requires Apple Developer Account credentials for code signing
+# To re-enable: uncomment macOS matrix entries and configure required GitHub secrets
+# See README.md for required secrets: APPLE_CERTIFICATE, APPLE_ID, etc.
 
 env:
   CARGO_TERM_COLOR: always
@@ -39,8 +29,6 @@ jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
-    # Only run if explicitly enabled with "ENABLE" input
-    if: github.event.inputs.enable_release == 'ENABLE'
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       version: ${{ steps.get_version.outputs.version }}
@@ -84,15 +72,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS builds
-          - platform: 'macos-latest'
-            os: macos-latest
-            rust_target: 'x86_64-apple-darwin'
-            args: '--target x86_64-apple-darwin'
-          - platform: 'macos-latest'
-            os: macos-latest
-            rust_target: 'aarch64-apple-darwin'
-            args: '--target aarch64-apple-darwin'
+          # macOS builds (temporarily disabled - requires Apple Developer credentials)
+          # - platform: 'macos-latest'
+          #   os: macos-latest
+          #   rust_target: 'x86_64-apple-darwin'
+          #   args: '--target x86_64-apple-darwin'
+          # - platform: 'macos-latest'
+          #   os: macos-latest
+          #   rust_target: 'aarch64-apple-darwin'
+          #   args: '--target aarch64-apple-darwin'
 
           # Windows build
           - platform: 'windows-latest'
@@ -100,7 +88,7 @@ jobs:
             rust_target: 'x86_64-pc-windows-msvc'
             args: ''
 
-          # Linux builds
+          # Linux build
           - platform: 'ubuntu-22.04'
             os: ubuntu-22.04
             rust_target: 'x86_64-unknown-linux-gnu'
@@ -162,41 +150,42 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      - name: Install macOS dependencies
-        if: startsWith(matrix.os, 'macos')
-        run: brew install create-dmg
-
-      - name: Import Apple Developer Certificate
-        if: startsWith(matrix.os, 'macos')
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-        run: |
-          # Only run if certificate is provided
-          if [ -n "$APPLE_CERTIFICATE" ]; then
-            echo "Importing Apple Developer Certificate..."
-            echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
-            security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-            security default-keychain -s build.keychain
-            security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-            security set-keychain-settings -t 3600 -u build.keychain
-            security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-            rm certificate.p12
-
-            # Extract and set signing identity
-            CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application" || echo "")
-            if [ -n "$CERT_INFO" ]; then
-              CERT_ID=$(echo "$CERT_INFO" | head -1 | awk -F'"' '{print $2}')
-              echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> $GITHUB_ENV
-              echo "Certificate imported: $CERT_ID"
-            else
-              echo "No Developer ID Application certificate found, build will be unsigned"
-            fi
-          else
-            echo "No Apple certificate provided, build will be unsigned"
-          fi
+      # macOS dependencies and certificate setup temporarily disabled
+      # - name: Install macOS dependencies
+      #   if: startsWith(matrix.os, 'macos')
+      #   run: brew install create-dmg
+      #
+      # - name: Import Apple Developer Certificate
+      #   if: startsWith(matrix.os, 'macos')
+      #   env:
+      #     APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      #     APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      #     KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      #   run: |
+      #     # Only run if certificate is provided
+      #     if [ -n "$APPLE_CERTIFICATE" ]; then
+      #       echo "Importing Apple Developer Certificate..."
+      #       echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+      #       security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+      #       security default-keychain -s build.keychain
+      #       security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+      #       security set-keychain-settings -t 3600 -u build.keychain
+      #       security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+      #       security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+      #       rm certificate.p12
+      #
+      #       # Extract and set signing identity
+      #       CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application" || echo "")
+      #       if [ -n "$CERT_INFO" ]; then
+      #         CERT_ID=$(echo "$CERT_INFO" | head -1 | awk -F'"' '{print $2}')
+      #         echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> $GITHUB_ENV
+      #         echo "Certificate imported: $CERT_ID"
+      #       else
+      #         echo "No Developer ID Application certificate found, build will be unsigned"
+      #       fi
+      #     else
+      #       echo "No Apple certificate provided, build will be unsigned"
+      #     fi
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
@@ -206,17 +195,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
-          npm_config_registry: 'https://registry.npmjs.org/'
-          # macOS code signing and notarization
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # Windows code signing (Tauri v2 uses different variables than macOS)
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Code signing disabled - building unsigned releases
+          # macOS code signing and notarization (temporarily disabled)
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Windows code signing (Tauri v2 uses different variables than macOS) - temporarily disabled
+          # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: ${{ matrix.args }}
 
@@ -259,9 +248,7 @@ jobs:
           tag_name: ${{ needs.create-release.outputs.version }}
           draft: true
           files: |
-            artifacts/**/*.dmg
             artifacts/**/*.deb
             artifacts/**/*.AppImage
             artifacts/**/*.exe
             artifacts/**/*.msi
-            artifacts/**/updater.json
