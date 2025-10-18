@@ -42,9 +42,11 @@ Initial release of TurboMCP Studio - Enterprise-grade desktop application for Mo
 
 - **Frontend**: SvelteKit 5 with Svelte 5 runes mode, TypeScript, and Tailwind CSS
 - **Backend**: Rust with Tauri 2.0 for native performance
-- **MCP Client**: Powered by [TurboMCP](https://github.com/Epistates/turbomcp) for enterprise-grade MCP operations
+- **MCP Client**: Powered by [TurboMCP v2.0.0-rc.3](https://github.com/Epistates/turbomcp/releases/tag/v2.0.0-rc.3) for enterprise-grade MCP operations
 - **Database**: SQLite for local-first data storage
 - **Build System**: Vite with HMR for fast development
+
+#### TurboMCP v2.0.0-rc.3 Integration
 
 #### Architecture
 

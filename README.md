@@ -36,11 +36,12 @@ A native desktop application for developing, testing, and debugging Model Contex
 
 ### Current (v0.1.0)
 
-- ✅ **Server Management** - Connect, configure, and manage MCP servers with ease
+- ✅ **Server Management** - Connect, configure, and manage MCP servers with profiles and persistence
 - ✅ **Enterprise UI** - Complete design system with light/dark themes
 - ✅ **Tool Explorer** - Discover and test MCP tools
 - ✅ **Resource Browser** - Navigate and inspect MCP resources
 - ✅ **Prompt Designer** - Create and test MCP prompts
+- ✅ **Sampling & Elicitation Flow** - Complete sampling and prompt elicitation workflow for model testing
 - ✅ **Protocol Inspector** - Real-time protocol message viewing
 - ✅ **Settings** - Configure application preferences and themes
 
