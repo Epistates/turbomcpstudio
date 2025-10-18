@@ -135,6 +135,7 @@ pub fn get_docker_command() -> &'static str {
 /// Converts:
 /// - `~` -> user home directory
 /// - `~/foo` -> `<home>/foo`
+#[allow(dead_code)]
 pub fn expand_home_dir<P: AsRef<Path>>(path: P) -> PathBuf {
     let path = path.as_ref();
 

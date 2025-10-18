@@ -1,819 +1,604 @@
 <script lang="ts">
-  import { serverStore, type ServerInfo, type TransportConfig } from '$lib/stores/serverStore';
-  import { uiStore } from '$lib/stores/uiStore';
-  import { withTimeout } from '$lib/utils/asyncHelpers';
-  import { createLogger } from '$lib/utils/logger';
-
-  // Initialize scoped logger
-  const logger = createLogger('ServerConfigModal');
-
-  import { TIMEOUTS } from '$lib/constants/timeouts';
-  import { createModalEscapeHandler, createModalOutsideClickHandler } from '$lib/utils/modalHelpers';
+  import { invoke } from '@tauri-apps/api/core';
+  import { writeText } from '@tauri-apps/plugin-clipboard-manager';
   import {
     X,
-    Save,
-    Trash2,
-    AlertCircle,
-    Database,
-    Globe,
-    Wifi,
-    Network,
-    HardDrive,
-    Activity,
+    ExternalLink,
+    Package,
+    Copy,
+    Download,
     CheckCircle,
-    Clock,
-    Edit,
-    Plus,
-    Minus,
-    Copy
+    AlertCircle,
+    Info,
+    Key,
+    Settings,
+    FileJson,
   } from 'lucide-svelte';
+  import Button from './ui/Button.svelte';
+  import SchemaFormGenerator from './SchemaFormGenerator.svelte';
+  import { uiStore } from '$lib/stores/uiStore';
+  import { serverStore } from '$lib/stores/serverStore';
 
-  // ✅ NEW: Use uiStore for modal state (single source of truth)
-  const uiState = $derived($uiStore);
-  const modalState = $derived(uiState.modals.serverConfig);
-  const showModal = $derived(modalState.open);
-  const modalLoading = $derived(modalState.loading);
+  // Props
+  export let server: any;
+  export let onClose: () => void;
 
-  let selectedServerId: string | undefined = $state(undefined);
-  let servers: ServerInfo[] = $state([]);
-  let editMode = $state(false);
-  let saving = $state(false);
+  // Available external clients
+  const externalClients = [
+    { id: 'claude-desktop', name: 'Claude Desktop', description: 'Anthropic Claude Desktop app' },
+    { id: 'claude-code', name: 'Claude Code', description: 'Claude CLI tool' },
+    { id: 'lmstudio', name: 'LM Studio', description: 'LM Studio desktop app' },
+    { id: 'cursor', name: 'Cursor', description: 'Cursor AI IDE' },
+    { id: 'cline', name: 'Cline', description: 'VS Code extension' },
+  ];
 
-  // ✅ NEW: Delete operation state
-  let deleting = $state(false);
-  let modalRef: HTMLDivElement | null = $state(null);
+  // State
+  let currentStep = 1; // 1: Info, 2: Choose Action, 3: Configure + Execute
+  let parameterValues: Record<string, any> = {};
+  let secretValues: Record<string, string> = {};
+  let validationErrors: Record<string, string> = {};
 
-  // Edit form state
-  let editForm = $state({
-    name: '',
-    description: '',
-    transport: {} as TransportConfig,
-    environment_variables: {} as Record<string, string>
-  });
+  // Step 2 state - action choice
+  let actionChoice: 'turbomcp' | 'export' | null = null;
 
-  // ✅ FIXED: Subscribe to store and convert Map to array
-  $effect(() => {
-    const unsubscribe = serverStore.subscribe((state: any) => {
-      // ✅ NEW: Convert Map to array for UI
-      servers = Array.from(state.servers.values());
-      selectedServerId = state.selectedServerId;
-    });
-    return unsubscribe;
-  });
+  // Step 3 state - export clients
+  let selectedClients: Set<string> = new Set();
+  let generatedConfigs: Map<string, { config: any; json: string; notes: string[] }> = new Map();
 
-  // ✅ NEW: Escape key handler
-  $effect(() => {
-    if (showModal && !modalLoading && !deleting) {
-      const escapeHandler = createModalEscapeHandler(closeModal);
-      document.addEventListener('keydown', escapeHandler);
-      return () => document.removeEventListener('keydown', escapeHandler);
+  // Extract configuration schema
+  $: config = server.config || {};
+  $: parameters = config.parameters || {};
+  $: secrets = config.secrets || [];
+
+  // Initialize default values
+  $: {
+    if (parameters.properties) {
+      Object.entries(parameters.properties).forEach(([name, prop]: [string, any]) => {
+        if (prop.default !== undefined && !(name in parameterValues)) {
+          parameterValues[name] = prop.default;
+        }
+      });
     }
-  });
+  }
 
-  const selectedServer = $derived(
-    servers.find(s => s.id === selectedServerId)
-  );
+  function handleParameterChange(name: string, value: any) {
+    parameterValues[name] = value;
+    parameterValues = { ...parameterValues };
 
-  // Initialize edit form when server changes
-  $effect(() => {
-    if (selectedServer && !editMode) {
-      editForm.name = selectedServer.config.name;
-      editForm.description = selectedServer.config.description || '';
-      editForm.transport = JSON.parse(JSON.stringify(selectedServer.config.transport_config));
-      editForm.environment_variables = JSON.parse(JSON.stringify(selectedServer.config.environment_variables || {}));
+    if (validationErrors[name]) {
+      delete validationErrors[name];
+      validationErrors = { ...validationErrors };
     }
-  });
+  }
 
-  // ✅ NEW: Use uiStore to close (single source of truth)
-  function closeModal() {
-    if (deleting) {
-      logger.warn('⚠️ Cannot close modal while delete operation is in progress');
+  function handleSecretChange(name: string, value: string) {
+    secretValues[name] = value;
+    secretValues = { ...secretValues };
+
+    if (validationErrors[name]) {
+      delete validationErrors[name];
+      validationErrors = { ...validationErrors };
+    }
+  }
+
+  function validateConfiguration(): boolean {
+    validationErrors = {};
+
+    const required = parameters.required || [];
+    for (const fieldName of required) {
+      if (!parameterValues[fieldName]) {
+        validationErrors[fieldName] = 'This field is required';
+      }
+    }
+
+    for (const secret of secrets) {
+      if (secret.required && !secretValues[secret.name]) {
+        validationErrors[secret.name] = 'This secret is required';
+      }
+    }
+
+    validationErrors = { ...validationErrors };
+    return Object.keys(validationErrors).length === 0;
+  }
+
+  function proceedToStep3() {
+    if (!actionChoice) {
+      uiStore.showError('Please choose an action');
       return;
     }
-    editMode = false;
-    uiStore.closeModal('serverConfig');
+    currentStep = 3;
   }
 
-  function enterEditMode() {
-    if (selectedServer) {
-      editForm.name = selectedServer.config.name;
-      editForm.description = selectedServer.config.description || '';
-      editForm.transport = JSON.parse(JSON.stringify(selectedServer.config.transport_config));
-      editForm.environment_variables = JSON.parse(JSON.stringify(selectedServer.config.environment_variables || {}));
-      editMode = true;
-    }
-  }
-
-  function cancelEdit() {
-    editMode = false;
-  }
-
-  async function saveChanges() {
-    if (!selectedServer) return;
-
-    try {
-      saving = true;
-
-      await serverStore.updateServerConfig(
-        selectedServer.id,
-        editForm.name,
-        editForm.description || undefined,
-        editForm.transport,
-        editForm.environment_variables
-      );
-
-      editMode = false;
-      uiStore.showSuccess('Server configuration updated successfully');
-    } catch (error) {
-      uiStore.showError(`Failed to update server: ${error}`);
-    } finally {
-      saving = false;
-    }
-  }
-
-  function addEnvironmentVariable() {
-    editForm.environment_variables = { ...editForm.environment_variables, '': '' };
-  }
-
-  function removeEnvironmentVariable(key: string) {
-    const newVars = { ...editForm.environment_variables };
-    delete newVars[key];
-    editForm.environment_variables = newVars;
-  }
-
-  function updateEnvironmentVariableKey(oldKey: string, newKey: string) {
-    if (oldKey === newKey) return;
-
-    const newVars = { ...editForm.environment_variables };
-    const value = newVars[oldKey];
-    delete newVars[oldKey];
-    newVars[newKey] = value;
-    editForm.environment_variables = newVars;
-  }
-
-  function updateEnvironmentVariableValue(key: string, value: string) {
-    editForm.environment_variables = { ...editForm.environment_variables, [key]: value };
-  }
-
-  let showDeleteConfirm = $state(false);
-
-  function confirmDeleteServer() {
-    showDeleteConfirm = true;
-  }
-
-  // ✅ FIXED: Delete with timeout, loading state, and proper cleanup
-  async function deleteServer() {
-    if (!selectedServer || deleting) return;
-
-    deleting = true;
-    const serverName = selectedServer.config.name;
-    const serverId = selectedServer.id;
-
-    logger.debug(`🗑️ Starting delete operation for: ${serverName} (ID: ${serverId})`);
-
-    try {
-      // First disconnect if connected
-      if (selectedServer.status === 'connected') {
-        logger.debug('🔌 Disconnecting server before deletion...');
-        await serverStore.disconnectServer(serverId);
-        logger.debug('✅ Server disconnected');
-      }
-
-      // Delete the server configuration from backend and store
-      logger.debug('🗑️ Deleting server configuration from database...');
-      await serverStore.deleteServerConfig(serverId);
-      logger.debug('✅ Database deletion complete');
-
-      logger.debug(`✅ Successfully deleted: ${serverName}`);
-      uiStore.showSuccess(`Server "${serverName}" deleted`);
-
-      // Close modal after successful deletion
-      closeModal();
-    } catch (error) {
-      logger.error('❌ Failed to delete server:', error);
-      logger.error('Error details:', JSON.stringify(error, null, 2));
-      uiStore.showError(`Failed to delete server: ${error}`);
-    } finally {
-      // ✅ NEW: Always cleanup, even on error
-      deleting = false;
-      showDeleteConfirm = false;
-      logger.debug('🧹 Delete operation cleanup complete');
-    }
-  }
-
-  function cancelDelete() {
-    showDeleteConfirm = false;
-  }
-
-  function getTransportIcon(type: string) {
-    switch (type) {
-      case 'stdio': return Database;
-      case 'http': return Globe;
-      case 'websocket': return Wifi;
-      case 'tcp': return Network;
-      case 'unix': return HardDrive;
-      default: return Activity;
-    }
-  }
-
-  function getStatusColor(status: string) {
-    switch (status?.toLowerCase()) {
-      case 'connected': return 'text-green-600 bg-green-100';
-      case 'connecting': return 'text-yellow-600 bg-yellow-100';
-      case 'error': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
-  }
-
-  function formatDateTime(dateString: string) {
-    return new Date(dateString).toLocaleString();
-  }
-
-  function formatBytes(bytes: number) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  }
-
-  // Convert server config to standard MCP JSON format
-  function serverToMcpJson(server: ServerInfo): string {
-    const config = server.config;
-    const mcpConfig: any = {};
-
-    if (config.transport_config?.type === 'stdio') {
-      mcpConfig.command = config.transport_config.command;
-      if (config.transport_config.args && config.transport_config.args.length > 0) {
-        mcpConfig.args = config.transport_config.args;
-      }
-      if (config.environment_variables && Object.keys(config.environment_variables).length > 0) {
-        mcpConfig.env = config.environment_variables;
-      }
-    } else if (config.transport_config?.type === 'http') {
-      mcpConfig.url = config.transport_config.url;
-      mcpConfig.transport = 'http';
-      if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
-        mcpConfig.headers = config.transport_config.headers;
-      }
-    } else if (config.transport_config?.type === 'webSocket') {  // ✅ FIXED: camelCase
-      mcpConfig.url = config.transport_config.url;
-      mcpConfig.transport = 'websocket';
-      if (config.transport_config.headers && Object.keys(config.transport_config.headers).length > 0) {
-        mcpConfig.headers = config.transport_config.headers;
-      }
-    } else if (config.transport_config?.type === 'tcp') {
-      mcpConfig.host = config.transport_config.host;
-      mcpConfig.port = config.transport_config.port;
-      mcpConfig.transport = 'tcp';
-    } else if (config.transport_config?.type === 'unix') {
-      mcpConfig.path = config.transport_config.path;
-      mcpConfig.transport = 'unix';
+  async function executeAction() {
+    if (!validateConfiguration()) {
+      uiStore.showError('Please fill in all required fields');
+      return;
     }
 
-    // Wrap in mcpServers format
-    const fullConfig = {
-      mcpServers: {
-        [config.name]: mcpConfig
-      }
+    if (actionChoice === 'turbomcp') {
+      await addToServerManager();
+    }
+    // For export, configs are already generated when clients are selected
+  }
+
+  async function generateConfigsForClients() {
+    generatedConfigs.clear();
+
+    const userConfig = {
+      parameters: parameterValues,
+      secrets: secretValues,
     };
 
-    return JSON.stringify(fullConfig, null, 2);
+    for (const clientId of selectedClients) {
+      try {
+        const result = await invoke('generate_client_config', {
+          server,
+          userConfig,
+          clientType: clientId,
+        });
+
+        generatedConfigs.set(clientId, {
+          config: result,
+          json: result.config_json,
+          notes: result.notes || [],
+        });
+      } catch (error) {
+        console.error(`Failed to generate config for ${clientId}:`, error);
+        uiStore.showError(`Failed to generate config for ${clientId}: ${error}`);
+      }
+    }
+
+    generatedConfigs = new Map(generatedConfigs);
   }
 
-  async function handleCopyServerJson() {
-    if (!selectedServer) return;
+  function toggleClient(clientId: string) {
+    if (selectedClients.has(clientId)) {
+      selectedClients.delete(clientId);
+    } else {
+      selectedClients.add(clientId);
+    }
+    selectedClients = new Set(selectedClients);
+
+    if (selectedClients.size > 0) {
+      generateConfigsForClients();
+    }
+  }
+
+  async function copyToClipboard(clientId: string) {
+    const configData = generatedConfigs.get(clientId);
+    if (!configData) return;
 
     try {
-      const jsonConfig = serverToMcpJson(selectedServer);
-      await navigator.clipboard.writeText(jsonConfig);
-      uiStore.showSuccess(`Copied "${selectedServer.config.name}" configuration to clipboard`);
-      logger.debug('📋 Copied MCP config:', jsonConfig);
+      await writeText(configData.json);
+      uiStore.showSuccess(`${getClientName(clientId)} configuration copied to clipboard`);
     } catch (error) {
-      logger.error('Failed to copy to clipboard:', error);
+      console.error('Failed to copy:', error);
       uiStore.showError('Failed to copy to clipboard');
     }
   }
+
+  async function exportToFile(clientId: string) {
+    const configData = generatedConfigs.get(clientId);
+    if (!configData) return;
+
+    try {
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const filePath = await save({
+        defaultPath: `${server.name}-${clientId}-config.json`,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      });
+
+      if (filePath) {
+        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+        await writeTextFile(filePath, configData.json);
+        uiStore.showSuccess('Configuration exported successfully');
+      }
+    } catch (error) {
+      console.error('Failed to export:', error);
+      uiStore.showError('Failed to export configuration');
+    }
+  }
+
+  async function addToServerManager() {
+    try {
+      const userConfig = {
+        parameters: parameterValues,
+        secrets: secretValues,
+      };
+
+      // Generate TurboMCP config
+      const result = await invoke('generate_client_config', {
+        server,
+        userConfig,
+        clientType: 'turbomcp',
+      });
+
+      const config = JSON.parse(result.config_json);
+
+      // Call backend to add server
+      await invoke('add_server_from_registry', { config });
+
+      // Refresh the server list to show the newly added server
+      await serverStore.loadServers();
+
+      uiStore.showSuccess(`${server.name} added to Server Manager successfully!`);
+      onClose();
+    } catch (error) {
+      console.error('Failed to add server:', error);
+      uiStore.showError(`Failed to add server: ${error}`);
+    }
+  }
+
+  function getClientName(clientId: string): string {
+    return externalClients.find((c) => c.id === clientId)?.name || clientId;
+  }
 </script>
 
-{#if showModal && selectedServer}
+<div
+  class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+  onclick={onClose}
+  role="dialog"
+  aria-modal="true"
+  onkeydown={(e) => e.key === 'Escape' && onClose()}
+>
   <div
-    bind:this={modalRef}
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="server-config-modal-title"
-    tabindex="-1"
-    onclick={createModalOutsideClickHandler(modalRef, () => {
-      if (!deleting) closeModal();
-    })}
-    onkeydown={(e) => {
-      if (e.key === 'Escape' && !deleting) closeModal();
-    }}
-    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-    style="z-index: var(--z-modal-backdrop, 40)"
+    class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
+    onclick={(e) => e.stopPropagation()}
+    role="document"
   >
-    <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <div
-      onclick={(e) => e.stopPropagation()}
-      class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
-      style="z-index: var(--z-modal-content, 50)"
-    >
-      <!-- Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-200">
-        <div class="flex items-center">
-          {#if selectedServer.config.transport_config}
-            {@const IconComponent = getTransportIcon(selectedServer.config.transport_config.type)}
-            <div class="p-2 bg-gray-100 rounded-lg mr-4">
-              <IconComponent size={20} class="text-gray-600" />
-            </div>
-          {/if}
-          <div>
-            <h2 id="server-config-modal-title" class="text-xl font-semibold text-gray-900">
-              {editMode ? 'Edit Server Configuration' : selectedServer.config.name}
-            </h2>
-            <div class="flex flex-wrap items-center gap-2 mt-1">
-              <span class="text-sm text-gray-600">
-                {selectedServer.config.transport_config?.type?.toUpperCase() || 'UNKNOWN'} Transport
+    <div class="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+      <div class="flex items-start gap-4 flex-1">
+        {#if server.about?.icon}
+          <img
+            src={server.about.icon}
+            alt={server.about.title}
+            class="w-12 h-12 rounded-lg object-cover"
+            onerror={(e) => {
+              const img = e.currentTarget as HTMLImageElement;
+              img.style.display = 'none';
+              const fallback = img.nextElementSibling as HTMLElement | null;
+              fallback?.classList.remove('hidden');
+            }}
+          />
+          <div class="hidden w-12 h-12 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+            <Package class="text-gray-500" size={28} />
+          </div>
+        {:else}
+          <div class="w-12 h-12 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+            <Package class="text-gray-500" size={28} />
+          </div>
+        {/if}
+
+        <div class="flex-1">
+          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+            {server.about?.title || server.name}
+          </h2>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            {server.about?.description || 'Configure this server'}
+          </p>
+
+          <div class="flex items-center gap-3 mt-2">
+            {#if server.type === 'remote'}
+              <span class="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
+                <ExternalLink size={14} />
+                Remote Server
               </span>
-              <div class="flex items-center px-2 py-1 rounded-full text-xs font-medium {getStatusColor(selectedServer.status)}">
-                {#if selectedServer.status === 'connected'}
-                  <CheckCircle size={12} class="mr-1" />
-                {:else if selectedServer.status === 'connecting'}
-                  <Clock size={12} class="mr-1" />
-                {:else if selectedServer.status === 'error'}
-                  <AlertCircle size={12} class="mr-1" />
-                {:else}
-                  <Activity size={12} class="mr-1" />
-                {/if}
-                {selectedServer.status}
-              </div>
-              <!-- Capability Tags -->
-              {#if selectedServer.capabilities}
-                {#if selectedServer.capabilities.tools}
-                  <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
-                    Tools
-                  </span>
-                {/if}
-                {#if selectedServer.capabilities.resources}
-                  <span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
-                    Resources
-                  </span>
-                {/if}
-                {#if selectedServer.capabilities.prompts}
-                  <span class="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
-                    Prompts
-                  </span>
-                {/if}
-                {#if selectedServer.capabilities.sampling}
-                  <span class="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded">
-                    Sampling
-                  </span>
-                {/if}
-                {#if selectedServer.capabilities.elicitation}
-                  <span class="text-xs px-2 py-0.5 bg-pink-100 text-pink-700 rounded">
-                    Elicitation
-                  </span>
-                {/if}
-              {/if}
-            </div>
+            {:else if server.image?.startsWith('mcp/')}
+              <span class="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                <CheckCircle size={14} />
+                Docker Built
+              </span>
+            {/if}
+
+            {#if server.source?.project}
+              <a
+                href={server.source.project}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+              >
+                <ExternalLink size={12} />
+                View Source
+              </a>
+            {/if}
           </div>
-        </div>
-        <div class="flex items-center space-x-2">
-          {#if !editMode}
-            <button
-              onclick={enterEditMode}
-              class="flex items-center px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <Edit size={16} class="mr-2" />
-              Edit
-            </button>
-          {/if}
-          <button onclick={closeModal} class="text-gray-400 hover:text-gray-600">
-            <X size={24} />
-          </button>
         </div>
       </div>
 
-      <!-- Content -->
-      <div class="p-6 overflow-y-auto max-h-[60vh]">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <!-- Configuration Details -->
-          <div class="space-y-6">
+      <button
+        onclick={onClose}
+        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+      >
+        <X size={24} />
+      </button>
+    </div>
+
+    <!-- Step Indicator -->
+    <div class="flex items-center justify-center gap-2 py-4 border-b border-gray-200 dark:border-gray-700">
+      {#each [1, 2, 3] as step}
+        <div class={`flex items-center gap-2 ${currentStep >= step ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`}>
+          <div class={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= step ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>
+            {step}
+          </div>
+          <span class="text-sm font-medium">
+            {step === 1 ? 'Info' : step === 2 ? 'Action' : 'Configure'}
+          </span>
+        </div>
+        {#if step < 3}
+          <div class="w-12 h-0.5 bg-gray-200 dark:border-gray-700" />
+        {/if}
+      {/each}
+    </div>
+
+    <!-- Content -->
+    <div class="flex-1 overflow-y-auto p-6">
+      {#if currentStep === 1}
+        <!-- Step 1: Server Info -->
+        <div class="space-y-6">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">About This Server</h3>
+            <p class="text-gray-600 dark:text-gray-400">
+              {server.about?.description || 'No description available'}
+            </p>
+          </div>
+
+          {#if server.meta?.tags && server.meta.tags.length > 0}
             <div>
-              <h3 class="text-lg font-semibold text-gray-900 mb-4">Configuration</h3>
+              <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tags</h4>
+              <div class="flex flex-wrap gap-2">
+                {#each server.meta.tags as tag}
+                  <span class="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-full">
+                    {tag}
+                  </span>
+                {/each}
+              </div>
+            </div>
+          {/if}
 
-              <div class="space-y-4">
-                <div>
-                  <label for="server-config-name" class="text-sm font-medium text-gray-700">Server Name</label>
-                  {#if editMode}
-                    <input
-                      id="server-config-name"
-                      type="text"
-                      bind:value={editForm.name}
-                      class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  {:else}
-                    <p class="text-sm text-gray-900 mt-1">{selectedServer.config.name}</p>
-                  {/if}
+          {#if server.type === 'server' && server.image}
+            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <h4 class="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">Container Information</h4>
+              <dl class="space-y-1 text-sm">
+                <div class="flex justify-between">
+                  <dt class="text-blue-700 dark:text-blue-400">Image:</dt>
+                  <dd class="text-blue-900 dark:text-blue-200 font-mono">{server.image}</dd>
                 </div>
-
-                <div>
-                  <label for="server-config-description" class="text-sm font-medium text-gray-700">Description</label>
-                  {#if editMode}
-                    <textarea
-                      id="server-config-description"
-                      bind:value={editForm.description}
-                      class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      rows="2"
-                      placeholder="Optional description"
-                    ></textarea>
-                  {:else if selectedServer.config.description}
-                    <p class="text-sm text-gray-900 mt-1">{selectedServer.config.description}</p>
-                  {:else}
-                    <p class="text-sm text-gray-500 mt-1 italic">No description</p>
-                  {/if}
-                </div>
-
-                <div>
-                  <label class="text-sm font-medium text-gray-700">Transport Type</label>
-                  {#if editMode}
-                    <p class="text-sm text-gray-500 mt-1 italic">
-                      Transport type cannot be changed after creation
-                    </p>
-                  {/if}
-                  <p class="text-sm text-gray-900 mt-1 capitalize">
-                    {selectedServer.config.transport_config?.type || 'Unknown'}
-                  </p>
-                </div>
-
-                <!-- Transport-specific details -->
-                {#if selectedServer.config.transport_config?.type === 'stdio'}
-                  <div>
-                    <label class="text-sm font-medium text-gray-700">Command</label>
-                    <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                      {selectedServer.config.transport_config.command}
-                    </p>
-                  </div>
-
-                  {#if selectedServer.config.transport_config.args && selectedServer.config.transport_config.args.length > 0}
-                    <div>
-                      <label class="text-sm font-medium text-gray-700">Arguments</label>
-                      <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                        {selectedServer.config.transport_config.args.join(' ')}
-                      </p>
-                    </div>
-                  {/if}
-
-                  {#if selectedServer.config.transport_config.working_directory}
-                    <div>
-                      <label class="text-sm font-medium text-gray-700">Working Directory</label>
-                      <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                        {selectedServer.config.transport_config.working_directory}
-                      </p>
-                    </div>
-                  {/if}
-
-                {:else if selectedServer.config.transport_config?.type === 'http' || selectedServer.config.transport_config?.type === 'webSocket'}  <!-- ✅ FIXED: camelCase -->
-                  <div>
-                    <label class="text-sm font-medium text-gray-700">URL</label>
-                    <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                      {selectedServer.config.transport_config.url}
-                    </p>
-                  </div>
-
-                  {#if selectedServer.config.transport_config.headers && Object.keys(selectedServer.config.transport_config.headers).length > 0}
-                    <div>
-                      <label class="text-sm font-medium text-gray-700">Headers</label>
-                      <div class="mt-1 space-y-1">
-                        {#each Object.entries(selectedServer.config.transport_config.headers) as [key, value]}
-                          <div class="text-sm bg-gray-50 p-2 rounded font-mono">
-                            <span class="text-gray-600">{key}:</span> {value}
-                          </div>
-                        {/each}
-                      </div>
-                    </div>
-                  {/if}
-
-                {:else if selectedServer.config.transport_config?.type === 'tcp'}
-                  <div class="grid grid-cols-2 gap-4">
-                    <div>
-                      <label class="text-sm font-medium text-gray-700">Host</label>
-                      <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                        {selectedServer.config.transport_config.host}
-                      </p>
-                    </div>
-                    <div>
-                      <label class="text-sm font-medium text-gray-700">Port</label>
-                      <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                        {selectedServer.config.transport_config.port}
-                      </p>
-                    </div>
-                  </div>
-
-                {:else if selectedServer.config.transport_config?.type === 'unix'}
-                  <div>
-                    <label class="text-sm font-medium text-gray-700">Socket Path</label>
-                    <p class="text-sm text-gray-900 mt-1 font-mono bg-gray-50 p-2 rounded">
-                      {selectedServer.config.transport_config.path}
-                    </p>
+                {#if server.image.startsWith('mcp/')}
+                  <div class="flex justify-between">
+                    <dt class="text-blue-700 dark:text-blue-400">Security:</dt>
+                    <dd class="text-green-600 dark:text-green-400">Signed, SBOM, Provenance</dd>
                   </div>
                 {/if}
-
-                <!-- Environment Variables -->
-                <div>
-                  <div class="flex items-center justify-between">
-                    <label class="text-sm font-medium text-gray-700">Environment Variables</label>
-                    {#if editMode}
-                      <button
-                        onclick={addEnvironmentVariable}
-                        class="flex items-center text-xs text-blue-600 hover:text-blue-800"
-                      >
-                        <Plus size={14} class="mr-1" />
-                        Add Variable
-                      </button>
-                    {/if}
-                  </div>
-
-                  {#if editMode}
-                    <div class="mt-2 space-y-2">
-                      {#each Object.entries(editForm.environment_variables) as [key, value], index}
-                        <div class="flex items-center space-x-2">
-                          <label for="server-config-env-key-{index}" class="sr-only">Environment variable name</label>
-                          <input
-                            id="server-config-env-key-{index}"
-                            type="text"
-                            value={key}
-                            onchange={(e) => updateEnvironmentVariableKey(key, (e.target as HTMLInputElement).value)}
-                            placeholder="Variable name"
-                            class="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <span class="text-gray-400">=</span>
-                          <label for="server-config-env-value-{index}" class="sr-only">Environment variable value</label>
-                          <input
-                            id="server-config-env-value-{index}"
-                            type="text"
-                            value={value}
-                            onchange={(e) => updateEnvironmentVariableValue(key, (e.target as HTMLInputElement).value)}
-                            placeholder="Value"
-                            class="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                          <button
-                            onclick={() => removeEnvironmentVariable(key)}
-                            class="text-red-500 hover:text-red-700"
-                            aria-label="Remove environment variable"
-                          >
-                            <Minus size={14} />
-                          </button>
-                        </div>
-                      {/each}
-                      {#if Object.keys(editForm.environment_variables).length === 0}
-                        <p class="text-xs text-gray-500 italic">No environment variables set</p>
-                      {/if}
-                    </div>
-                  {:else if selectedServer.config.environment_variables && Object.keys(selectedServer.config.environment_variables).length > 0}
-                    <div class="mt-1 space-y-1">
-                      {#each Object.entries(selectedServer.config.environment_variables) as [key, value]}
-                        <div class="text-sm bg-gray-50 p-2 rounded font-mono">
-                          <span class="text-gray-600">{key}=</span>{value}
-                        </div>
-                      {/each}
-                    </div>
-                  {:else}
-                    <p class="text-sm text-gray-500 mt-1 italic">No environment variables set</p>
-                  {/if}
-                </div>
-
-                <!-- Timestamps -->
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label class="text-sm font-medium text-gray-700">Created</label>
-                    <p class="text-sm text-gray-900 mt-1">
-                      {formatDateTime(selectedServer.config.created_at)}
-                    </p>
-                  </div>
-                  <div>
-                    <label class="text-sm font-medium text-gray-700">Last Updated</label>
-                    <p class="text-sm text-gray-900 mt-1">
-                      {formatDateTime(selectedServer.config.updated_at)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              </dl>
             </div>
-          </div>
-
-          <!-- Runtime Information -->
-          <div class="space-y-6">
-            <!-- Server Capabilities -->
-            {#if selectedServer.capabilities}
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Capabilities</h3>
-                <div class="flex flex-wrap gap-2">
-                  {#if selectedServer.capabilities.tools}
-                    <span class="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-full">Tools</span>
-                  {/if}
-                  {#if selectedServer.capabilities.resources}
-                    <span class="px-3 py-1 bg-green-100 text-green-700 text-sm rounded-full">Resources</span>
-                  {/if}
-                  {#if selectedServer.capabilities.prompts}
-                    <span class="px-3 py-1 bg-purple-100 text-purple-700 text-sm rounded-full">Prompts</span>
-                  {/if}
-                  {#if selectedServer.capabilities.sampling}
-                    <span class="px-3 py-1 bg-orange-100 text-orange-700 text-sm rounded-full">Sampling</span>
-                  {/if}
-                  {#if selectedServer.capabilities.elicitation}
-                    <span class="px-3 py-1 bg-pink-100 text-pink-700 text-sm rounded-full">Elicitation</span>
-                  {/if}
-                </div>
-              </div>
-            {/if}
-
-            <!-- Connection Metrics -->
-            {#if selectedServer.metrics && selectedServer.status === 'connected'}
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Connection Metrics</h3>
-                <div class="grid grid-cols-2 gap-4">
-                  <div class="bg-gray-50 rounded-lg p-3">
-                    <p class="text-xs text-gray-600">Requests Sent</p>
-                    <p class="text-lg font-semibold text-gray-900">{selectedServer.metrics.requests_sent}</p>
-                  </div>
-                  <div class="bg-gray-50 rounded-lg p-3">
-                    <p class="text-xs text-gray-600">Responses Received</p>
-                    <p class="text-lg font-semibold text-gray-900">{selectedServer.metrics.responses_received}</p>
-                  </div>
-                  <div class="bg-gray-50 rounded-lg p-3">
-                    <p class="text-xs text-gray-600">Data Sent</p>
-                    <p class="text-lg font-semibold text-gray-900">{formatBytes(selectedServer.metrics.bytes_sent)}</p>
-                  </div>
-                  <div class="bg-gray-50 rounded-lg p-3">
-                    <p class="text-xs text-gray-600">Data Received</p>
-                    <p class="text-lg font-semibold text-gray-900">{formatBytes(selectedServer.metrics.bytes_received)}</p>
-                  </div>
-                  <div class="bg-gray-50 rounded-lg p-3">
-                    <p class="text-xs text-gray-600">Avg Response Time</p>
-                    <p class="text-lg font-semibold text-gray-900">{Math.round(selectedServer.metrics.avg_response_time_ms)}ms</p>
-                  </div>
-                  <div class="bg-gray-50 rounded-lg p-3">
-                    <p class="text-xs text-gray-600">Error Count</p>
-                    <p class="text-lg font-semibold text-gray-900">{selectedServer.metrics.error_count}</p>
-                  </div>
-                </div>
-              </div>
-            {/if}
-
-            <!-- Process Information -->
-            {#if selectedServer.process_info && selectedServer.status === 'connected'}
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Process Information</h3>
-                <div class="space-y-3">
-                  <div class="flex justify-between">
-                    <span class="text-sm text-gray-600">Process ID</span>
-                    <span class="text-sm font-medium text-gray-900">{selectedServer.process_info.pid}</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-sm text-gray-600">CPU Usage</span>
-                    <span class="text-sm font-medium text-gray-900">{selectedServer.process_info.cpu_usage.toFixed(1)}%</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-sm text-gray-600">Memory Usage</span>
-                    <span class="text-sm font-medium text-gray-900">{formatBytes(selectedServer.process_info.memory_usage)}</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-sm text-gray-600">Started At</span>
-                    <span class="text-sm font-medium text-gray-900">{formatDateTime(selectedServer.process_info.started_at)}</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-sm text-gray-600">Status</span>
-                    <span class="text-sm font-medium text-gray-900 capitalize">{selectedServer.process_info.status}</span>
-                  </div>
-                </div>
-              </div>
-            {/if}
-
-            <!-- Error Information -->
-            {#if selectedServer.status === 'error' && selectedServer.metrics.last_error}
-              <div>
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Error Details</h3>
-                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div class="flex items-start">
-                    <AlertCircle size={16} class="text-red-500 mr-2 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p class="text-sm font-medium text-red-800">Last Error</p>
-                      <p class="text-sm text-red-700 mt-1">{selectedServer.metrics.last_error}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            {/if}
-          </div>
-        </div>
-      </div>
-
-      <!-- Footer -->
-      <div class="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-        <div class="flex items-center space-x-2">
-          {#if !editMode}
-            <button
-              onclick={handleCopyServerJson}
-              class="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Copy MCP JSON configuration to clipboard"
-            >
-              <Copy size={16} class="mr-2" />
-              Copy Config JSON
-            </button>
-            <button
-              onclick={confirmDeleteServer}
-              class="flex items-center px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-            >
-              <Trash2 size={16} class="mr-2" />
-              Delete Server
-            </button>
           {/if}
         </div>
 
-        <div class="flex space-x-3">
-          {#if editMode}
-            <button
-              onclick={cancelEdit}
-              class="btn-secondary"
-              disabled={saving}
-            >
-              Cancel
-            </button>
-            <button
-              onclick={saveChanges}
-              class="btn-primary"
-              disabled={saving || !editForm.name.trim()}
-            >
-              {#if saving}
-                <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                Saving...
-              {:else}
-                <Save size={16} class="mr-2" />
-                Save Changes
+      {:else if currentStep === 2}
+        <!-- Step 2: Choose Action -->
+        <div class="space-y-6">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">What would you like to do?</h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Add to TurboMCP -->
+              <button
+                onclick={() => (actionChoice = 'turbomcp')}
+                class={`p-6 border-2 rounded-lg hover:bg-opacity-80 transition-all text-left group ${
+                  actionChoice === 'turbomcp'
+                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
+                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-400'
+                }`}
+              >
+                <div class="flex items-start gap-3 mb-3">
+                  <div class={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    actionChoice === 'turbomcp' ? 'bg-blue-600' : 'bg-blue-500'
+                  }`}>
+                    <Package class="text-white" size={24} />
+                  </div>
+                  <div>
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">Add to TurboMCP Studio</h4>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                      Add this server to your local server manager
+                    </p>
+                  </div>
+                </div>
+                {#if actionChoice === 'turbomcp'}
+                  <div class="text-sm text-blue-600 dark:text-blue-400">✓ Selected</div>
+                {/if}
+              </button>
+
+              <!-- Export to External Clients -->
+              <button
+                onclick={() => (actionChoice = 'export')}
+                class={`p-6 border-2 rounded-lg hover:bg-opacity-80 transition-all text-left group ${
+                  actionChoice === 'export'
+                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
+                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-400'
+                }`}
+              >
+                <div class="flex items-start gap-3 mb-3">
+                  <div class={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    actionChoice === 'export' ? 'bg-blue-600' : 'bg-gray-500'
+                  }`}>
+                    <Download class="text-white" size={24} />
+                  </div>
+                  <div>
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">Export to External Clients</h4>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                      Generate configs for Claude Desktop, LM Studio, Cursor, etc.
+                    </p>
+                  </div>
+                </div>
+                {#if actionChoice === 'export'}
+                  <div class="text-sm text-blue-600 dark:text-blue-400">✓ Selected</div>
+                {/if}
+              </button>
+            </div>
+          </div>
+        </div>
+
+      {:else if currentStep === 3}
+        <!-- Step 3: Configure + Execute -->
+        <div class="space-y-6">
+          <!-- Configuration Section (always shown) -->
+          {#if secrets.length > 0 || (parameters.properties && Object.keys(parameters.properties).length > 0)}
+            <div class="border-b border-gray-200 dark:border-gray-700 pb-6">
+              <!-- Secrets -->
+              {#if secrets.length > 0}
+                <div class="mb-6">
+                  <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Secrets & API Keys</h3>
+                  <div class="space-y-4">
+                    {#each secrets as secret}
+                      <div class="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                        <label for={secret.name} class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          {secret.env}
+                          {#if secret.required}<span class="text-red-500">*</span>{/if}
+                        </label>
+                        <input
+                          type="password"
+                          id={secret.name}
+                          value={secretValues[secret.name] || ''}
+                          oninput={(e) => handleSecretChange(secret.name, e.currentTarget.value)}
+                          placeholder="Enter {secret.env}"
+                          class={`w-full px-3 py-2 border rounded-lg ${
+                            validationErrors[secret.name] ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                          }`}
+                        />
+                        {#if validationErrors[secret.name]}
+                          <div class="text-sm text-red-600 mt-1">{validationErrors[secret.name]}</div>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                </div>
               {/if}
-            </button>
-          {:else}
-            <button onclick={closeModal} class="btn-secondary">
-              Close
-            </button>
-          {/if}
-        </div>
-      </div>
-    </div>
-  </div>
-{/if}
 
-<!-- Delete Confirmation Modal -->
-{#if showDeleteConfirm}
-  <div
-    class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center"
-    style="z-index: var(--z-modal-nested-backdrop, 60)"
-  >
-    <div
-      class="bg-white rounded-lg p-6 max-w-md w-full mx-4"
-      style="z-index: var(--z-modal-nested-content, 70)"
-    >
-      <div class="flex items-center mb-4">
-        <div class="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
-          <Trash2 size={24} class="text-red-600" />
-        </div>
-        <div>
-          <h3 class="text-lg font-semibold text-gray-900">Delete Server</h3>
-          <p class="text-sm text-gray-600">This action cannot be undone</p>
-        </div>
-      </div>
-
-      <p class="text-gray-700 mb-6">
-        Are you sure you want to delete "<strong>{selectedServer?.config.name}</strong>"?
-        All configurations and connection history will be permanently removed.
-      </p>
-
-      <div class="flex justify-end space-x-3">
-        <button
-          onclick={cancelDelete}
-          disabled={deleting}
-          class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Cancel
-        </button>
-        <button
-          onclick={deleteServer}
-          disabled={deleting}
-          class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {#if deleting}
-            <div class="flex items-center">
-              <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-              Deleting...
+              <!-- Parameters -->
+              {#if parameters.properties && Object.keys(parameters.properties).length > 0}
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Configuration Parameters</h3>
+                  <SchemaFormGenerator
+                    schema={parameters}
+                    serverName={server.name}
+                    bind:values={parameterValues}
+                    bind:errors={validationErrors}
+                    onValueChange={handleParameterChange}
+                  />
+                </div>
+              {/if}
             </div>
-          {:else}
-            Delete Server
           {/if}
-        </button>
+
+          <!-- Execute Section (based on action choice) -->
+          {#if actionChoice === 'turbomcp'}
+            <!-- TurboMCP: Add to Server Manager -->
+            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 text-center">
+              <h4 class="text-lg font-semibold text-blue-900 dark:text-blue-300 mb-2">Ready to Add to Server Manager</h4>
+              <p class="text-sm text-blue-700 dark:text-blue-400 mb-4">
+                Click the button below to add <strong>{server.name}</strong> to your local server list
+              </p>
+              <Button variant="primary" size="lg" onclick={addToServerManager}>
+                Add to Server Manager
+              </Button>
+            </div>
+
+          {:else if actionChoice === 'export'}
+            <!-- Export: Select Clients -->
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Select Target Clients</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Choose one or more clients to generate configurations for
+                </p>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+                  {#each externalClients as client}
+                    <button
+                      onclick={() => toggleClient(client.id)}
+                      class={`p-4 border rounded-lg text-left transition-all ${
+                        selectedClients.has(client.id)
+                          ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}
+                    >
+                      <div class="font-medium text-gray-900 dark:text-white">{client.name}</div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">{client.description}</div>
+                    </button>
+                  {/each}
+                </div>
+
+                {#if selectedClients.size > 0}
+                  <div class="space-y-4">
+                    {#each Array.from(selectedClients) as clientId}
+                      {@const configData = generatedConfigs.get(clientId)}
+                      {#if configData}
+                        <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                          <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-semibold text-gray-900 dark:text-white">{getClientName(clientId)}</h4>
+                            <div class="flex gap-2">
+                              <Button variant="secondary" size="sm" leftIcon={Copy} onclick={() => copyToClipboard(clientId)}>
+                                Copy
+                              </Button>
+                              <Button variant="secondary" size="sm" leftIcon={Download} onclick={() => exportToFile(clientId)}>
+                                Export
+                              </Button>
+                            </div>
+                          </div>
+
+                          {#if configData.notes.length > 0}
+                            <div class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                              {#each configData.notes as note}
+                                <div>• {note}</div>
+                              {/each}
+                            </div>
+                          {/if}
+
+                          <details>
+                            <summary class="text-sm text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-900 dark:hover:text-white">
+                              Show configuration
+                            </summary>
+                            <pre class="mt-2 bg-gray-900 text-gray-100 p-3 rounded-lg overflow-x-auto text-xs font-mono max-h-64">{configData.json}</pre>
+                          </details>
+                        </div>
+                      {/if}
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+          {/if}
+        </div>
+      {/if}
+    </div>
+
+    <!-- Footer -->
+    <div class="border-t border-gray-200 dark:border-gray-700 p-6 flex items-center justify-between">
+      <div>
+        {#if currentStep > 1}
+          <Button variant="secondary" onclick={() => (currentStep -= 1)}>
+            Back
+          </Button>
+        {/if}
+      </div>
+
+      <div class="flex gap-3">
+        <Button variant="secondary" onclick={onClose}>
+          {currentStep === 3 ? 'Close' : 'Cancel'}
+        </Button>
+        {#if currentStep < 3}
+          <Button
+            variant="primary"
+            onclick={() => {
+              if (currentStep === 2) {
+                proceedToStep3();
+              } else {
+                currentStep += 1;
+              }
+            }}
+          >
+            Next
+          </Button>
+        {/if}
       </div>
     </div>
   </div>
-{/if}
+</div>

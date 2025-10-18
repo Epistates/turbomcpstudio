@@ -10,6 +10,7 @@
   import Button from './ui/Button.svelte';
   import ProfileEditor from './ProfileEditor.svelte';
   import InstallClientModal from './InstallClientModal.svelte';
+  import RegistryBrowser from './RegistryBrowser.svelte';
   import {
     Plus,
     Play,
@@ -28,6 +29,7 @@
     List,
     Download,
     Upload,
+    Package,
   } from 'lucide-svelte';
 
   // Initialize scoped logger
@@ -97,6 +99,9 @@
 
   // Install client modal state
   let showInstallModal = $state(false);
+
+  // Registry browser modal state
+  let showRegistryBrowser = $state(false);
 
   function openInstallModal() {
     showInstallModal = true;
@@ -757,6 +762,14 @@
         </Button>
         <Button
           variant="secondary"
+          leftIcon={Package}
+          onclick={() => (showRegistryBrowser = true)}
+          title="Browse Docker MCP Registry (270+ pre-configured servers)"
+        >
+          Browse Docker Registry
+        </Button>
+        <Button
+          variant="secondary"
           leftIcon={Upload}
           onclick={openInstallModal}
           disabled={servers.length === 0}
@@ -1408,3 +1421,35 @@
   profiles={profiles}
   localProfileServerMap={localProfileServerMap}
 />
+
+<!-- Registry Browser Modal -->
+{#if showRegistryBrowser}
+  <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col">
+      <!-- Header -->
+      <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Package size={24} />
+            Docker MCP Registry
+          </h2>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Browse 270+ pre-configured MCP servers from the official Docker registry
+          </p>
+        </div>
+        <button
+          onclick={() => (showRegistryBrowser = false)}
+          class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+          title="Close"
+        >
+          <X size={24} />
+        </button>
+      </div>
+
+      <!-- Registry Browser Content -->
+      <div class="flex-1 overflow-hidden">
+        <RegistryBrowser />
+      </div>
+    </div>
+  </div>
+{/if}
