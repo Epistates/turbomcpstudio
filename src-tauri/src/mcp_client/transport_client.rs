@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use turbomcp_client::handlers::{
-    ElicitationHandler, LogHandler, ProgressHandler, ResourceUpdateHandler,
+    ElicitationHandler, LogHandler, ResourceUpdateHandler,
 };
 use turbomcp_client::Client;
 use turbomcp_protocol::types::{Prompt, PromptInput, Tool, ToolInputSchema};
@@ -376,29 +376,6 @@ impl McpTransportClient {
         }
     }
 
-    /// Register a progress handler for server progress notifications (TurboMCP 2.0)
-    /// Receives updates about long-running operations on the server
-    #[allow(dead_code)]
-    pub fn register_progress_handler(&self, handler: Arc<dyn ProgressHandler>) {
-        match self {
-            McpTransportClient::Stdio(client) => client.set_progress_handler(handler),
-
-            McpTransportClient::ChildProcess(client) => client.set_progress_handler(handler),
-
-            #[cfg(feature = "http")]
-            McpTransportClient::Http(client) => client.set_progress_handler(handler),
-
-            #[cfg(feature = "websocket")]
-            McpTransportClient::WebSocket(client) => client.set_progress_handler(handler),
-
-            #[cfg(feature = "tcp")]
-            McpTransportClient::Tcp(client) => client.set_progress_handler(handler),
-
-            #[cfg(unix)]
-            McpTransportClient::Unix(client) => client.set_progress_handler(handler),
-        }
-    }
-
     /// Register a log handler for server log messages (TurboMCP 2.0)
     /// Routes server log messages to client logging system
     #[allow(dead_code)]
@@ -458,22 +435,6 @@ impl McpTransportClient {
             McpTransportClient::Tcp(client) => client.has_elicitation_handler(),
             #[cfg(unix)]
             McpTransportClient::Unix(client) => client.has_elicitation_handler(),
-        }
-    }
-
-    /// Check if a progress handler is registered (TurboMCP 2.0)
-    pub fn has_progress_handler(&self) -> bool {
-        match self {
-            McpTransportClient::Stdio(client) => client.has_progress_handler(),
-            McpTransportClient::ChildProcess(client) => client.has_progress_handler(),
-            #[cfg(feature = "http")]
-            McpTransportClient::Http(client) => client.has_progress_handler(),
-            #[cfg(feature = "websocket")]
-            McpTransportClient::WebSocket(client) => client.has_progress_handler(),
-            #[cfg(feature = "tcp")]
-            McpTransportClient::Tcp(client) => client.has_progress_handler(),
-            #[cfg(unix)]
-            McpTransportClient::Unix(client) => client.has_progress_handler(),
         }
     }
 

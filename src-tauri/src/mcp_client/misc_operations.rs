@@ -126,7 +126,6 @@ impl MiscOperations {
 
         // Check all handler registration statuses
         let elicitation_handler = client.has_elicitation_handler();
-        let progress_handler = client.has_progress_handler();
         let log_handler = client.has_log_handler();
         let resource_update_handler = client.has_resource_update_handler();
 
@@ -137,7 +136,6 @@ impl MiscOperations {
         // Count registered handlers
         let handlers = [
             elicitation_handler,
-            progress_handler,
             log_handler,
             resource_update_handler,
         ];
@@ -147,7 +145,6 @@ impl MiscOperations {
             "server_id": server_id,
             "handlers": {
                 "elicitation": elicitation_handler,
-                "progress": progress_handler,
                 "log": log_handler,
                 "resource_update": resource_update_handler
             },
