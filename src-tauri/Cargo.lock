@@ -1586,11 +1586,32 @@ dependencies = [
 
 [[package]]
 name = "dirs"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
+dependencies = [
+ "dirs-sys 0.4.1",
+]
+
+[[package]]
+name = "dirs"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e"
 dependencies = [
- "dirs-sys",
+ "dirs-sys 0.5.0",
+]
+
+[[package]]
+name = "dirs-sys"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "520f05a5cbd335fae5a99ff7a6ab8627577660ee5cfd6a94a6a929b52ff0321c"
+dependencies = [
+ "libc",
+ "option-ext",
+ "redox_users 0.4.6",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -1601,7 +1622,7 @@ checksum = "e01a3366d27ee9890022452ee61b2b63a67e6f13f58900b651ff5665f0bb1fab"
 dependencies = [
  "libc",
  "option-ext",
- "redox_users",
+ "redox_users 0.5.2",
  "windows-sys 0.61.2",
 ]
 
@@ -5194,6 +5215,17 @@ dependencies = [
 
 [[package]]
 name = "redox_users"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba009ff324d1fc1b900bd1fdb31564febe58a8ccc8a6fdbb93b543d33b13ca43"
+dependencies = [
+ "getrandom 0.2.16",
+ "libredox",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "redox_users"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4e608c6638b9c18977b00b475ac1f28d14e84b27d8d42f70e0bf1e3dec127ac"
@@ -6687,7 +6719,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "cookie",
- "dirs",
+ "dirs 6.0.0",
  "dunce",
  "embed_plist",
  "getrandom 0.3.3",
@@ -6738,7 +6770,7 @@ checksum = "9c432ccc9ff661803dab74c6cd78de11026a578a9307610bbc39d3c55be7943f"
 dependencies = [
  "anyhow",
  "cargo_toml",
- "dirs",
+ "dirs 6.0.0",
  "glob",
  "heck 0.5.0",
  "json-patch",
@@ -7618,7 +7650,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a0d92153331e7d02ec09137538996a7786fe679c629c279e82a6be762b7e6fe2"
 dependencies = [
  "crossbeam-channel",
- "dirs",
+ "dirs 6.0.0",
  "libappindicator",
  "muda",
  "objc2 0.6.3",
@@ -7670,9 +7702,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp"
-version = "2.0.0-rc.2"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c12927a6898dec22d6e14e63035cda920ad59f7e34cae41c2d121c1b569515ad"
+checksum = "ebf361cbe6e4a96a75f2f70aa13d5b5074c1748879f5428580632ec5c8c1d442"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7700,9 +7732,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-client"
-version = "2.0.0-rc.2"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ce944381451a40560082ecfb92b6476c9c96ba674e00a3263bbf69e98662922"
+checksum = "f01e277fedb9fd775c97333d40f137a1673e870594941ca67f729b3a9ebf57d7"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7720,9 +7752,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-macros"
-version = "2.0.0-rc.2"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "332167fd85c0091b99006b4faeee1f1824d96b9995d2a3416f1e65caaaf2441f"
+checksum = "e30771bd0c2eced89c9a9b416625675985d9a94ef0be9d23a52ad5f78340d6fe"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7735,9 +7767,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-protocol"
-version = "2.0.0-rc.2"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "681b44ab90c3789b501cd3248c87d621ff85fd69ad0d0baeabe86290d06b5e78"
+checksum = "ab5ccfd33da29684935a0b50ea9f2d0fe79a7bfd492377be37770727bda43855"
 dependencies = [
  "ahash 0.8.12",
  "arc-swap",
@@ -7769,9 +7801,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-server"
-version = "2.0.0-rc.2"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78d9919c4d3e8cf65d1c5c7367e9ef83428e47848c4b77bd9167698842fb06be"
+checksum = "18002029619403b124e65cca5e7f574c1ecf0b534355862a2c22ba7af990dd2b"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7801,9 +7833,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-transport"
-version = "2.0.0-rc.2"
+version = "2.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "452e01c3f9b966164514de27aa5c3ab94b831eec218aebe53f2d98c717457b36"
+checksum = "7aedabac3d1682fe24c6806ed8d8126a7b9485dd948b1f715c68e16f103293df"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -7851,6 +7883,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "dashmap",
+ "dirs 5.0.1",
  "futures",
  "keyring",
  "log",
@@ -9079,7 +9112,7 @@ dependencies = [
  "block2 0.6.2",
  "cookie",
  "crossbeam-channel",
- "dirs",
+ "dirs 6.0.0",
  "dpi",
  "dunce",
  "gdkx11",
