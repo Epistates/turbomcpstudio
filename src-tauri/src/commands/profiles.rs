@@ -862,7 +862,7 @@ async fn load_active_profile_state(
     let profile_row = sqlx::query(
         "SELECT id, name, description, icon, color, auto_activate, created_at, updated_at FROM server_profiles WHERE id = ?"
     )
-    .bind(&profile_id)
+    .bind(profile_id)
     .fetch_one(database.pool())
     .await
     .map_err(|e| format!("Profile not found: {}", e))?;
@@ -893,7 +893,7 @@ async fn load_active_profile_state(
         ORDER BY ps.startup_order, sc.name
         "#,
     )
-    .bind(&profile_id)
+    .bind(profile_id)
     .fetch_all(database.pool())
     .await
     .map_err(|e| format!("Failed to get profile servers: {}", e))?;
@@ -932,7 +932,7 @@ async fn load_active_profile_state(
     let activation_row = sqlx::query(
         "SELECT id, profile_id, activated_at, deactivated_at, success_count, failure_count, errors FROM profile_activations WHERE profile_id = ? ORDER BY activated_at DESC LIMIT 1"
     )
-    .bind(&profile_id)
+    .bind(profile_id)
     .fetch_optional(database.pool())
     .await
     .map_err(|e| format!("Failed to get activation: {}", e))?;

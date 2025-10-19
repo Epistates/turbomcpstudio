@@ -279,7 +279,7 @@ pub fn search_servers(
 
             false
         })
-        .map(|server| ServerDisplayInfo::from(server))
+        .map(ServerDisplayInfo::from)
         .collect()
 }
 
@@ -295,9 +295,9 @@ pub fn filter_by_category(
                 .meta
                 .as_ref()
                 .and_then(|m| m.category.as_ref())
-                .map_or(false, |c| c == category)
+                .is_some_and(|c| c == category)
         })
-        .map(|server| ServerDisplayInfo::from(server))
+        .map(ServerDisplayInfo::from)
         .collect()
 }
 

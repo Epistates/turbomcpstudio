@@ -241,7 +241,7 @@ fn generate_claude_desktop_remote(
     notes.push("Remote MCP servers don't require Docker".to_string());
     notes.push(format!("This server connects to: {}", url));
 
-    if server.oauth.as_ref().map_or(false, |o| !o.is_empty()) {
+    if server.oauth.as_ref().is_some_and(|o| !o.is_empty()) {
         notes.push("⚠️  This server requires OAuth authentication".to_string());
     }
 
@@ -412,7 +412,7 @@ fn generate_turbomcp_remote(
     notes.push("TurboMCP Studio supports HTTP and WebSocket remote servers".to_string());
     notes.push(format!("This server connects to: {}", url));
 
-    if server.oauth.as_ref().map_or(false, |o| !o.is_empty()) {
+    if server.oauth.as_ref().is_some_and(|o| !o.is_empty()) {
         notes.push("⚠️  This server requires OAuth authentication".to_string());
         notes.push("⚠️  OAuth support may be limited in TurboMCP Studio".to_string());
     }
