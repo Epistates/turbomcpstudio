@@ -725,14 +725,22 @@ function createServerStore() {
           return { ...state, servers: newServers };
         });
       } else if (event.CapabilitiesUpdated) {
+        logger.info('[CapabilitiesUpdated] 🎯 Event received:', {
+          server_id: event.CapabilitiesUpdated.server_id,
+          capabilities: event.CapabilitiesUpdated.capabilities
+        });
+
         update(state => {
           const newServers = new Map(state.servers);
           const server = newServers.get(event.CapabilitiesUpdated.server_id);
           if (server) {
+            logger.info('[CapabilitiesUpdated] ✅ Updating server with capabilities:', server.config.name);
             newServers.set(event.CapabilitiesUpdated.server_id, {
               ...server,
               capabilities: event.CapabilitiesUpdated.capabilities
             });
+          } else {
+            logger.warn('[CapabilitiesUpdated] ⚠️ Server not found in map:', event.CapabilitiesUpdated.server_id);
           }
           return { ...state, servers: newServers };
         });

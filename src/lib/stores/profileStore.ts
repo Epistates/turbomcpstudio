@@ -89,7 +89,7 @@ export interface AddServerToProfileRequest {
 
 interface ProfileStoreState {
   profiles: ServerProfileWithCount[];
-  activeProfile: ActiveProfileState | null;
+  activeProfiles: Map<string, ActiveProfileState>;  // Multi-profile support
   selectedProfileId?: string;
   loading: boolean;
   error?: string;
@@ -97,7 +97,7 @@ interface ProfileStoreState {
 
 const initialState: ProfileStoreState = {
   profiles: [],
-  activeProfile: null,
+  activeProfiles: new Map(),  // Multiple active profiles
   selectedProfileId: undefined,
   loading: false,
   error: undefined,
@@ -207,7 +207,7 @@ function createProfileStore() {
       }
     },
 
-    // Activate a profile
+    // Activate a profile (additive - supports multiple active profiles)
     async activateProfile(profileId: string): Promise<boolean> {
       update((state) => ({ ...state, loading: true }));
 
@@ -220,11 +220,20 @@ function createProfileStore() {
 
         const activation = await Promise.race([activationPromise, timeoutPromise]);
 
-        // Reload active profile state
-        await this.loadActiveProfile();
+        // Reload all active profiles
+        await this.loadActiveProfiles();
 
         // ✅ Show success even if some servers failed (partial success is OK)
         const total = activation.success_count + activation.failure_count;
+
+        // Check if already active
+        const wasAlreadyActive = activation.errors?.includes('Profile already active') ?? false;
+
+        if (wasAlreadyActive) {
+          uiStore.showInfo('Profile is already active');
+          return true;
+        }
+
         const successMsg = `Profile activated: ${activation.success_count}/${total} servers connected`;
 
         if (activation.success_count > 0) {
@@ -234,7 +243,7 @@ function createProfileStore() {
         }
 
         // ✅ Show errors in a more user-friendly way
-        if (activation.errors && activation.errors.length > 0) {
+        if (activation.errors && activation.errors.length > 0 && !wasAlreadyActive) {
           const errorCount = activation.errors.length;
           const errorSummary = errorCount === 1
             ? '1 server failed to connect'
@@ -250,7 +259,7 @@ function createProfileStore() {
         }
 
         // ✅ Return true even if some servers failed (partial success)
-        return activation.success_count > 0;
+        return activation.success_count > 0 || wasAlreadyActive;
       } catch (error) {
         const errorMessage = String(error);
         logger.error('Failed to activate profile:', error);
@@ -262,13 +271,13 @@ function createProfileStore() {
       }
     },
 
-    // Deactivate the current profile
-    async deactivateProfile(): Promise<boolean> {
+    // Deactivate a specific profile (smart disconnect - only disconnects servers not in other active profiles)
+    async deactivateProfile(profileId: string): Promise<boolean> {
       update((state) => ({ ...state, loading: true }));
 
       try {
-        await invoke('deactivate_profile');
-        await this.loadActiveProfile();
+        await invoke('deactivate_profile', { profileId });
+        await this.loadActiveProfiles();
         uiStore.showSuccess('Profile deactivated');
         return true;
       } catch (error) {
@@ -280,14 +289,44 @@ function createProfileStore() {
       }
     },
 
-    // Load active profile state
-    async loadActiveProfile() {
+    // Load all active profiles (multi-profile support)
+    async loadActiveProfiles() {
       try {
-        const activeProfile = await invoke<ActiveProfileState | null>('get_active_profile');
-        update((state) => ({ ...state, activeProfile }));
+        const activeProfilesList = await invoke<ActiveProfileState[]>('get_active_profiles');
+
+        // Convert array to Map for easier lookups
+        const activeProfiles = new Map<string, ActiveProfileState>();
+        activeProfilesList.forEach(profile => {
+          if (profile.profile) {
+            activeProfiles.set(profile.profile.id, profile);
+          }
+        });
+
+        update((state) => ({ ...state, activeProfiles }));
+        logger.debug(`Loaded ${activeProfiles.size} active profiles`);
       } catch (error) {
-        logger.error('Failed to load active profile:', error);
-        update((state) => ({ ...state, activeProfile: null }));
+        logger.error('Failed to load active profiles:', error);
+        update((state) => ({ ...state, activeProfiles: new Map() }));
+      }
+    },
+
+    // Check if a profile is currently active
+    isProfileActive(profileId: string): boolean {
+      let isActive = false;
+      this.subscribe((state) => {
+        isActive = state.activeProfiles.has(profileId);
+      })();
+      return isActive;
+    },
+
+    // Toggle a profile (activate if inactive, deactivate if active)
+    async toggleProfile(profileId: string): Promise<boolean> {
+      const isActive = this.isProfileActive(profileId);
+
+      if (isActive) {
+        return await this.deactivateProfile(profileId);
+      } else {
+        return await this.activateProfile(profileId);
       }
     },
 
