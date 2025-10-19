@@ -125,18 +125,17 @@ pub async fn delete_server_profile(
         .as_ref()
         .ok_or_else(|| "Database not yet initialized".to_string())?;
 
-    // Check if this is the active profile
-    let active_profile = sqlx::query_scalar::<_, Option<String>>(
-        "SELECT profile_id FROM active_profile_state WHERE id = 1",
+    // Check if this profile is currently active (multi-profile support)
+    let is_active = sqlx::query_scalar::<_, i32>(
+        "SELECT COUNT(*) FROM active_profile_state WHERE profile_id = ?",
     )
-    .fetch_optional(database.pool())
+    .bind(&id)
+    .fetch_one(database.pool())
     .await
     .map_err(|e| format!("Failed to check active profile: {}", e))?;
 
-    if let Some(active_id) = active_profile.flatten() {
-        if active_id == id {
-            return Err("Cannot delete the active profile. Deactivate it first.".to_string());
-        }
+    if is_active > 0 {
+        return Err("Cannot delete an active profile. Deactivate it first.".to_string());
     }
 
     sqlx::query("DELETE FROM server_profiles WHERE id = ?")
@@ -386,19 +385,53 @@ pub async fn get_profile_servers(
 }
 
 /// Activate a server profile (connect all servers in the profile)
+/// Supports multiple active profiles - activation is additive
 #[tauri::command]
 pub async fn activate_profile(
     profile_id: String,
     app_state: State<'_, AppState>,
 ) -> Result<ProfileActivation, String> {
-    tracing::info!("Activating profile: {}", profile_id);
+    tracing::info!("Activating profile: {} (multi-profile mode)", profile_id);
 
     let db_lock = app_state.database.read().await;
     let database = db_lock
         .as_ref()
         .ok_or_else(|| "Database not yet initialized".to_string())?;
 
-    // 1. Get the profile
+    // 1. Check if profile is already active (idempotent)
+    let already_active = sqlx::query_scalar::<_, i32>(
+        "SELECT COUNT(*) FROM active_profile_state WHERE profile_id = ?"
+    )
+    .bind(&profile_id)
+    .fetch_one(database.pool())
+    .await
+    .map_err(|e| format!("Failed to check active status: {}", e))?;
+
+    if already_active > 0 {
+        tracing::info!("Profile {} is already active, skipping activation", profile_id);
+
+        // Return a ProfileActivation with 0 connections (already active)
+        let profile_name = sqlx::query_scalar::<_, String>(
+            "SELECT name FROM server_profiles WHERE id = ?"
+        )
+        .bind(&profile_id)
+        .fetch_one(database.pool())
+        .await
+        .map_err(|e| format!("Profile not found: {}", e))?;
+
+        return Ok(ProfileActivation {
+            id: Uuid::new_v4().to_string(),
+            profile_id,
+            profile_name,
+            activated_at: chrono::Utc::now().to_rfc3339(),
+            deactivated_at: None,
+            success_count: 0,
+            failure_count: 0,
+            errors: Some(vec!["Profile already active".to_string()]),
+        });
+    }
+
+    // 2. Get the profile
     let profile = sqlx::query(
         "SELECT id, name, description, icon, color, auto_activate, created_at, updated_at FROM server_profiles WHERE id = ?"
     )
@@ -582,12 +615,11 @@ pub async fn activate_profile(
     .await
     .map_err(|e| format!("Failed to record activation: {}", e))?;
 
-    // 6. Update active profile state
+    // 6. Add to active profile state (multi-profile support)
     sqlx::query(
         r#"
-        INSERT INTO active_profile_state (id, profile_id, activated_at)
-        VALUES (1, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET profile_id = excluded.profile_id, activated_at = excluded.activated_at
+        INSERT INTO active_profile_state (profile_id, activated_at)
+        VALUES (?, ?)
         "#,
     )
     .bind(&profile_id)
@@ -595,6 +627,8 @@ pub async fn activate_profile(
     .execute(database.pool())
     .await
     .map_err(|e| format!("Failed to set active profile: {}", e))?;
+
+    tracing::info!("✅ Profile {} added to active profiles", profile_id);
 
     let activation = ProfileActivation {
         id: activation_id,
@@ -619,83 +653,126 @@ pub async fn activate_profile(
     Ok(activation)
 }
 
-/// Deactivate the current profile (disconnect all servers)
+/// Deactivate a specific profile (smart disconnect - only disconnects servers not in other active profiles)
 #[tauri::command]
-pub async fn deactivate_profile(app_state: State<'_, AppState>) -> Result<(), String> {
-    tracing::info!("Deactivating current profile");
+pub async fn deactivate_profile(
+    profile_id: String,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    tracing::info!("Deactivating profile: {} (multi-profile mode)", profile_id);
 
     let db_lock = app_state.database.read().await;
     let database = db_lock
         .as_ref()
         .ok_or_else(|| "Database not yet initialized".to_string())?;
 
-    // Get active profile
-    let active_profile = sqlx::query_scalar::<_, Option<String>>(
-        "SELECT profile_id FROM active_profile_state WHERE id = 1",
+    // 1. Check if profile is active (idempotent)
+    let is_active = sqlx::query_scalar::<_, i32>(
+        "SELECT COUNT(*) FROM active_profile_state WHERE profile_id = ?"
     )
-    .fetch_optional(database.pool())
+    .bind(&profile_id)
+    .fetch_one(database.pool())
     .await
-    .map_err(|e| format!("Failed to get active profile: {}", e))?;
+    .map_err(|e| format!("Failed to check active status: {}", e))?;
 
-    if let Some(Some(profile_id)) = active_profile {
-        // Get all servers in the profile
-        let server_ids: Vec<String> =
+    if is_active == 0 {
+        tracing::info!("Profile {} is not active, skipping deactivation", profile_id);
+        return Ok(());
+    }
+
+    // 2. Get all servers in THIS profile
+    let this_profile_servers: Vec<String> =
+        sqlx::query_scalar("SELECT server_id FROM profile_servers WHERE profile_id = ?")
+            .bind(&profile_id)
+            .fetch_all(database.pool())
+            .await
+            .map_err(|e| format!("Failed to get profile servers: {}", e))?;
+
+    tracing::info!("Profile {} has {} servers", profile_id, this_profile_servers.len());
+
+    // 3. Get all OTHER active profiles
+    let other_active_profiles: Vec<String> =
+        sqlx::query_scalar("SELECT profile_id FROM active_profile_state WHERE profile_id != ?")
+            .bind(&profile_id)
+            .fetch_all(database.pool())
+            .await
+            .map_err(|e| format!("Failed to get other active profiles: {}", e))?;
+
+    tracing::info!("Found {} other active profiles", other_active_profiles.len());
+
+    // 4. Get union of servers in all OTHER active profiles
+    let mut servers_in_other_profiles = std::collections::HashSet::new();
+
+    for other_profile_id in other_active_profiles {
+        let servers: Vec<String> =
             sqlx::query_scalar("SELECT server_id FROM profile_servers WHERE profile_id = ?")
-                .bind(&profile_id)
+                .bind(&other_profile_id)
                 .fetch_all(database.pool())
                 .await
-                .map_err(|e| format!("Failed to get profile servers: {}", e))?;
+                .map_err(|e| format!("Failed to get servers for profile {}: {}", other_profile_id, e))?;
 
-        drop(db_lock);
-
-        // Disconnect all servers
-        let mcp_manager = &app_state.mcp_manager;
-        for server_id in server_ids {
-            let uuid = match Uuid::parse_str(&server_id) {
-                Ok(u) => u,
-                Err(e) => {
-                    tracing::warn!("Invalid server ID {}: {}", server_id, e);
-                    continue;
-                }
-            };
-
-            match mcp_manager.disconnect_server(uuid).await {
-                Ok(_) => tracing::info!("✓ Server {} disconnected", server_id),
-                Err(e) => tracing::warn!("Failed to disconnect server {}: {}", server_id, e),
-            }
+        for server_id in servers {
+            servers_in_other_profiles.insert(server_id);
         }
+    }
 
-        // Update activation record
-        let db_lock = app_state.database.read().await;
-        let database = db_lock
-            .as_ref()
-            .ok_or_else(|| "Database not yet initialized".to_string())?;
+    tracing::info!("Other active profiles contain {} unique servers", servers_in_other_profiles.len());
 
-        let now = chrono::Utc::now().to_rfc3339();
-        sqlx::query(
-            r#"
-            UPDATE profile_activations
-            SET deactivated_at = ?
-            WHERE profile_id = ? AND deactivated_at IS NULL
-            "#,
-        )
-        .bind(&now)
+    // 5. Calculate servers to disconnect (this profile's servers NOT in other profiles)
+    let servers_to_disconnect: Vec<String> = this_profile_servers
+        .into_iter()
+        .filter(|server_id| !servers_in_other_profiles.contains(server_id))
+        .collect();
+
+    tracing::info!("Will disconnect {} servers (not in other active profiles)", servers_to_disconnect.len());
+
+    drop(db_lock);
+
+    // 6. Disconnect only the servers not in other active profiles
+    let mcp_manager = &app_state.mcp_manager;
+    for server_id in &servers_to_disconnect {
+        let uuid = match Uuid::parse_str(server_id) {
+            Ok(u) => u,
+            Err(e) => {
+                tracing::warn!("Invalid server ID {}: {}", server_id, e);
+                continue;
+            }
+        };
+
+        match mcp_manager.disconnect_server(uuid).await {
+            Ok(_) => tracing::info!("✓ Server {} disconnected", server_id),
+            Err(e) => tracing::warn!("Failed to disconnect server {}: {}", server_id, e),
+        }
+    }
+
+    // 7. Update activation record
+    let db_lock = app_state.database.read().await;
+    let database = db_lock
+        .as_ref()
+        .ok_or_else(|| "Database not yet initialized".to_string())?;
+
+    let now = chrono::Utc::now().to_rfc3339();
+    sqlx::query(
+        r#"
+        UPDATE profile_activations
+        SET deactivated_at = ?
+        WHERE profile_id = ? AND deactivated_at IS NULL
+        "#,
+    )
+    .bind(&now)
+    .bind(&profile_id)
+    .execute(database.pool())
+    .await
+    .map_err(|e| format!("Failed to update activation: {}", e))?;
+
+    // 8. Remove from active profile state
+    sqlx::query("DELETE FROM active_profile_state WHERE profile_id = ?")
         .bind(&profile_id)
         .execute(database.pool())
         .await
-        .map_err(|e| format!("Failed to update activation: {}", e))?;
+        .map_err(|e| format!("Failed to clear active profile: {}", e))?;
 
-        // Clear active profile state
-        sqlx::query("DELETE FROM active_profile_state WHERE id = 1")
-            .execute(database.pool())
-            .await
-            .map_err(|e| format!("Failed to clear active profile: {}", e))?;
-
-        tracing::info!("✓ Profile deactivated");
-    } else {
-        tracing::info!("No active profile to deactivate");
-    }
-
+    tracing::info!("✅ Profile {} deactivated ({} servers disconnected)", profile_id, servers_to_disconnect.len());
     Ok(())
 }
 
@@ -739,29 +816,47 @@ pub async fn get_all_profile_server_relationships(
     Ok(relationships)
 }
 
-/// Get the currently active profile state
+/// Get all currently active profiles (multi-profile support)
 #[tauri::command]
-pub async fn get_active_profile(
+pub async fn get_active_profiles(
     app_state: State<'_, AppState>,
-) -> Result<Option<ActiveProfileState>, String> {
-    tracing::info!("Getting active profile state");
+) -> Result<Vec<ActiveProfileState>, String> {
+    tracing::info!("Getting all active profiles (multi-profile mode)");
 
     let db_lock = app_state.database.read().await;
     let database = db_lock
         .as_ref()
         .ok_or_else(|| "Database not yet initialized".to_string())?;
 
-    // Get active profile ID
-    let active_profile = sqlx::query_scalar::<_, Option<String>>(
-        "SELECT profile_id FROM active_profile_state WHERE id = 1",
-    )
-    .fetch_optional(database.pool())
-    .await
-    .map_err(|e| format!("Failed to get active profile: {}", e))?;
+    // Get all active profile IDs
+    let active_profile_ids: Vec<String> =
+        sqlx::query_scalar("SELECT profile_id FROM active_profile_state")
+            .fetch_all(database.pool())
+            .await
+            .map_err(|e| format!("Failed to get active profiles: {}", e))?;
 
-    let Some(Some(profile_id)) = active_profile else {
-        return Ok(None);
-    };
+    if active_profile_ids.is_empty() {
+        tracing::info!("No active profiles");
+        return Ok(Vec::new());
+    }
+
+    tracing::info!("Found {} active profiles", active_profile_ids.len());
+
+    let mut active_states = Vec::new();
+
+    for profile_id in active_profile_ids {
+        let profile_state = load_active_profile_state(database, &profile_id).await?;
+        active_states.push(profile_state);
+    }
+
+    Ok(active_states)
+}
+
+/// Helper function to load a single active profile state
+async fn load_active_profile_state(
+    database: &crate::database::Database,
+    profile_id: &str,
+) -> Result<ActiveProfileState, String> {
 
     // Get profile details
     let profile_row = sqlx::query(
@@ -858,10 +953,20 @@ pub async fn get_active_profile(
         }
     });
 
-    Ok(Some(ActiveProfileState {
+    Ok(ActiveProfileState {
         profile: Some(profile),
         servers,
         activation,
         is_activating: false,
-    }))
+    })
+}
+
+/// Legacy function for backward compatibility - returns first active profile or None
+/// This maintains compatibility with existing frontend code during migration
+#[tauri::command]
+pub async fn get_active_profile(
+    app_state: State<'_, AppState>,
+) -> Result<Option<ActiveProfileState>, String> {
+    let profiles = get_active_profiles(app_state).await?;
+    Ok(profiles.into_iter().next())
 }

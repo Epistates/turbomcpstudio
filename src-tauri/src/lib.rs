@@ -5,7 +5,7 @@ mod hitl_sampling;
 mod llm_config;
 mod llm_providers;
 mod mcp_client;
-mod registry;
+pub mod registry;
 mod types;
 mod workflow_engine;
 use database::Database;
@@ -480,6 +480,7 @@ pub fn run() {
             commands::activate_profile,
             commands::deactivate_profile,
             commands::get_active_profile,
+            commands::get_active_profiles,  // Multi-profile support
             // Client Installation commands
             commands::detect_installed_clients,
             commands::install_servers_to_client,
