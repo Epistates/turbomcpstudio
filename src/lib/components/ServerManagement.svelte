@@ -115,7 +115,7 @@
   onMount(async () => {
     await Promise.all([
       profileStore.loadProfiles(),
-      profileStore.loadActiveProfile(),
+      profileStore.loadActiveProfiles(),
       serverStore.loadServers(),
       loadAllProfileServerRelationships(), // Load ALL relationships on mount
     ]);
@@ -182,16 +182,31 @@
     return serverIds ? serverIds.has(serverId) : false;
   }
 
-  // Profile actions
-  async function handleActivateProfile(profileId: string) {
-    const success = await profileStore.activateProfile(profileId);
-    if (success) {
-      await profileStore.loadProfiles();
+  // Profile actions (multi-profile support with toggle)
+  async function handleToggleProfile(profileId: string) {
+    // Check if profile is currently active
+    const isActive = $profileStore.activeProfiles.has(profileId);
+
+    if (isActive) {
+      const success = await profileStore.deactivateProfile(profileId);
+      if (success) {
+        await profileStore.loadProfiles();
+      }
+    } else {
+      const success = await profileStore.activateProfile(profileId);
+      if (success) {
+        await profileStore.loadProfiles();
+      }
     }
   }
 
-  async function handleDeactivateProfile() {
-    const success = await profileStore.deactivateProfile();
+  // Legacy handlers for backwards compatibility
+  async function handleActivateProfile(profileId: string) {
+    await handleToggleProfile(profileId);
+  }
+
+  async function handleDeactivateProfile(profileId: string) {
+    const success = await profileStore.deactivateProfile(profileId);
     if (success) {
       await profileStore.loadProfiles();
     }
@@ -434,7 +449,7 @@
       logger.debug('🔄 Reloading profiles and relationships after deletion...');
       await Promise.all([
         profileStore.loadProfiles(),
-        profileStore.loadActiveProfile(),
+        profileStore.loadActiveProfiles(),
         loadAllProfileServerRelationships(),
       ]);
 
@@ -568,7 +583,7 @@
       // Reload data to reflect changes
       await Promise.all([
         profileStore.loadProfiles(),
-        profileStore.loadActiveProfile(),
+        profileStore.loadActiveProfiles(),
         serverStore.loadServers(),
         loadAllProfileServerRelationships(), // Reload ALL relationships
       ]);
@@ -588,7 +603,7 @@
       // Reload data to reflect changes
       await Promise.all([
         profileStore.loadProfiles(),
-        profileStore.loadActiveProfile(),
+        profileStore.loadActiveProfiles(),
         serverStore.loadServers(),
         loadAllProfileServerRelationships(), // Reload ALL relationships
       ]);
@@ -838,7 +853,7 @@
         {:else}
           <div class="space-y-2">
             {#each profiles as profile}
-              {@const isActive = activeProfile?.profile?.id === profile.id}
+              {@const isActive = profileState.activeProfiles.has(profile.id)}
               {@const isSelected = selectedProfileId === profile.id}
               <div
                 role="button"
@@ -909,31 +924,32 @@
                   >
                     <Trash2 size={12} class="inline" />
                   </button>
-                  {#if isActive}
-                    <button
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        handleDeactivateProfile();
-                      }}
-                      class="flex-1 text-xs py-1.5 px-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
-                      disabled={loading}
-                    >
-                      <Square size={12} class="inline mr-1" />
-                      Deactivate
-                    </button>
-                  {:else}
-                    <button
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        handleActivateProfile(profile.id);
-                      }}
-                      class="flex-1 text-xs py-1.5 px-2 bg-blue-600 dark:bg-blue-500 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-600"
-                      disabled={loading}
-                    >
+                  <!-- Multi-profile toggle button -->
+                  <button
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      handleToggleProfile(profile.id);
+                    }}
+                    class="flex-1 text-xs py-1.5 px-2 rounded disabled:opacity-50"
+                    class:bg-green-600={isActive}
+                    class:dark:bg-green-500={isActive}
+                    class:text-white={isActive}
+                    class:hover:bg-green-700={isActive}
+                    class:dark:hover:bg-green-600={isActive}
+                    class:bg-blue-600={!isActive}
+                    class:dark:bg-blue-500={!isActive}
+                    class:hover:bg-blue-700={!isActive}
+                    class:dark:hover:bg-blue-600={!isActive}
+                    disabled={loading || togglingProfile === profile.id}
+                  >
+                    {#if isActive}
+                      <CheckCircle size={12} class="inline mr-1" />
+                      Active
+                    {:else}
                       <Play size={12} class="inline mr-1" />
                       Activate
-                    </button>
-                  {/if}
+                    {/if}
+                  </button>
                 </div>
               </div>
             {/each}

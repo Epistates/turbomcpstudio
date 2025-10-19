@@ -67,10 +67,31 @@
 
   // ✅ NEW: Auto-select server when context bar is shown
   // Pass mode to respect filter vs selector behavior
+  // Also re-trigger when servers become available (fixes race condition on profile activation)
+  // BUG FIX: Addresses issue where "No tool servers connected" appears after profile activation
+  // even though servers are connecting. The fix detects when servers transition from
+  // disconnected to connected state and triggers server selection at that point.
+  const contextState = $derived($contextStore);
+  const availableServerCount = $derived(contextState.availableServers.length);
+
+  // Track previous server count to detect when servers become available
+  let previousServerCount = $state(0);
+
   $effect(() => {
+    // Track availableServerCount to ensure effect re-runs when servers connect
+    const serverCount = availableServerCount;
+
     if (showContextBar) {
-      contextStore.autoSelectServer(contextBarMode());
+      // Auto-select when:
+      // 1. Context bar first becomes visible
+      // 2. Servers become available (0 -> N transition, important for profile activation)
+      // 3. First server connects when none were connected before
+      if (serverCount > 0 && (previousServerCount === 0 || !contextState.selectedServer)) {
+        contextStore.autoSelectServer(contextBarMode());
+      }
     }
+
+    previousServerCount = serverCount;
   });
 
   // Content component mapping (unused - kept for reference)

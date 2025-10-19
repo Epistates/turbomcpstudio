@@ -161,7 +161,7 @@
 
           // Load profiles and active profile state
           await profileStore.loadProfiles();
-          await profileStore.loadActiveProfile();
+          await profileStore.loadActiveProfiles();
 
           appStore.completeInitialization();
 
@@ -227,7 +227,7 @@
       // Also attempt to load profiles (may fail if database not ready)
       try {
         await profileStore.loadProfiles();
-        await profileStore.loadActiveProfile();
+        await profileStore.loadActiveProfiles();
       } catch (err) {
         // Silent fail - will retry after database ready
       }

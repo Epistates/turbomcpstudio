@@ -159,7 +159,7 @@
       // Reload profiles and active profile
       await Promise.all([
         profileStore.loadProfiles(),
-        profileStore.loadActiveProfile(),
+        profileStore.loadActiveProfiles(),
       ]);
 
       onClose();
