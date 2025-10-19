@@ -59,39 +59,71 @@ const initialState: ContextStoreState = {
 };
 
 function createContextStore() {
-  const { subscribe, set, update } = writable<ContextStoreState>(initialState);
+  const internalStore = writable<ContextStoreState>(initialState);
 
   /**
    * Derived context that computes full server context from current state
    */
   const context = derived(
-    [{ subscribe }, serverStore, profileStore],
+    [internalStore, serverStore, profileStore],
     ([$state, $servers, $profiles]) => {
       const servers = $servers.servers instanceof Map
         ? Array.from($servers.servers.values())
         : [];
 
-      const connectedServers = servers.filter(s => s.status === 'connected');
+      const connectingServersDebug = servers.filter(s => s.status === 'connecting');
+      const connectedServersDebug = servers.filter(s => s.status === 'connected');
+      const serversWithCapabilities = servers.filter(s => s.capabilities);
+      const serversWithoutCapabilities = servers.filter(s => !s.capabilities);
 
-      // Find selected server
+      logger.debug('[ContextStore] Derived recomputing:', {
+        totalServers: servers.length,
+        connecting: connectingServersDebug.length,
+        connected: connectedServersDebug.length,
+        withCapabilities: serversWithCapabilities.length,
+        withoutCapabilities: serversWithoutCapabilities.length,
+        connectingServers: connectingServersDebug.map(s => ({
+          name: s.config.name,
+          status: s.status,
+          hasCapabilities: !!s.capabilities
+        })),
+        connectedServers: connectedServersDebug.map(s => ({
+          name: s.config.name,
+          status: s.status,
+          hasCapabilities: !!s.capabilities
+        }))
+      });
+
+      // Include both connected and connecting servers (important for profile activation)
+      // This ensures servers appear in the dropdown immediately when connecting
+      // BUG FIX: Previously only showed 'connected' servers, causing empty dropdown
+      // during profile activation when servers were still in 'connecting' state
+      const connectedServers = servers.filter(s =>
+        s.status === 'connected' || s.status === 'connecting'
+      );
+
+      // Find selected server - look in ALL servers first, then filter to connected
       const selectedServer = $state.selectedServerId
-        ? connectedServers.find(s => s.id === $state.selectedServerId) || null
+        ? servers.find(s => s.id === $state.selectedServerId &&
+                       (s.status === 'connected' || s.status === 'connecting')) || null
         : null;
 
-      // Get active profile context
-      const activeProfile = $profiles.activeProfile?.profile
+      // Get active profiles context (multi-profile support)
+      const firstActiveProfile = Array.from($profiles.activeProfiles.values())[0];
+      const activeProfile = firstActiveProfile?.profile
         ? {
-            id: $profiles.activeProfile.profile.id,
-            name: $profiles.activeProfile.profile.name,
-            icon: $profiles.activeProfile.profile.icon,
+            id: firstActiveProfile.profile.id,
+            name: firstActiveProfile.profile.name,
+            icon: firstActiveProfile.profile.icon,
           }
         : null;
 
-      // Check if selected server is from active profile
+      // Check if selected server is from ANY active profile
       const isFromActiveProfile = !!(
         selectedServer &&
-        activeProfile &&
-        $profiles.activeProfile?.servers?.some(ps => ps.server_id === selectedServer.id)
+        Array.from($profiles.activeProfiles.values()).some(
+          ap => ap.servers?.some((ps: any) => ps.server_id === selectedServer.id)
+        )
       );
 
       // Determine connection status
@@ -121,7 +153,7 @@ function createContextStore() {
     selectServer(serverId: string | null) {
       logger.debug('Selecting server:', serverId);
 
-      update(state => ({
+      internalStore.update(state => ({
         ...state,
         selectedServerId: serverId,
       }));
@@ -137,7 +169,7 @@ function createContextStore() {
      */
     clearSelection() {
       logger.debug('Clearing server selection');
-      update(state => ({
+      internalStore.update(state => ({
         ...state,
         selectedServerId: null,
       }));
@@ -158,7 +190,8 @@ function createContextStore() {
       // In filter mode, respect user's decision to view all servers (don't force selection)
       if (mode === 'filter') {
         // If current selection is valid, keep it (user explicitly chose to filter)
-        if (currentContext.selectedServer && currentContext.connectionStatus === 'connected') {
+        if (currentContext.selectedServer &&
+            (currentContext.connectionStatus === 'connected' || currentContext.connectionStatus === 'connecting')) {
           logger.debug('[Filter Mode] Keeping current selection:', currentContext.selectedServer.config.name);
           return;
         }
@@ -171,16 +204,18 @@ function createContextStore() {
 
       // Selector mode: Auto-select a server (required for operational tabs)
 
-      // If current selection is valid, keep it
-      if (currentContext.selectedServer && currentContext.connectionStatus === 'connected') {
+      // If current selection is valid, keep it (allow both connected and connecting)
+      if (currentContext.selectedServer &&
+          (currentContext.connectionStatus === 'connected' || currentContext.connectionStatus === 'connecting')) {
         logger.debug('[Selector Mode] Keeping current selection:', currentContext.selectedServer.config.name);
         return;
       }
 
-      // Try to select first server from active profile
+      // Try to select first server from active profiles
       if (currentContext.activeProfile) {
         const profileStore$ = get(profileStore);
-        const profileServers = profileStore$.activeProfile?.servers || [];
+        const firstActiveProfile = Array.from(profileStore$.activeProfiles.values())[0];
+        const profileServers = firstActiveProfile?.servers || [];
 
         if (profileServers.length > 0) {
           const firstProfileServerId = profileServers[0].server_id;
@@ -223,7 +258,7 @@ function createContextStore() {
      * Toggle remember selection preference
      */
     toggleRememberSelection() {
-      update(state => ({
+      internalStore.update(state => ({
         ...state,
         rememberSelection: !state.rememberSelection,
       }));
@@ -241,21 +276,39 @@ function createContextStore() {
 export const contextStore = createContextStore();
 
 // Export helper to check if server is capable for a specific operation
+// With proper event emission, capabilities will be populated reactively via CapabilitiesUpdated events
 export function serverHasCapability(server: ServerInfo | null, capability: string): boolean {
-  if (!server?.capabilities) return false;
+  if (!server) return false;
 
-  switch (capability) {
-    case 'tools':
-      return !!server.capabilities.tools;
-    case 'resources':
-      return !!server.capabilities.resources;
-    case 'prompts':
-      return !!server.capabilities.prompts;
-    case 'sampling':
-      return !!server.capabilities.sampling;
-    case 'elicitation':
-      return !!server.capabilities.elicitation;
-    default:
-      return false;
+  // If capabilities haven't been populated yet, we cannot determine capability
+  // The UI will reactively update when CapabilitiesUpdated event arrives from backend
+  if (!server.capabilities) {
+    logger.debug(`[serverHasCapability] Server ${server.config.name} (${server.status}) has no capabilities yet, excluding until CapabilitiesUpdated event`);
+    return false;
   }
+
+  // Capabilities ARE populated - make definitive check
+  const hasCapability = (() => {
+    switch (capability) {
+      case 'tools':
+        return !!server.capabilities.tools;
+      case 'resources':
+        return !!server.capabilities.resources;
+      case 'prompts':
+        return !!server.capabilities.prompts;
+      case 'sampling':
+        return !!server.capabilities.sampling;
+      case 'elicitation':
+        return !!server.capabilities.elicitation;
+      default:
+        return false;
+    }
+  })();
+
+  logger.debug(`[serverHasCapability] Server ${server.config.name}: ${capability} = ${hasCapability}`, {
+    status: server.status,
+    capabilities: server.capabilities
+  });
+
+  return hasCapability;
 }

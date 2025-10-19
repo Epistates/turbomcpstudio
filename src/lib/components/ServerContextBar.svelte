@@ -40,26 +40,43 @@
   // Derived label based on mode
   const label = $derived(mode === 'filter' ? '🔍 Filter:' : '🎯 Testing:');
 
-  // Reactive context
-  const context = $derived($contextStore) as ServerContext;
-  const servers = $derived(context.availableServers);
-  const selectedServer = $derived(context.selectedServer);
-  const activeProfile = $derived(context.activeProfile);
-  const isFromActiveProfile = $derived(context.isFromActiveProfile);
-
-  // Filter servers by required capability
-  const capableServers = $derived(
-    requiredCapability
-      ? servers.filter(s => serverHasCapability(s, requiredCapability))
-      : servers
-  );
-
   // Dropdown state
   let isDropdownOpen = $state(false);
   let searchQuery = $state('');
   let dropdownRef: HTMLDivElement | undefined = $state();
 
-  // Filtered servers for search
+  // Get the context and derive values from it
+  const context = $derived($contextStore) as ServerContext;
+  const selectedServer = $derived(context.selectedServer);
+  const activeProfile = $derived(context.activeProfile);
+  const isFromActiveProfile = $derived(context.isFromActiveProfile);
+  const lastUpdated = $derived(context.lastUpdated);
+  const availableServers = $derived(context.availableServers);
+
+  // Apply capability filter
+  const capableServers = $derived(
+    requiredCapability
+      ? availableServers.filter(s => serverHasCapability(s, requiredCapability))
+      : availableServers
+  );
+
+  // Debug logging for capability filtering
+  $effect(() => {
+    console.log('[ServerContextBar] Capability filtering:', {
+      requiredCapability,
+      availableServers: availableServers.length,
+      capableServers: capableServers.length,
+      availableServerDetails: availableServers.map(s => ({
+        name: s.config.name,
+        status: s.status,
+        hasCapabilities: !!s.capabilities,
+        capabilities: s.capabilities ? Object.keys(s.capabilities) : []
+      })),
+      capableServerNames: capableServers.map(s => s.config.name)
+    });
+  });
+
+  // Apply search filter
   const filteredServers = $derived(
     searchQuery.trim()
       ? capableServers.filter(s =>
@@ -70,21 +87,25 @@
 
   // Group servers by profile
   const serverGroups = $derived(() => {
-    if (!activeProfile) {
-      return [{ name: 'All Servers', servers: filteredServers, isProfile: false }];
+    // Get current filtered servers
+    const currentFilteredServers = filteredServers;
+    const currentActiveProfile = activeProfile;
+
+    if (!currentActiveProfile) {
+      return [{ name: 'All Servers', servers: currentFilteredServers, isProfile: false }];
     }
 
     const profileStore$ = $profileStore;
     const profileServerIds = new Set(profileStore$.activeProfile?.servers?.map(ps => ps.server_id) || []);
 
-    const profileServers = filteredServers.filter(s => profileServerIds.has(s.id));
-    const standaloneServers = filteredServers.filter(s => !profileServerIds.has(s.id));
+    const profileServers = currentFilteredServers.filter(s => profileServerIds.has(s.id));
+    const standaloneServers = currentFilteredServers.filter(s => !profileServerIds.has(s.id));
 
     const groups = [];
 
     if (profileServers.length > 0) {
       groups.push({
-        name: `${activeProfile.icon || '📁'} ${activeProfile.name}`,
+        name: `${currentActiveProfile.icon || '📁'} ${currentActiveProfile.name}`,
         servers: profileServers,
         isProfile: true,
       });
@@ -236,7 +257,7 @@
   {#if isDropdownOpen}
     <div class="server-dropdown">
       <!-- Search -->
-      {#if capableServers.length > 5}
+      {#if filteredServers.length > 5}
         <div class="dropdown-search">
           <Search size={14} />
           <input
@@ -270,7 +291,7 @@
               </div>
 
               {#each group.servers as server}
-                {@const isSelected = server.id === selectedServer?.id}
+                {@const isSelected = selectedServer && server.id === selectedServer.id}
                 <button
                   class="server-item"
                   class:selected={isSelected}
@@ -290,6 +311,8 @@
                   </div>
                   {#if isSelected}
                     <span class="selected-indicator">✓</span>
+                  {:else}
+                    <span class="unselected-indicator">○</span>
                   {/if}
                 </button>
               {/each}
@@ -634,6 +657,11 @@
   .selected-indicator {
     color: var(--mcp-primary);
     font-weight: var(--mcp-font-bold);
+  }
+
+  .unselected-indicator {
+    color: var(--mcp-text-tertiary);
+    font-weight: var(--mcp-font-normal);
   }
 
   /* Dropdown Footer */
