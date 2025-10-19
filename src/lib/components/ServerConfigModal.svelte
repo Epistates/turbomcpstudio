@@ -20,8 +20,11 @@
   import { serverStore } from '$lib/stores/serverStore';
 
   // Props
-  export let server: any;
-  export let onClose: () => void;
+  let { server, onClose, onServerAdded }: {
+    server: any;
+    onClose?: () => void;
+    onServerAdded?: () => void;
+  } = $props();
 
   // Available external clients
   const externalClients = [
@@ -32,26 +35,33 @@
     { id: 'cline', name: 'Cline', description: 'VS Code extension' },
   ];
 
-  // State
-  let currentStep = 1; // 1: Info, 2: Choose Action, 3: Configure + Execute
-  let parameterValues: Record<string, any> = {};
-  let secretValues: Record<string, string> = {};
-  let validationErrors: Record<string, string> = {};
+  // State (must use $state() in runes mode for reactivity!)
+  let currentStep = $state<1 | 2 | 3>(1); // 1: Info, 2: Choose Action, 3: Configure + Execute
+  let parameterValues = $state<Record<string, any>>({});
+  let secretValues = $state<Record<string, string>>({});
+  let validationErrors = $state<Record<string, string>>({});
 
-  // Step 2 state - action choice
-  let actionChoice: 'turbomcp' | 'export' | null = null;
+  // Step 2 state - action choice (default to turbomcp)
+  let actionChoice = $state<'turbomcp' | 'export' | null>('turbomcp');
 
   // Step 3 state - export clients
-  let selectedClients: Set<string> = new Set();
-  let generatedConfigs: Map<string, { config: any; json: string; notes: string[] }> = new Map();
+  let selectedClients = $state<Set<string>>(new Set());
+  let generatedConfigs = $state<Map<string, { config: any; json: string; notes: string[] }> >(new Map());
 
-  // Extract configuration schema - handle both ServerInfo and RegistryServer
-  $: config = server?.config || {};
-  $: parameters = config?.parameters || {};
-  $: secrets = config?.secrets || [];
+  // Extract configuration schema
+  const config = $derived(server?.config || {});
+  const parameters = $derived(config?.parameters || {});
+  const secrets = $derived(config?.secrets || {});
+
+  // Handle close
+  function handleClose() {
+    if (onClose) {
+      onClose();
+    }
+  }
 
   // Initialize default values
-  $: {
+  $effect(() => {
     if (server && parameters?.properties) {
       Object.entries(parameters.properties).forEach(([name, prop]: [string, any]) => {
         if (prop?.default !== undefined && !(name in parameterValues)) {
@@ -59,7 +69,7 @@
         }
       });
     }
-  }
+  });
 
   function handleParameterChange(name: string, value: any) {
     parameterValues[name] = value;
@@ -135,7 +145,7 @@
           server,
           userConfig,
           clientType: clientId,
-        });
+        }) as { config_json: string; notes?: string[] };
 
         generatedConfigs.set(clientId, {
           config: result,
@@ -211,7 +221,7 @@
         server,
         userConfig,
         clientType: 'turbomcp',
-      });
+      }) as { config_json: string; notes?: string[] };
 
       const config = JSON.parse(result.config_json);
 
@@ -222,6 +232,10 @@
       await serverStore.loadServers();
 
       uiStore.showSuccess(`${server.name} added to Server Manager successfully!`);
+
+      // Call the callback if provided (closes RegistryBrowser)
+      onServerAdded?.();
+
       onClose();
     } catch (error) {
       console.error('Failed to add server:', error);
@@ -237,10 +251,10 @@
 {#if server}
 <div
   class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-  onclick={onClose}
+  onclick={handleClose}
   role="dialog"
   aria-modal="true"
-  onkeydown={(e) => e.key === 'Escape' && onClose()}
+  onkeydown={(e) => e.key === 'Escape' && handleClose()}
 >
   <div
     class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
@@ -307,7 +321,7 @@
       </div>
 
       <button
-        onclick={onClose}
+        onclick={handleClose}
         class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
       >
         <X size={24} />
@@ -575,7 +589,7 @@
     <div class="border-t border-gray-200 dark:border-gray-700 p-6 flex items-center justify-between">
       <div>
         {#if currentStep > 1}
-          <Button variant="secondary" onclick={() => (currentStep -= 1)}>
+          <Button variant="secondary" onclick={() => { currentStep = currentStep - 1; }}>
             Back
           </Button>
         {/if}
@@ -592,7 +606,7 @@
               if (currentStep === 2) {
                 proceedToStep3();
               } else {
-                currentStep += 1;
+                currentStep = currentStep + 1;
               }
             }}
           >

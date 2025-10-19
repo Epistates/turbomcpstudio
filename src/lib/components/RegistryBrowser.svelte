@@ -17,6 +17,9 @@
   import ServerConfigModal from './ServerConfigModal.svelte';
   import { uiStore } from '$lib/stores/uiStore';
 
+  // Props
+  export let onServerAdded: (() => void) | undefined = undefined;
+
   // Types
   interface RegistryServer {
     name: string;
@@ -372,7 +375,14 @@
 
 <!-- Config Modal -->
 {#if showConfigModal && selectedServer}
-  <ServerConfigModal server={selectedServer} onClose={closeConfigModal} />
+  <ServerConfigModal
+    server={selectedServer}
+    onClose={closeConfigModal}
+    onServerAdded={() => {
+      closeConfigModal();
+      onServerAdded?.();
+    }}
+  />
 {:else if showConfigModal}
   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
     <div class="bg-white dark:bg-gray-800 p-6 rounded-lg">
