@@ -481,7 +481,7 @@ impl TransportLayer {
             init_result.server_info.version
         );
 
-        // Register capabilities and bidirectional handlers (DRY helper)
+        // Register capabilities and bidirectional handlers (emits CapabilitiesUpdated event)
         Initialization::register_capabilities_and_handlers(
             &client,
             &init_result,

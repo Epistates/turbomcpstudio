@@ -24,4 +24,11 @@ pub struct ManagedConnection {
 
     /// Transport-agnostic MCP client
     pub client: RwLock<Option<McpTransportClient>>,
+
+    /// Event sender for emitting connection events to frontend
+    /// Enables reactive UI updates for capability changes, status changes, etc.
+    pub event_sender: tokio::sync::mpsc::Sender<crate::mcp_client::events::ConnectionEvent>,
+
+    /// Server ID for event emission
+    pub server_id: uuid::Uuid,
 }

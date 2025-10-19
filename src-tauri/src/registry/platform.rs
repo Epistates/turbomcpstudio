@@ -15,12 +15,20 @@ use std::path::{Path, PathBuf};
 /// - **Unix**: Returns path as-is with forward slashes
 ///
 /// # Examples
-/// ```
+/// ```no_run
+/// use turbomcpstudio_lib::registry::platform::normalize_docker_path;
+///
 /// // Windows
-/// assert_eq!(normalize_docker_path(r"C:\Users\Alice\data"), "/c/Users/Alice/data");
+/// #[cfg(target_os = "windows")]
+/// {
+///     assert_eq!(normalize_docker_path(r"C:\Users\Alice\data"), "/c/Users/Alice/data");
+/// }
 ///
 /// // Unix (macOS, Linux)
-/// assert_eq!(normalize_docker_path("/Users/alice/data"), "/Users/alice/data");
+/// #[cfg(not(target_os = "windows"))]
+/// {
+///     assert_eq!(normalize_docker_path("/Users/alice/data"), "/Users/alice/data");
+/// }
 /// ```
 pub fn normalize_docker_path<P: AsRef<Path>>(path: P) -> String {
     let path = path.as_ref();
@@ -82,12 +90,20 @@ fn extract_drive_letter(path: &str) -> Option<char> {
 /// Converts host:container volume syntax to be cross-platform
 ///
 /// # Examples
-/// ```
+/// ```no_run
+/// use turbomcpstudio_lib::registry::platform::normalize_volume_mount;
+///
 /// // Windows
-/// normalize_volume_mount(r"C:\data:/app/data") -> "/c/data:/app/data"
+/// #[cfg(target_os = "windows")]
+/// {
+///     assert_eq!(normalize_volume_mount(r"C:\data:/app/data"), "/c/data:/app/data");
+/// }
 ///
 /// // Unix
-/// normalize_volume_mount("/Users/data:/app/data") -> "/Users/data:/app/data"
+/// #[cfg(not(target_os = "windows"))]
+/// {
+///     assert_eq!(normalize_volume_mount("/Users/data:/app/data"), "/Users/data:/app/data");
+/// }
 /// ```
 pub fn normalize_volume_mount(volume_spec: &str) -> String {
     // Split on : to separate host:container[:options]

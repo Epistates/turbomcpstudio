@@ -215,7 +215,7 @@ impl McpClientManager {
     pub async fn connect_server(&self, config: ServerConfig) -> McpResult<ServerInfo> {
         let server_id = config.id;
 
-        // Create managed connection with enterprise monitoring
+        // Create managed connection with enterprise monitoring and event emission
         let connection = Arc::new(ManagedConnection {
             config: config.clone(),
             status: RwLock::new(ConnectionStatus::Connecting),
@@ -227,6 +227,8 @@ impl McpClientManager {
             request_count: parking_lot::Mutex::new(0),
             error_count: parking_lot::Mutex::new(0),
             client: RwLock::new(None),
+            event_sender: self.event_sender.clone(),
+            server_id,
         });
 
         // Store connection
