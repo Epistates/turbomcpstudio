@@ -11,6 +11,7 @@
   import ProfileEditor from './ProfileEditor.svelte';
   import InstallClientModal from './InstallClientModal.svelte';
   import RegistryBrowser from './RegistryBrowser.svelte';
+  import ConfirmDialog from './ConfirmDialog.svelte';
   import {
     Plus,
     Play,
@@ -361,19 +362,42 @@
   }
 
   // ✅ FIXED: Delete with timeout, loading state, and proper cleanup
-  async function handleDeleteServer(serverId: string, serverName: string) {
+  // Track servers being confirmed for deletion to prevent race conditions
+  let confirmingDelete = $state<Set<string>>(new Set());
+  let deleteCallCounter = 0;
+  let globalConfirmInProgress = false; // NUCLEAR OPTION: Prevent ALL deletes while confirm is showing
+
+  // Delete confirmation dialog state
+  let deleteConfirmDialog = $state<{serverId: string; serverName: string} | null>(null);
+
+  function requestDeleteServer(serverId: string, serverName: string) {
     // Prevent concurrent deletes on same server
     if (deletingServers.has(serverId)) {
       logger.warn('⚠️ Delete already in progress for:', serverName);
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete server "${serverName}"? This action cannot be undone.`)) {
+    // Prevent showing multiple confirm dialogs for the same server
+    if (confirmingDelete.has(serverId)) {
+      logger.warn('⚠️ Confirmation dialog already open for:', serverName);
       return;
     }
 
+    // Show confirmation dialog
+    deleteConfirmDialog = { serverId, serverName };
+  }
+
+  async function executeDeleteServer(serverId: string, serverName: string) {
+    // Close dialog
+    deleteConfirmDialog = null;
+
+    const callId = ++deleteCallCounter;
+    console.log(`🗑️ DELETE [${callId}]: executeDeleteServer called for:`, serverName, 'ID:', serverId);
+    logger.debug('🗑️ executeDeleteServer called for:', serverName);
+
     // Add to deleting set
     deletingServers = new Set(deletingServers).add(serverId);
+    console.log(`🗑️ DELETE [${callId}]: deletingServers updated:`, Array.from(deletingServers));
 
     try {
       logger.debug('🗑️ Deleting server:', serverId, serverName);
@@ -1094,7 +1118,7 @@
                   <button
                     onclick={(e) => {
                       e.stopPropagation();
-                      handleDeleteServer(server.id, server.config.name);
+                      requestDeleteServer(server.id, server.config.name);
                     }}
                     disabled={deletingServers.has(server.id)}
                     class="text-sm py-2 px-3 bg-white dark:bg-gray-700 text-red-600 dark:text-red-400 border border-gray-300 dark:border-gray-600 rounded hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1385,7 +1409,7 @@
                   <button
                     onclick={(e) => {
                       e.stopPropagation();
-                      handleDeleteServer(server.id, server.config.name);
+                      requestDeleteServer(server.id, server.config.name);
                     }}
                     disabled={deletingServers.has(server.id)}
                     class="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1454,8 +1478,21 @@
 
       <!-- Registry Browser Content -->
       <div class="flex-1 overflow-hidden">
-        <RegistryBrowser />
+        <RegistryBrowser onServerAdded={() => (showRegistryBrowser = false)} />
       </div>
     </div>
   </div>
+{/if}
+
+<!-- Delete Confirmation Dialog -->
+{#if deleteConfirmDialog}
+  <ConfirmDialog
+    title="Delete Server"
+    message={`Are you sure you want to delete server "${deleteConfirmDialog.serverName}"? This action cannot be undone.`}
+    confirmText="Delete"
+    cancelText="Cancel"
+    variant="danger"
+    onConfirm={() => executeDeleteServer(deleteConfirmDialog.serverId, deleteConfirmDialog.serverName)}
+    onCancel={() => { deleteConfirmDialog = null; }}
+  />
 {/if}
