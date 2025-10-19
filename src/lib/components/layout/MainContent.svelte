@@ -16,7 +16,7 @@
   import CollectionsManager from '../CollectionsManager.svelte';
   import Settings from '../Settings.svelte';
   import AddServerModal from '../AddServerModal.svelte';
-  import ServerConfigModal from '../ServerConfigModal.svelte';
+  import EditServerModal from '../EditServerModal.svelte';
   import ModeIndicator from '../ModeIndicator.svelte';
   import ServerContextBar from '../ServerContextBar.svelte';
 
@@ -154,7 +154,7 @@
 {/if}
 
 {#if modals.serverConfig.open}
-  <ServerConfigModal />
+  <EditServerModal />
 {/if}
 
 <style>

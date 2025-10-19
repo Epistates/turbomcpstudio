@@ -4,7 +4,7 @@
   import { profileStore } from '$lib/stores/profileStore';
   import ServerOverview from './ServerOverview.svelte';
   import AddServerModal from './AddServerModal.svelte';
-  import ServerConfigModal from './ServerConfigModal.svelte';
+  import EditServerModal from './EditServerModal.svelte';
   import {
     Plus,
     Activity,
@@ -597,7 +597,7 @@
 {/if}
 
 {#if modals.serverConfig.open}
-  <ServerConfigModal />
+  <EditServerModal />
 {/if}
 
 <style>
