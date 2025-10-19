@@ -417,21 +417,55 @@ impl Database {
         .await?;
         tracing::info!("profile_activations table created successfully");
 
-        // Active profile state table (singleton with id = 1)
-        tracing::info!("Creating active_profile_state table");
+        // Active profile state table (supports multiple active profiles)
+        tracing::info!("Creating/migrating active_profile_state table");
+
+        // First, check if we need to migrate from old singleton schema
+        let needs_migration = sqlx::query_scalar::<_, i32>(
+            r#"
+            SELECT COUNT(*) FROM sqlite_master
+            WHERE type='table' AND name='active_profile_state'
+            "#
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        if needs_migration > 0 {
+            // Check if table has old schema (with id column)
+            let has_old_schema = sqlx::query_scalar::<_, i32>(
+                r#"
+                SELECT COUNT(*) FROM pragma_table_info('active_profile_state')
+                WHERE name = 'id'
+                "#
+            )
+            .fetch_one(&self.pool)
+            .await?;
+
+            if has_old_schema > 0 {
+                tracing::info!("Migrating active_profile_state from singleton to multi-profile schema");
+
+                // Drop old table (we clear on startup anyway, no data loss)
+                sqlx::query("DROP TABLE IF EXISTS active_profile_state")
+                    .execute(&self.pool)
+                    .await?;
+
+                tracing::info!("Old active_profile_state table dropped");
+            }
+        }
+
+        // Create new multi-profile schema
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS active_profile_state (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                profile_id TEXT,
+                profile_id TEXT PRIMARY KEY,
                 activated_at TEXT NOT NULL,
-                FOREIGN KEY(profile_id) REFERENCES server_profiles(id) ON DELETE SET NULL
+                FOREIGN KEY(profile_id) REFERENCES server_profiles(id) ON DELETE CASCADE
             )
             "#,
         )
         .execute(&self.pool)
         .await?;
-        tracing::info!("active_profile_state table created successfully");
+        tracing::info!("active_profile_state table created successfully (multi-profile)");
 
         // Create indexes for performance
         tracing::info!("Creating database indexes");
@@ -992,15 +1026,15 @@ impl Database {
     pub async fn clear_active_profile_on_startup(&self) -> McpResult<()> {
         tracing::info!("Clearing active profile state for fresh startup");
 
-        // ✅ FIXED: Handle case where table doesn't exist yet (fresh installation)
-        // Use a safer query that won't fail if table is missing
-        let result = sqlx::query("DELETE FROM active_profile_state WHERE id = 1")
+        // Clear all active profiles (supports multiple active profiles)
+        let result = sqlx::query("DELETE FROM active_profile_state")
             .execute(&self.pool)
             .await;
 
         match result {
-            Ok(_) => {
-                tracing::info!("✅ Active profile state cleared successfully");
+            Ok(result) => {
+                let rows_deleted = result.rows_affected();
+                tracing::info!("✅ Active profile state cleared successfully ({} profiles deactivated)", rows_deleted);
                 Ok(())
             }
             Err(e) => {
