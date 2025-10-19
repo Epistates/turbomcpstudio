@@ -106,23 +106,42 @@ fn extract_drive_letter(path: &str) -> Option<char> {
 /// }
 /// ```
 pub fn normalize_volume_mount(volume_spec: &str) -> String {
-    // Split on : to separate host:container[:options]
-    let parts: Vec<&str> = volume_spec.splitn(3, ':').collect();
+    // Find the colon that separates host:container
+    // On Windows, skip the drive letter colon (e.g., C:)
+    let start_search = if cfg!(target_os = "windows")
+        && volume_spec.len() >= 2
+        && volume_spec.chars().nth(1) == Some(':')
+        && volume_spec.chars().next().map(|c| c.is_ascii_alphabetic()).unwrap_or(false)
+    {
+        2 // Skip "C:"
+    } else {
+        0
+    };
 
-    if parts.is_empty() {
-        return volume_spec.to_string();
+    // Find the first colon after start_search (the host:container separator)
+    let colon_pos = volume_spec[start_search..].find(':').map(|p| p + start_search);
+
+    let (host_path, container_and_options) = if let Some(pos) = colon_pos {
+        (&volume_spec[..pos], &volume_spec[pos + 1..])
+    } else {
+        // No colon found, entire string is the path
+        (volume_spec, "")
+    };
+
+    // Normalize the host path
+    let normalized_host = normalize_docker_path(host_path);
+
+    // If there's no container path, just return the normalized host path
+    if container_and_options.is_empty() {
+        return normalized_host;
     }
 
-    // Normalize host path (first part)
-    let host_path = normalize_docker_path(parts[0]);
-
-    // Reconstruct with normalized host path
-    if parts.len() == 1 {
-        host_path
-    } else if parts.len() == 2 {
-        format!("{}:{}", host_path, parts[1])
+    // Check if there's an options part (container:options)
+    if let Some(opt_pos) = container_and_options.find(':') {
+        let (container, options) = container_and_options.split_at(opt_pos);
+        format!("{}:{}{}", normalized_host, container, options)
     } else {
-        format!("{}:{}:{}", host_path, parts[1], parts[2])
+        format!("{}:{}", normalized_host, container_and_options)
     }
 }
 
