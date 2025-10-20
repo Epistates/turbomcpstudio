@@ -35,7 +35,7 @@
   const selectedServerId = $derived(serverState.selectedServerId);
   const modals = $derived(uiState.modals);
   const error = $derived(uiState.error);
-  const activeProfile = $derived(profileState.activeProfile);
+  const activeProfile = $derived(Array.from(profileState.activeProfiles.values())[0]);
 
   // Profile-aware filtering
   const shouldShowProfileView = $derived(activeProfile?.profile != null);
@@ -218,7 +218,7 @@
                 </div>
               </div>
               <button
-                onclick={async () => await profileStore.deactivateProfile()}
+                onclick={async () => activeProfile?.profile?.id && await profileStore.deactivateProfile(activeProfile.profile.id)}
                 class="btn-secondary flex items-center gap-2"
               >
                 <Square size={16} />

@@ -15,7 +15,7 @@
       : []
   );
 
-  const activeProfile = $derived(profileState.activeProfile);
+  const activeProfile = $derived(Array.from(profileState.activeProfiles.values())[0]);
 
   // Server status counts
   const connectedCount = $derived(servers.filter((s) => s.status === 'connected').length);

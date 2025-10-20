@@ -41,7 +41,7 @@
   const serverState = $derived($serverStore);
   const uiState = $derived($uiStore);
 
-  const activeProfile = $derived(profileState.activeProfile);
+  const activeProfile = $derived(Array.from(profileState.activeProfiles.values())[0]);
   const profiles = $derived(profileState.profiles);
   const loading = $derived(profileState.loading);
   // ✅ FIXED: Convert Map to array for UI compatibility
@@ -124,21 +124,14 @@
   // Compute server-to-profile mapping
   // TODO: This needs backend support to load full profile with server details
   const serverProfileMap = $derived(() => {
-    const map = new Map<string, string | null>();
-
-    // Initialize all servers as unassigned
-    servers.forEach(server => {
-      map.set(server.id, null);
+    // Build map using Array.map to avoid .set() calls inside $derived
+    const entries: [string, string | null][] = servers.map(server => {
+      // Check if server is in active profile
+      const isInActiveProfile = activeProfile?.servers?.some((ps: any) => ps.server_id === server.id);
+      return [server.id, isInActiveProfile ? (activeProfile?.profile?.id || null) : null];
     });
 
-    // If we have active profile, map its servers
-    if (activeProfile?.servers) {
-      activeProfile.servers.forEach(ps => {
-        map.set(ps.server_id, activeProfile.profile?.id || null);
-      });
-    }
-
-    return map;
+    return new Map(entries);
   });
 
   // Get ALL profiles for a server (for multi-profile display)
@@ -1508,7 +1501,7 @@
     confirmText="Delete"
     cancelText="Cancel"
     variant="danger"
-    onConfirm={() => executeDeleteServer(deleteConfirmDialog.serverId, deleteConfirmDialog.serverName)}
+    onConfirm={() => deleteConfirmDialog && executeDeleteServer(deleteConfirmDialog.serverId, deleteConfirmDialog.serverName)}
     onCancel={() => { deleteConfirmDialog = null; }}
   />
 {/if}

@@ -96,7 +96,8 @@
     }
 
     const profileStore$ = $profileStore;
-    const profileServerIds = new Set(profileStore$.activeProfile?.servers?.map(ps => ps.server_id) || []);
+    const firstActiveProfile = Array.from(profileStore$.activeProfiles.values())[0];
+    const profileServerIds = new Set(firstActiveProfile?.servers?.map((ps: any) => ps.server_id) || []);
 
     const profileServers = currentFilteredServers.filter(s => profileServerIds.has(s.id));
     const standaloneServers = currentFilteredServers.filter(s => !profileServerIds.has(s.id));

@@ -21,7 +21,7 @@
 
   // Reactive store access
   const profiles = $derived($profileStore.profiles);
-  const activeProfile = $derived($profileStore.activeProfile);
+  const activeProfile = $derived(Array.from($profileStore.activeProfiles.values())[0]);
   // ✅ FIXED: Convert Map to array for UI compatibility
   const serverState = $derived($serverStore);
   const servers = $derived(
@@ -35,7 +35,7 @@
     if (!activeProfile?.profile) return null;
 
     const profileServers = activeProfile.servers || [];
-    const connectedCount = profileServers.filter(ps => {
+    const connectedCount = profileServers.filter((ps: any) => {
       const server = servers.find(s => s.id === ps.server_id);
       return server?.status === 'connected';
     }).length;
@@ -81,7 +81,9 @@
   }
 
   async function handleDeactivateProfile() {
-    await profileStore.deactivateProfile();
+    if (activeProfile?.profile?.id) {
+      await profileStore.deactivateProfile(activeProfile.profile.id);
+    }
   }
 
   function handleNewProfile() {

@@ -146,7 +146,7 @@
     }
 
     // Activate profile if inactive
-    if (!profileState.activeProfile && profileState.profiles.length > 0) {
+    if (!Array.from(profileState.activeProfiles.values())[0] && profileState.profiles.length > 0) {
       actions.push({
         icon: Zap,
         label: 'Activate Profile',
@@ -197,9 +197,9 @@
   <div class="welcome-header">
     <div class="welcome-content">
       <h1 class="welcome-title">
-        {#if profileState.activeProfile?.profile}
+        {#if Array.from(profileState.activeProfiles.values())[0]?.profile}
           <Zap size={28} class="text-blue-600" />
-          {profileState.activeProfile.profile.name || 'Active Profile'}
+          {Array.from(profileState.activeProfiles.values())[0]?.profile?.name || 'Active Profile'}
         {:else}
           Welcome back!
         {/if}

@@ -42,7 +42,7 @@
   );
   const selectedServerId = $derived(serverState.selectedServerId);
   const currentView = $derived(uiState.currentView);
-  const activeProfile = $derived(profileState.activeProfile);
+  const activeProfile = $derived(Array.from(profileState.activeProfiles.values())[0]);
 
   let expandedSections = $state(new Set(['navigation', 'servers']));
 
@@ -183,7 +183,7 @@
   const displayServers = $derived(() => {
     if (shouldShowProfileView && activeProfile) {
       // Show only active profile servers
-      const profileServerIds = new Set(activeProfile.servers.map(ps => ps.server_id));
+      const profileServerIds = new Set(activeProfile.servers.map((ps: any) => ps.server_id));
       return servers.filter(s => profileServerIds.has(s.id));
     } else {
       // Show all servers
@@ -402,7 +402,7 @@
             <div class="mcp-sidebar__profile-actions">
               <button
                 class="mcp-sidebar__profile-action"
-                onclick={async () => await profileStore.deactivateProfile()}
+                onclick={async () => activeProfile?.profile?.id && await profileStore.deactivateProfile(activeProfile.profile.id)}
                 title="Deactivate profile"
               >
                 <Square size={14} />

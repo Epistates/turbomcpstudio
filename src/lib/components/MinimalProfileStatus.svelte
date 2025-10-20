@@ -16,7 +16,7 @@
   import { Zap, Server, ChevronRight } from 'lucide-svelte';
 
   // Reactive profile state
-  const activeProfile = $derived($profileStore.activeProfile);
+  const activeProfile = $derived(Array.from($profileStore.activeProfiles.values())[0]);
   const servers = $derived(
     $serverStore.servers instanceof Map
       ? Array.from($serverStore.servers.values())
