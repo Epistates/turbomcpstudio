@@ -370,23 +370,26 @@ pub async fn update_server_config(
     let server_id =
         Uuid::parse_str(&request.id).map_err(|e| format!("Invalid server ID: {}", e))?;
 
-    // Try to get database
-    let database = app_handle
-        .try_state::<Database>()
-        .ok_or_else(|| "Database not yet initialized. Please try again in a moment.".to_string())?;
-
-    // Get the existing config to preserve created_at timestamp
-    let existing_config = database
-        .load_server_config(server_id)
-        .await
-        .map_err(|e| format!("Failed to find existing server config: {}", e))?
-        .ok_or_else(|| "Server configuration not found".to_string())?;
-
-    // Check if the server is currently connected and if connection details changed
+    // Get AppState
     let app_state = app_handle.try_state::<AppState>().ok_or_else(|| {
         "Application state not yet initialized. Please try again in a moment.".to_string()
     })?;
 
+    // Get the existing config to preserve created_at timestamp
+    let existing_config = {
+        let db_lock = app_state.database.read().await;
+        let database = db_lock.as_ref().ok_or_else(|| {
+            "Database not yet initialized. Please try again in a moment.".to_string()
+        })?;
+
+        database
+            .load_server_config(server_id)
+            .await
+            .map_err(|e| format!("Failed to find existing server config: {}", e))?
+            .ok_or_else(|| "Server configuration not found".to_string())?
+    };
+
+    // Check if the server is currently connected and if connection details changed
     let is_connected = match app_state.mcp_manager.get_server_info(server_id).await {
         Ok(server_info) => matches!(
             server_info.status,
@@ -414,10 +417,17 @@ pub async fn update_server_config(
     };
 
     // Save the updated configuration
-    database
-        .save_server_config(&updated_config)
-        .await
-        .map_err(|e| format!("Failed to save updated server config: {}", e))?;
+    {
+        let db_lock = app_state.database.read().await;
+        let database = db_lock.as_ref().ok_or_else(|| {
+            "Database not yet initialized. Please try again in a moment.".to_string()
+        })?;
+
+        database
+            .save_server_config(&updated_config)
+            .await
+            .map_err(|e| format!("Failed to save updated server config: {}", e))?;
+    }
 
     Ok(updated_config)
 }

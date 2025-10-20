@@ -87,8 +87,13 @@
 
       // Save to backend
       await invoke('update_server_config', {
-        serverId: server.id,
-        config: updatedConfig
+        request: {
+          id: server.id,
+          name: updatedConfig.name,
+          description: updatedConfig.description,
+          transport: updatedConfig.transport_config,
+          environment_variables: updatedConfig.environment_variables
+        }
       });
 
       // Reload servers
