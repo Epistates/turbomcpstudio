@@ -367,7 +367,7 @@
             appName,
             servers: installPayload,
           });
-          installResults[appName] = { ...result, status: 'success' };
+          installResults[appName] = { ...(result as object), status: 'success' };
           logger.info(`Successfully installed to ${appName}:`, result);
         } catch (error) {
           installResults[appName] = {
@@ -682,7 +682,7 @@
           </div>
         {/if}
 
-        {#if step === 3}
+        {#if step === 3 as number}
           <!-- Step 3: Installation Results -->
           <div class="space-y-4">
             <h3 class="font-medium text-gray-900 dark:text-white mb-4">Installation Results</h3>
@@ -735,13 +735,13 @@
       <!-- Footer -->
       <div class="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 relative">
         <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-          {#if step !== 3}
+          {#if (step as number) !== 3}
             <span>Step {step} of 2</span>
           {/if}
         </div>
 
         <div class="flex gap-3 relative z-10">
-          {#if step !== 3}
+          {#if (step as number) !== 3}
             <button
               onclick={() => {
                 if (step === 1) {

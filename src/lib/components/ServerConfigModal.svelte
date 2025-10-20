@@ -234,9 +234,13 @@
       uiStore.showSuccess(`${server.name} added to Server Manager successfully!`);
 
       // Call the callback if provided (closes RegistryBrowser)
-      onServerAdded?.();
+      if (onServerAdded) {
+        onServerAdded();
+      }
 
-      onClose();
+      if (onClose) {
+        onClose();
+      }
     } catch (error) {
       console.error('Failed to add server:', error);
       uiStore.showError(`Failed to add server: ${error}`);

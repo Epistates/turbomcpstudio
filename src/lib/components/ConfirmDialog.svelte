@@ -85,7 +85,7 @@
         {cancelText}
       </Button>
       <Button
-        variant={variant === 'danger' ? 'destructive' : 'primary'}
+        variant={(variant === 'danger' ? 'destructive' : 'primary') as any}
         onclick={handleConfirm}
       >
         {confirmText}
