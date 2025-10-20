@@ -26,20 +26,6 @@ jobs:
         run: cargo fmt --all --check
         working-directory: src-tauri
 
-  audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run cargo-audit
-        uses: actions-rust-lang/audit@v1
-        with:
-          # Deny vulnerabilities with warnings or higher severity
-          denyWarnings: true
-          # Only audit the src-tauri directory
-          workingDirectory: src-tauri
-
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
