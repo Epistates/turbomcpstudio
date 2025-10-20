@@ -271,11 +271,12 @@ impl From<&RegistryServer> for ServerDisplayInfo {
             category: meta
                 .and_then(|m| m.category.clone())
                 .unwrap_or_else(|| "other".to_string()),
-            tags: meta
-                .and_then(|m| m.tags.clone())
-                .unwrap_or_default(),
+            tags: meta.and_then(|m| m.tags.clone()).unwrap_or_default(),
             server_type: server.server_type.clone(),
-            is_docker_built: server.image.as_ref().is_some_and(|img| img.starts_with("mcp/")),
+            is_docker_built: server
+                .image
+                .as_ref()
+                .is_some_and(|img| img.starts_with("mcp/")),
             is_remote: server.server_type == ServerType::Remote,
             has_oauth: server.oauth.as_ref().is_some_and(|o| !o.is_empty()),
             github_url: source.and_then(|s| s.project.clone()),

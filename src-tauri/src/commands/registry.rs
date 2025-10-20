@@ -1,8 +1,8 @@
 //! Registry-related Tauri commands
 
 use crate::registry::*;
-use crate::AppState;
 use crate::types::{ServerConfig, TransportConfig};
+use crate::AppState;
 use std::collections::HashMap;
 use tauri::State;
 use uuid::Uuid;

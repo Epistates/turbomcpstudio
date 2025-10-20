@@ -41,8 +41,7 @@ pub fn normalize_docker_path<P: AsRef<Path>>(path: P) -> String {
     #[cfg(not(target_os = "windows"))]
     {
         // On Unix systems, just convert to string with forward slashes
-        path.to_string_lossy()
-            .replace('\\', "/")
+        path.to_string_lossy().replace('\\', "/")
     }
 }
 
@@ -111,7 +110,11 @@ pub fn normalize_volume_mount(volume_spec: &str) -> String {
     let start_search = if cfg!(target_os = "windows")
         && volume_spec.len() >= 2
         && volume_spec.chars().nth(1) == Some(':')
-        && volume_spec.chars().next().map(|c| c.is_ascii_alphabetic()).unwrap_or(false)
+        && volume_spec
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_alphabetic())
+            .unwrap_or(false)
     {
         2 // Skip "C:"
     } else {
@@ -119,7 +122,9 @@ pub fn normalize_volume_mount(volume_spec: &str) -> String {
     };
 
     // Find the first colon after start_search (the host:container separator)
-    let colon_pos = volume_spec[start_search..].find(':').map(|p| p + start_search);
+    let colon_pos = volume_spec[start_search..]
+        .find(':')
+        .map(|p| p + start_search);
 
     let (host_path, container_and_options) = if let Some(pos) = colon_pos {
         (&volume_spec[..pos], &volume_spec[pos + 1..])
@@ -194,10 +199,7 @@ mod tests {
             normalize_docker_path(r"C:\Users\Alice\data"),
             "/c/Users/Alice/data"
         );
-        assert_eq!(
-            normalize_docker_path(r"D:\Projects"),
-            "/d/Projects"
-        );
+        assert_eq!(normalize_docker_path(r"D:\Projects"), "/d/Projects");
     }
 
     #[test]
@@ -238,10 +240,7 @@ mod tests {
 
         #[cfg(not(target_os = "windows"))]
         {
-            assert_eq!(
-                normalize_volume_mount("/data:/app/data"),
-                "/data:/app/data"
-            );
+            assert_eq!(normalize_volume_mount("/data:/app/data"), "/data:/app/data");
             assert_eq!(
                 normalize_volume_mount("/data:/app/data:ro"),
                 "/data:/app/data:ro"

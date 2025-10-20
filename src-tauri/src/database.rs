@@ -425,7 +425,7 @@ impl Database {
             r#"
             SELECT COUNT(*) FROM sqlite_master
             WHERE type='table' AND name='active_profile_state'
-            "#
+            "#,
         )
         .fetch_one(&self.pool)
         .await?;
@@ -436,13 +436,15 @@ impl Database {
                 r#"
                 SELECT COUNT(*) FROM pragma_table_info('active_profile_state')
                 WHERE name = 'id'
-                "#
+                "#,
             )
             .fetch_one(&self.pool)
             .await?;
 
             if has_old_schema > 0 {
-                tracing::info!("Migrating active_profile_state from singleton to multi-profile schema");
+                tracing::info!(
+                    "Migrating active_profile_state from singleton to multi-profile schema"
+                );
 
                 // Drop old table (we clear on startup anyway, no data loss)
                 sqlx::query("DROP TABLE IF EXISTS active_profile_state")
@@ -1034,7 +1036,10 @@ impl Database {
         match result {
             Ok(result) => {
                 let rows_deleted = result.rows_affected();
-                tracing::info!("✅ Active profile state cleared successfully ({} profiles deactivated)", rows_deleted);
+                tracing::info!(
+                    "✅ Active profile state cleared successfully ({} profiles deactivated)",
+                    rows_deleted
+                );
                 Ok(())
             }
             Err(e) => {

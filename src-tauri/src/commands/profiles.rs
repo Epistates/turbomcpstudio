@@ -400,7 +400,7 @@ pub async fn activate_profile(
 
     // 1. Check if profile is already active (idempotent)
     let already_active = sqlx::query_scalar::<_, i32>(
-        "SELECT COUNT(*) FROM active_profile_state WHERE profile_id = ?"
+        "SELECT COUNT(*) FROM active_profile_state WHERE profile_id = ?",
     )
     .bind(&profile_id)
     .fetch_one(database.pool())
@@ -408,16 +408,18 @@ pub async fn activate_profile(
     .map_err(|e| format!("Failed to check active status: {}", e))?;
 
     if already_active > 0 {
-        tracing::info!("Profile {} is already active, skipping activation", profile_id);
+        tracing::info!(
+            "Profile {} is already active, skipping activation",
+            profile_id
+        );
 
         // Return a ProfileActivation with 0 connections (already active)
-        let profile_name = sqlx::query_scalar::<_, String>(
-            "SELECT name FROM server_profiles WHERE id = ?"
-        )
-        .bind(&profile_id)
-        .fetch_one(database.pool())
-        .await
-        .map_err(|e| format!("Profile not found: {}", e))?;
+        let profile_name =
+            sqlx::query_scalar::<_, String>("SELECT name FROM server_profiles WHERE id = ?")
+                .bind(&profile_id)
+                .fetch_one(database.pool())
+                .await
+                .map_err(|e| format!("Profile not found: {}", e))?;
 
         return Ok(ProfileActivation {
             id: Uuid::new_v4().to_string(),
@@ -668,7 +670,7 @@ pub async fn deactivate_profile(
 
     // 1. Check if profile is active (idempotent)
     let is_active = sqlx::query_scalar::<_, i32>(
-        "SELECT COUNT(*) FROM active_profile_state WHERE profile_id = ?"
+        "SELECT COUNT(*) FROM active_profile_state WHERE profile_id = ?",
     )
     .bind(&profile_id)
     .fetch_one(database.pool())
@@ -676,7 +678,10 @@ pub async fn deactivate_profile(
     .map_err(|e| format!("Failed to check active status: {}", e))?;
 
     if is_active == 0 {
-        tracing::info!("Profile {} is not active, skipping deactivation", profile_id);
+        tracing::info!(
+            "Profile {} is not active, skipping deactivation",
+            profile_id
+        );
         return Ok(());
     }
 
@@ -688,7 +693,11 @@ pub async fn deactivate_profile(
             .await
             .map_err(|e| format!("Failed to get profile servers: {}", e))?;
 
-    tracing::info!("Profile {} has {} servers", profile_id, this_profile_servers.len());
+    tracing::info!(
+        "Profile {} has {} servers",
+        profile_id,
+        this_profile_servers.len()
+    );
 
     // 3. Get all OTHER active profiles
     let other_active_profiles: Vec<String> =
@@ -698,7 +707,10 @@ pub async fn deactivate_profile(
             .await
             .map_err(|e| format!("Failed to get other active profiles: {}", e))?;
 
-    tracing::info!("Found {} other active profiles", other_active_profiles.len());
+    tracing::info!(
+        "Found {} other active profiles",
+        other_active_profiles.len()
+    );
 
     // 4. Get union of servers in all OTHER active profiles
     let mut servers_in_other_profiles = std::collections::HashSet::new();
@@ -709,14 +721,22 @@ pub async fn deactivate_profile(
                 .bind(&other_profile_id)
                 .fetch_all(database.pool())
                 .await
-                .map_err(|e| format!("Failed to get servers for profile {}: {}", other_profile_id, e))?;
+                .map_err(|e| {
+                    format!(
+                        "Failed to get servers for profile {}: {}",
+                        other_profile_id, e
+                    )
+                })?;
 
         for server_id in servers {
             servers_in_other_profiles.insert(server_id);
         }
     }
 
-    tracing::info!("Other active profiles contain {} unique servers", servers_in_other_profiles.len());
+    tracing::info!(
+        "Other active profiles contain {} unique servers",
+        servers_in_other_profiles.len()
+    );
 
     // 5. Calculate servers to disconnect (this profile's servers NOT in other profiles)
     let servers_to_disconnect: Vec<String> = this_profile_servers
@@ -724,7 +744,10 @@ pub async fn deactivate_profile(
         .filter(|server_id| !servers_in_other_profiles.contains(server_id))
         .collect();
 
-    tracing::info!("Will disconnect {} servers (not in other active profiles)", servers_to_disconnect.len());
+    tracing::info!(
+        "Will disconnect {} servers (not in other active profiles)",
+        servers_to_disconnect.len()
+    );
 
     drop(db_lock);
 
@@ -772,7 +795,11 @@ pub async fn deactivate_profile(
         .await
         .map_err(|e| format!("Failed to clear active profile: {}", e))?;
 
-    tracing::info!("✅ Profile {} deactivated ({} servers disconnected)", profile_id, servers_to_disconnect.len());
+    tracing::info!(
+        "✅ Profile {} deactivated ({} servers disconnected)",
+        profile_id,
+        servers_to_disconnect.len()
+    );
     Ok(())
 }
 
@@ -857,7 +884,6 @@ async fn load_active_profile_state(
     database: &crate::database::Database,
     profile_id: &str,
 ) -> Result<ActiveProfileState, String> {
-
     // Get profile details
     let profile_row = sqlx::query(
         "SELECT id, name, description, icon, color, auto_activate, created_at, updated_at FROM server_profiles WHERE id = ?"

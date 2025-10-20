@@ -99,12 +99,17 @@ impl Initialization {
 
         // Emit CapabilitiesUpdated event to frontend for reactive UI updates
         let server_id = connection.server_id;
-        match connection.event_sender.try_send(ConnectionEvent::CapabilitiesUpdated {
-            server_id,
-            capabilities: server_capabilities,
-        }) {
+        match connection
+            .event_sender
+            .try_send(ConnectionEvent::CapabilitiesUpdated {
+                server_id,
+                capabilities: server_capabilities,
+            }) {
             Ok(_) => {
-                tracing::info!("✅ Emitted CapabilitiesUpdated event for server {}", server_id);
+                tracing::info!(
+                    "✅ Emitted CapabilitiesUpdated event for server {}",
+                    server_id
+                );
             }
             Err(TrySendError::Full(_)) => {
                 tracing::warn!("Event channel full, dropping CapabilitiesUpdated event");

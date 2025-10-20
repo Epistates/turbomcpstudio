@@ -41,7 +41,8 @@ impl ClientApp {
 
     /// Get the config file path for this application on the current OS
     pub fn config_path(&self) -> Result<PathBuf, String> {
-        let home = dirs::home_dir().ok_or_else(|| "Could not determine home directory".to_string())?;
+        let home =
+            dirs::home_dir().ok_or_else(|| "Could not determine home directory".to_string())?;
 
         let path = match self {
             // Claude Desktop
@@ -52,7 +53,8 @@ impl ClientApp {
                 }
                 #[cfg(target_os = "windows")]
                 {
-                    let appdata = std::env::var("APPDATA").map_err(|_| "APPDATA not set".to_string())?;
+                    let appdata =
+                        std::env::var("APPDATA").map_err(|_| "APPDATA not set".to_string())?;
                     PathBuf::from(&appdata).join("Claude\\claude_desktop_config.json")
                 }
                 #[cfg(target_os = "linux")]
@@ -69,7 +71,11 @@ impl ClientApp {
                 }
                 #[cfg(target_os = "windows")]
                 {
-                    PathBuf::from(std::env::var("USERPROFILE").map_err(|_| "USERPROFILE not set".to_string())?).join(".claude.json")
+                    PathBuf::from(
+                        std::env::var("USERPROFILE")
+                            .map_err(|_| "USERPROFILE not set".to_string())?,
+                    )
+                    .join(".claude.json")
                 }
             }
 
@@ -81,7 +87,8 @@ impl ClientApp {
                 }
                 #[cfg(target_os = "windows")]
                 {
-                    let userprofile = std::env::var("USERPROFILE").map_err(|_| "USERPROFILE not set".to_string())?;
+                    let userprofile = std::env::var("USERPROFILE")
+                        .map_err(|_| "USERPROFILE not set".to_string())?;
                     PathBuf::from(&userprofile).join(".lmstudio/mcp.json")
                 }
             }
@@ -94,7 +101,8 @@ impl ClientApp {
                 }
                 #[cfg(target_os = "windows")]
                 {
-                    let userprofile = std::env::var("USERPROFILE").map_err(|_| "USERPROFILE not set".to_string())?;
+                    let userprofile = std::env::var("USERPROFILE")
+                        .map_err(|_| "USERPROFILE not set".to_string())?;
                     PathBuf::from(&userprofile).join(".cursor/mcp.json")
                 }
             }
@@ -107,7 +115,8 @@ impl ClientApp {
                 }
                 #[cfg(target_os = "windows")]
                 {
-                    let userprofile = std::env::var("USERPROFILE").map_err(|_| "USERPROFILE not set".to_string())?;
+                    let userprofile = std::env::var("USERPROFILE")
+                        .map_err(|_| "USERPROFILE not set".to_string())?;
                     PathBuf::from(&userprofile).join(".codex/config.toml")
                 }
             }
@@ -120,7 +129,8 @@ impl ClientApp {
                 }
                 #[cfg(target_os = "windows")]
                 {
-                    let appdata = std::env::var("APPDATA").map_err(|_| "APPDATA not set".to_string())?;
+                    let appdata =
+                        std::env::var("APPDATA").map_err(|_| "APPDATA not set".to_string())?;
                     PathBuf::from(&appdata).join("Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json")
                 }
                 #[cfg(target_os = "linux")]
@@ -131,7 +141,10 @@ impl ClientApp {
 
             // Continue.dev - workspace-relative (handled separately)
             Self::ContinueDev => {
-                return Err("Continue.dev uses workspace-relative paths (.continue/config.yaml)".to_string());
+                return Err(
+                    "Continue.dev uses workspace-relative paths (.continue/config.yaml)"
+                        .to_string(),
+                );
             }
         };
 
@@ -223,9 +236,9 @@ pub async fn install_servers_to_client(
     }
 
     match app {
-        ClientApp::ContinueDev => {
-            Err("Continue.dev installation not yet implemented (workspace-relative paths)".to_string())
-        }
+        ClientApp::ContinueDev => Err(
+            "Continue.dev installation not yet implemented (workspace-relative paths)".to_string(),
+        ),
         _ => install_to_json_config(&app, &servers),
     }
 }
@@ -260,9 +273,7 @@ fn install_to_json_config(
     let mut config: serde_json::Value = if config_path.exists() {
         let content = fs::read_to_string(&config_path)
             .map_err(|e| format!("Failed to read config file: {}", e))?;
-        serde_json::from_str(&content).unwrap_or_else(|_| {
-            serde_json::json!({ "mcpServers": {} })
-        })
+        serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({ "mcpServers": {} }))
     } else {
         serde_json::json!({ "mcpServers": {} })
     };
@@ -324,9 +335,10 @@ fn install_to_json_config(
     if added > 0 || updated > 0 {
         // Backup original file before modifying
         if config_path.exists() {
-            let backup_path = config_path.with_extension(
-                format!("json.backup.{}", chrono::Local::now().format("%Y%m%d_%H%M%S"))
-            );
+            let backup_path = config_path.with_extension(format!(
+                "json.backup.{}",
+                chrono::Local::now().format("%Y%m%d_%H%M%S")
+            ));
             fs::copy(&config_path, &backup_path)
                 .map_err(|e| format!("Failed to create backup: {}", e))?;
         }

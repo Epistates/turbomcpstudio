@@ -134,11 +134,7 @@ impl MiscOperations {
         *connection.last_seen.write() = Some(Utc::now());
 
         // Count registered handlers
-        let handlers = [
-            elicitation_handler,
-            log_handler,
-            resource_update_handler,
-        ];
+        let handlers = [elicitation_handler, log_handler, resource_update_handler];
         let total_registered = handlers.iter().filter(|&&x| x).count();
 
         let status_response = serde_json::json!({

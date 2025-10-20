@@ -57,9 +57,7 @@ async fn check_for_updates(cached_etag: Option<String>) -> Result<()> {
     let client = reqwest::Client::new();
     let api_url = "https://api.github.com/repos/docker/mcp-registry/commits/main";
 
-    let mut request = client
-        .get(api_url)
-        .header("User-Agent", "TurboMCP-Studio");
+    let mut request = client.get(api_url).header("User-Agent", "TurboMCP-Studio");
 
     if let Some(etag) = &cached_etag {
         request = request.header("If-None-Match", etag);
@@ -135,7 +133,10 @@ struct GitHubDirEntry {
 }
 
 /// Fetches a single server's configuration
-async fn fetch_server_config(client: &reqwest::Client, server_name: &str) -> Result<RegistryServer> {
+async fn fetch_server_config(
+    client: &reqwest::Client,
+    server_name: &str,
+) -> Result<RegistryServer> {
     let url = format!("{}/{}/server.yaml", REGISTRY_URL, server_name);
 
     let response = client
@@ -154,8 +155,8 @@ async fn fetch_server_config(client: &reqwest::Client, server_name: &str) -> Res
         .await
         .context("Failed to read server config")?;
 
-    let server: RegistryServer = serde_yaml::from_str(&yaml_text)
-        .context("Failed to parse server YAML")?;
+    let server: RegistryServer =
+        serde_yaml::from_str(&yaml_text).context("Failed to parse server YAML")?;
 
     Ok(server)
 }
@@ -271,7 +272,10 @@ pub fn search_servers(
             // Match against tags
             if let Some(meta) = &server.meta {
                 if let Some(tags) = &meta.tags {
-                    if tags.iter().any(|tag| tag.to_lowercase().contains(&query_lower)) {
+                    if tags
+                        .iter()
+                        .any(|tag| tag.to_lowercase().contains(&query_lower))
+                    {
                         return true;
                     }
                 }
@@ -305,12 +309,7 @@ pub fn filter_by_category(
 pub fn get_categories(servers: &HashMap<String, RegistryServer>) -> Vec<String> {
     let mut categories: Vec<String> = servers
         .values()
-        .filter_map(|server| {
-            server
-                .meta
-                .as_ref()
-                .and_then(|m| m.category.clone())
-        })
+        .filter_map(|server| server.meta.as_ref().and_then(|m| m.category.clone()))
         .collect();
 
     categories.sort();

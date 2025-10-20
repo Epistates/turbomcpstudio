@@ -1,7 +1,7 @@
 //! Configuration generator for various MCP clients
 
-use super::types::*;
 use super::platform::normalize_volume_mount;
+use super::types::*;
 use anyhow::{Context, Result};
 use serde_json::json;
 use std::collections::HashMap;
@@ -95,8 +95,8 @@ pub fn generate_config(
         }
     };
 
-    let config_json = serde_json::to_string_pretty(&config_value)
-        .context("Failed to serialize config")?;
+    let config_json =
+        serde_json::to_string_pretty(&config_value).context("Failed to serialize config")?;
 
     Ok(GeneratedConfig {
         client_type: client_type.name().to_string(),
@@ -112,7 +112,9 @@ fn generate_claude_desktop_docker(
     user_config: &UserConfig,
     notes: &mut Vec<String>,
 ) -> Result<serde_json::Value> {
-    let image = server.image.as_ref()
+    let image = server
+        .image
+        .as_ref()
         .context("Server has no Docker image")?;
 
     let mut args = vec!["run".to_string(), "-i".to_string(), "--rm".to_string()];
@@ -171,7 +173,9 @@ fn generate_lmstudio_docker(
     user_config: &UserConfig,
     _notes: &mut Vec<String>,
 ) -> Result<serde_json::Value> {
-    let image = server.image.as_ref()
+    let image = server
+        .image
+        .as_ref()
         .context("Server has no Docker image")?;
 
     let mut args = vec!["run".to_string(), "-i".to_string(), "--rm".to_string()];
@@ -232,11 +236,12 @@ fn generate_claude_desktop_remote(
     _user_config: &UserConfig,
     notes: &mut Vec<String>,
 ) -> Result<serde_json::Value> {
-    let remote = server.remote.as_ref()
+    let remote = server
+        .remote
+        .as_ref()
         .context("Server has no remote configuration")?;
 
-    let url = remote.url.as_ref()
-        .context("Remote server has no URL")?;
+    let url = remote.url.as_ref().context("Remote server has no URL")?;
 
     notes.push("Remote MCP servers don't require Docker".to_string());
     notes.push(format!("This server connects to: {}", url));
@@ -270,11 +275,12 @@ fn generate_lmstudio_remote(
     _user_config: &UserConfig,
     notes: &mut Vec<String>,
 ) -> Result<serde_json::Value> {
-    let remote = server.remote.as_ref()
+    let remote = server
+        .remote
+        .as_ref()
         .context("Server has no remote configuration")?;
 
-    let url = remote.url.as_ref()
-        .context("Remote server has no URL")?;
+    let url = remote.url.as_ref().context("Remote server has no URL")?;
 
     notes.push("Remote MCP servers connect via HTTP".to_string());
 
@@ -317,7 +323,8 @@ fn build_env_vars(
         if let Some(env_list) = &config.env {
             for env in env_list {
                 if let Some(value_template) = &env.value {
-                    let resolved = resolve_template(value_template, &server.name, &user_config.parameters);
+                    let resolved =
+                        resolve_template(value_template, &server.name, &user_config.parameters);
                     env_vars.insert(env.name.clone(), resolved);
                 }
             }
@@ -344,7 +351,9 @@ fn generate_turbomcp_docker(
     user_config: &UserConfig,
     notes: &mut Vec<String>,
 ) -> Result<serde_json::Value> {
-    let image = server.image.as_ref()
+    let image = server
+        .image
+        .as_ref()
         .context("Server has no Docker image")?;
 
     let mut args = vec!["run".to_string(), "-i".to_string(), "--rm".to_string()];
@@ -403,11 +412,12 @@ fn generate_turbomcp_remote(
     _user_config: &UserConfig,
     notes: &mut Vec<String>,
 ) -> Result<serde_json::Value> {
-    let remote = server.remote.as_ref()
+    let remote = server
+        .remote
+        .as_ref()
         .context("Server has no remote configuration")?;
 
-    let url = remote.url.as_ref()
-        .context("Remote server has no URL")?;
+    let url = remote.url.as_ref().context("Remote server has no URL")?;
 
     notes.push("TurboMCP Studio supports HTTP and WebSocket remote servers".to_string());
     notes.push(format!("This server connects to: {}", url));
@@ -487,11 +497,7 @@ mod tests {
         let mut params = HashMap::new();
         params.insert("db_path".to_string(), json!("/Users/test/db"));
 
-        let result = resolve_template(
-            "{{sqlite.db_path}}:/data/db.sqlite",
-            "sqlite",
-            &params,
-        );
+        let result = resolve_template("{{sqlite.db_path}}:/data/db.sqlite", "sqlite", &params);
 
         assert_eq!(result, "/Users/test/db:/data/db.sqlite");
     }
@@ -501,11 +507,7 @@ mod tests {
         let mut params = HashMap::new();
         params.insert("paths".to_string(), json!(["/path1", "/path2"]));
 
-        let result = resolve_template(
-            "{{filesystem.paths}}",
-            "filesystem",
-            &params,
-        );
+        let result = resolve_template("{{filesystem.paths}}", "filesystem", &params);
 
         assert_eq!(result, "/path1:/path2");
     }

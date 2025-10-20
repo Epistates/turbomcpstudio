@@ -5,9 +5,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use turbomcp_client::handlers::{
-    ElicitationHandler, LogHandler, ResourceUpdateHandler,
-};
+use turbomcp_client::handlers::{ElicitationHandler, LogHandler, ResourceUpdateHandler};
 use turbomcp_client::Client;
 use turbomcp_protocol::types::{Prompt, PromptInput, Tool, ToolInputSchema};
 use turbomcp_protocol::{Error, ErrorKind}; // v2.0: Re-exported at root (was turbomcp_core)
