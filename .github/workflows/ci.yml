@@ -38,7 +38,7 @@ jobs:
           # Deny vulnerabilities with warnings or higher severity
           denyWarnings: true
           # Only audit the src-tauri directory
-          working-directory: src-tauri
+          workingDirectory: src-tauri
 
   clippy:
     name: Clippy
