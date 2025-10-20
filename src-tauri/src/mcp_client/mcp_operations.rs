@@ -447,8 +447,9 @@ impl McpOperations {
             McpStudioError::ConnectionFailed("MCP client not initialized".to_string())
         })?;
 
-        // List resources using TurboMCP client (transport-agnostic)
-        let resource_uris = client.list_resources().await.map_err(|e| {
+        // List resources using TurboMCP client (awaiting patch for spec-compliant full Resource objects)
+        // Once patched, this will return Vec<Resource> with full metadata per MCP 2025-06-18 spec
+        let resources = client.list_resources().await.map_err(|e| {
             *connection.error_count.lock() += 1;
             McpStudioError::ToolCallFailed(format!("Failed to list resources: {}", e))
         })?;
@@ -457,15 +458,27 @@ impl McpOperations {
         *connection.request_count.lock() += 1;
         *connection.last_seen.write() = Some(Utc::now());
 
-        // Convert resource URIs to resource objects for the frontend
-        let resource_values: Vec<serde_json::Value> = resource_uris
+        // Convert Resource objects to JSON values for the frontend
+        // TurboMCP 2.0.1 provides full Resource objects with name, description, uri, mimeType, etc.
+        let resource_values: Vec<serde_json::Value> = resources
             .into_iter()
-            .map(|uri| {
-                serde_json::json!({
-                    "uri": uri,
-                    "name": uri.split("://").nth(1).unwrap_or(&uri).split('/').next_back().unwrap_or(&uri),
-                    "description": format!("Resource at {}", uri),
-                    "mimeType": "text/plain"
+            .map(|resource| {
+                // Debug log to see actual URIs from server
+                tracing::debug!(
+                    "Resource from server: name='{}', uri='{}', description={:?}, mimeType={:?}",
+                    resource.name,
+                    resource.uri,
+                    resource.description,
+                    resource.mime_type
+                );
+
+                serde_json::to_value(resource).unwrap_or_else(|e| {
+                    tracing::error!("Failed to serialize resource: {}", e);
+                    serde_json::json!({
+                        "uri": "",
+                        "name": "Unknown",
+                        "description": "Serialization error"
+                    })
                 })
             })
             .collect();
@@ -506,8 +519,10 @@ impl McpOperations {
         })?;
 
         // Read the resource using TurboMCP client (transport-agnostic)
+        tracing::debug!("Attempting to read resource with URI: '{}'", uri);
         let resource_result = client.read_resource(&uri).await.map_err(|e| {
             *connection.error_count.lock() += 1;
+            tracing::error!("Failed to read resource '{}': {}", uri, e);
             McpStudioError::ToolCallFailed(format!("Failed to read resource '{}': {}", uri, e))
         })?;
 

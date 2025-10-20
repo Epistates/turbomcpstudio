@@ -216,7 +216,8 @@ impl McpTransportClient {
     }
 
     /// List resources available on the MCP server (transport-agnostic)
-    pub async fn list_resources(&self) -> Result<Vec<String>, Box<Error>> {
+    /// Returns full Resource objects per MCP spec (as of TurboMCP 2.0.1)
+    pub async fn list_resources(&self) -> Result<Vec<turbomcp_client::Resource>, Box<Error>> {
         match self {
             McpTransportClient::Stdio(client) => client.list_resources().await,
             McpTransportClient::ChildProcess(client) => client.list_resources().await,
