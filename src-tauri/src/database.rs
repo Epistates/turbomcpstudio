@@ -56,11 +56,11 @@ impl Database {
             // ✅ FIXED: Clear active profile state on startup (in-memory path)
             match db.clear_active_profile_on_startup().await {
                 Ok(_) => {
-                    tracing::info!("✅ Cleared active profile state for fresh startup (in-memory)");
+                    tracing::info!("Cleared active profile state for fresh startup (in-memory)");
                 }
                 Err(e) => {
                     tracing::warn!(
-                        "⚠️ Failed to clear active profile state (non-critical): {}",
+                        "Failed to clear active profile state (non-critical): {}",
                         e
                     );
                 }
@@ -138,11 +138,11 @@ impl Database {
                         // This ensures every app session starts fresh with no auto-connections
                         match db.clear_active_profile_on_startup().await {
                             Ok(_) => {
-                                tracing::info!("✅ Cleared active profile state for fresh startup");
+                                tracing::info!("Cleared active profile state for fresh startup");
                             }
                             Err(e) => {
                                 tracing::warn!(
-                                    "⚠️ Failed to clear active profile state (non-critical): {}",
+                                    "Failed to clear active profile state (non-critical): {}",
                                     e
                                 );
                             }
@@ -266,6 +266,72 @@ impl Database {
         .execute(&self.pool)
         .await?;
         tracing::info!("workflow_executions table created successfully");
+
+        // Migration: Fix workflow_executions column name (results -> step_results)
+        // This handles databases created with the incorrect column name
+        tracing::info!("Checking for workflow_executions column migration");
+        let column_check = sqlx::query(
+            "SELECT COUNT(*) as count FROM pragma_table_info('workflow_executions') WHERE name = 'results'"
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        if let Some(row) = column_check {
+            let has_old_column: i32 = row.get("count");
+            if has_old_column > 0 {
+                tracing::info!("Found old 'results' column, migrating to 'step_results'");
+
+                // SQLite doesn't support ALTER TABLE RENAME COLUMN in older versions
+                // We'll use the safe migration pattern: create temp table, copy data, swap
+                sqlx::query(
+                    r#"
+                    CREATE TABLE workflow_executions_new (
+                        id TEXT PRIMARY KEY,
+                        collection_id TEXT NOT NULL,
+                        collection_version TEXT NOT NULL,
+                        started_at TEXT NOT NULL,
+                        completed_at TEXT,
+                        status TEXT NOT NULL,
+                        step_results TEXT NOT NULL,
+                        final_variables TEXT NOT NULL,
+                        summary TEXT NOT NULL,
+                        environment_name TEXT NOT NULL,
+                        user_variables TEXT NOT NULL,
+                        FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE
+                    )
+                    "#
+                )
+                .execute(&self.pool)
+                .await?;
+
+                // Copy data from old table to new table
+                sqlx::query(
+                    r#"
+                    INSERT INTO workflow_executions_new
+                        (id, collection_id, collection_version, started_at, completed_at, status,
+                         step_results, final_variables, summary, environment_name, user_variables)
+                    SELECT id, collection_id, collection_version, started_at, completed_at, status,
+                           results, final_variables, summary, environment_name, user_variables
+                    FROM workflow_executions
+                    "#
+                )
+                .execute(&self.pool)
+                .await?;
+
+                // Drop old table and rename new table
+                sqlx::query("DROP TABLE workflow_executions")
+                    .execute(&self.pool)
+                    .await?;
+
+                sqlx::query("ALTER TABLE workflow_executions_new RENAME TO workflow_executions")
+                    .execute(&self.pool)
+                    .await?;
+
+                tracing::info!("Successfully migrated 'results' column to 'step_results'");
+            } else {
+                tracing::info!("No migration needed - 'step_results' column already exists");
+            }
+        }
 
         // Collection templates table for reusable templates
         tracing::info!("Creating collection_templates table");
@@ -498,7 +564,7 @@ impl Database {
             .await?;
 
         let migration_duration = migration_start.elapsed();
-        tracing::info!("✅ Database migrations completed successfully in {:?} (11 tables + 3 indexes, typically 3-15ms)", migration_duration);
+        tracing::info!("Database migrations completed successfully in {:?} (11 tables + 3 indexes, typically 3-15ms)", migration_duration);
         Ok(())
     }
 
@@ -613,12 +679,12 @@ impl Database {
 
     /// Delete a server configuration
     pub async fn delete_server_config(&self, id: Uuid) -> McpResult<()> {
-        log::debug!("🗄️ Executing DELETE query for id: {}", id);
+        log::debug!("Executing DELETE query for id: {}", id);
 
         let id_str = id.to_string();
 
         // ✅ FIXED: Delete from profile_servers first (foreign key dependency)
-        log::debug!("🔗 Removing server from all profiles...");
+        log::debug!("Removing server from all profiles...");
         let profile_result = sqlx::query("DELETE FROM profile_servers WHERE server_id = ?")
             .bind(&id_str)
             .execute(&self.pool)
@@ -626,54 +692,54 @@ impl Database {
 
         if profile_result.rows_affected() > 0 {
             log::info!(
-                "✅ Removed server from {} profile(s)",
+                "Removed server from {} profile(s)",
                 profile_result.rows_affected()
             );
         } else {
-            log::debug!("ℹ️ Server was not part of any profiles");
+            log::debug!("Server was not part of any profiles");
         }
 
         // ✅ FIXED: Delete from message_history (another foreign key)
-        log::debug!("💬 Removing message history...");
+        log::debug!("Removing message history...");
         let history_result = sqlx::query("DELETE FROM message_history WHERE server_id = ?")
             .bind(&id_str)
             .execute(&self.pool)
             .await?;
 
         if history_result.rows_affected() > 0 {
-            log::info!("✅ Deleted {} message(s)", history_result.rows_affected());
+            log::info!("Deleted {} message(s)", history_result.rows_affected());
         }
 
         // ✅ FIXED: Delete from server_sessions (another foreign key)
-        log::debug!("📊 Removing server sessions...");
+        log::debug!("Removing server sessions...");
         let session_result = sqlx::query("DELETE FROM server_sessions WHERE server_id = ?")
             .bind(&id_str)
             .execute(&self.pool)
             .await?;
 
         if session_result.rows_affected() > 0 {
-            log::info!("✅ Deleted {} session(s)", session_result.rows_affected());
+            log::info!("Deleted {} session(s)", session_result.rows_affected());
         }
 
         // Now delete the server config itself
-        log::debug!("🗑️ Deleting server configuration...");
+        log::debug!("Deleting server configuration...");
         let result = sqlx::query("DELETE FROM server_configs WHERE id = ?")
             .bind(&id_str)
             .execute(&self.pool)
             .await?;
 
         log::debug!(
-            "📊 DELETE query result: rows_affected = {}",
+            "DELETE query result: rows_affected = {}",
             result.rows_affected()
         );
 
         if result.rows_affected() == 0 {
             log::warn!(
-                "⚠️ No rows affected - server {} may not exist in database",
+                "No rows affected - server {} may not exist in database",
                 id
             );
         } else {
-            log::info!("✅ Successfully deleted server configuration from database");
+            log::info!("Successfully deleted server configuration from database");
         }
 
         Ok(())
@@ -835,7 +901,7 @@ impl Database {
         id: Uuid,
     ) -> McpResult<Option<crate::types::collections::WorkflowExecution>> {
         let row = sqlx::query(
-            "SELECT id, collection_id, status, started_at, completed_at, summary, results FROM workflow_executions WHERE id = ?"
+            "SELECT id, collection_id, status, started_at, completed_at, summary, step_results, collection_version, environment_name, user_variables, final_variables FROM workflow_executions WHERE id = ?"
         )
         .bind(id.to_string())
         .fetch_optional(&self.pool)
@@ -847,7 +913,11 @@ impl Database {
             let step_results: std::collections::HashMap<
                 uuid::Uuid,
                 crate::types::collections::StepResult,
-            > = serde_json::from_str(&row.get::<String, _>("results"))?;
+            > = serde_json::from_str(&row.get::<String, _>("step_results"))?;
+            let final_variables: HashMap<String, serde_json::Value> =
+                serde_json::from_str(&row.get::<String, _>("final_variables"))?;
+            let user_variables: HashMap<String, serde_json::Value> =
+                serde_json::from_str(&row.get::<String, _>("user_variables"))?;
 
             Ok(Some(crate::types::collections::WorkflowExecution {
                 id: Uuid::parse_str(&row.get::<String, _>("id"))
@@ -866,10 +936,10 @@ impl Database {
                     .map(|dt| dt.with_timezone(&chrono::Utc)),
                 summary,
                 step_results,
-                collection_version: "1.0.0".to_string(), // Default version since not stored in DB yet
-                final_variables: HashMap::new(),
-                environment_name: "default".to_string(),
-                user_variables: HashMap::new(),
+                collection_version: row.get("collection_version"),
+                final_variables,
+                environment_name: row.get("environment_name"),
+                user_variables,
             }))
         } else {
             Ok(None)
@@ -882,7 +952,7 @@ impl Database {
         collection_id: Uuid,
     ) -> McpResult<Vec<crate::types::collections::WorkflowExecution>> {
         let rows = sqlx::query(
-            "SELECT id, collection_id, status, started_at, completed_at, summary, results FROM workflow_executions WHERE collection_id = ? ORDER BY started_at DESC"
+            "SELECT id, collection_id, status, started_at, completed_at, summary, step_results, collection_version, environment_name, user_variables, final_variables FROM workflow_executions WHERE collection_id = ? ORDER BY started_at DESC"
         )
         .bind(collection_id.to_string())
         .fetch_all(&self.pool)
@@ -896,7 +966,11 @@ impl Database {
             let step_results: std::collections::HashMap<
                 uuid::Uuid,
                 crate::types::collections::StepResult,
-            > = serde_json::from_str(&row.get::<String, _>("results"))?;
+            > = serde_json::from_str(&row.get::<String, _>("step_results"))?;
+            let final_variables: HashMap<String, serde_json::Value> =
+                serde_json::from_str(&row.get::<String, _>("final_variables"))?;
+            let user_variables: HashMap<String, serde_json::Value> =
+                serde_json::from_str(&row.get::<String, _>("user_variables"))?;
 
             executions.push(crate::types::collections::WorkflowExecution {
                 id: Uuid::parse_str(&row.get::<String, _>("id"))
@@ -915,14 +989,60 @@ impl Database {
                     .map(|dt| dt.with_timezone(&chrono::Utc)),
                 summary,
                 step_results,
-                collection_version: "1.0.0".to_string(), // Default version since not stored in DB yet
-                final_variables: HashMap::new(),
-                environment_name: "default".to_string(),
-                user_variables: HashMap::new(),
+                collection_version: row.get("collection_version"),
+                final_variables,
+                environment_name: row.get("environment_name"),
+                user_variables,
             });
         }
 
         Ok(executions)
+    }
+
+    /// Save or update a workflow execution
+    pub async fn save_workflow_execution(
+        &self,
+        execution: &crate::types::collections::WorkflowExecution,
+    ) -> McpResult<()> {
+        // Serialize complex fields to JSON
+        let step_results_json = serde_json::to_string(&execution.step_results)?;
+        let final_variables_json = serde_json::to_string(&execution.final_variables)?;
+        let summary_json = serde_json::to_string(&execution.summary)?;
+        let user_variables_json = serde_json::to_string(&execution.user_variables)?;
+
+        // Serialize status enum to string
+        let status_str = match execution.status {
+            crate::types::collections::ExecutionStatus::Running => "Running",
+            crate::types::collections::ExecutionStatus::Completed => "Completed",
+            crate::types::collections::ExecutionStatus::Failed => "Failed",
+            crate::types::collections::ExecutionStatus::Cancelled => "Cancelled",
+            crate::types::collections::ExecutionStatus::Paused => "Paused",
+        };
+
+        // Use INSERT OR REPLACE to handle both insert and update
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO workflow_executions (
+                id, collection_id, collection_version, started_at, completed_at, status,
+                step_results, final_variables, summary, environment_name, user_variables
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(execution.id.to_string())
+        .bind(execution.collection_id.to_string())
+        .bind(&execution.collection_version)
+        .bind(execution.started_at.to_rfc3339())
+        .bind(execution.completed_at.as_ref().map(|dt| dt.to_rfc3339()))
+        .bind(status_str)
+        .bind(step_results_json)
+        .bind(final_variables_json)
+        .bind(summary_json)
+        .bind(&execution.environment_name)
+        .bind(user_variables_json)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 
     /// Save message to history
@@ -1037,7 +1157,7 @@ impl Database {
             Ok(result) => {
                 let rows_deleted = result.rows_affected();
                 tracing::info!(
-                    "✅ Active profile state cleared successfully ({} profiles deactivated)",
+                    "Active profile state cleared successfully ({} profiles deactivated)",
                     rows_deleted
                 );
                 Ok(())
@@ -1045,12 +1165,12 @@ impl Database {
             Err(e) => {
                 // If table doesn't exist yet, that's fine - it means fresh install
                 if e.to_string().contains("no such table") {
-                    tracing::info!("ℹ️ Active profile state table not yet created (fresh install) - skipping clear");
+                    tracing::info!("Active profile state table not yet created (fresh install) - skipping clear");
                     Ok(())
                 } else {
                     // Other errors should be logged but not fail startup
                     tracing::warn!(
-                        "⚠️ Failed to clear active profile state: {} (non-critical)",
+                        "Failed to clear active profile state: {} (non-critical)",
                         e
                     );
                     Ok(())
