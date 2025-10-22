@@ -47,6 +47,35 @@ use super::initialization::Initialization;
 pub struct TransportLayer;
 
 impl TransportLayer {
+    /// Redact sensitive environment variable values for safe logging
+    ///
+    /// Sensitive keys (API keys, tokens, passwords) have their values masked
+    /// to prevent credential leaks in logs while preserving debugging utility.
+    fn redact_env_value(key: &str, value: &str) -> String {
+        // List of patterns that indicate sensitive data
+        let sensitive_patterns = [
+            "KEY", "TOKEN", "SECRET", "PASSWORD", "PASS", "PWD",
+            "AUTH", "CREDENTIAL", "API", "BEARER", "ACCESS"
+        ];
+
+        // Check if the key contains any sensitive pattern (case-insensitive)
+        let key_upper = key.to_uppercase();
+        let is_sensitive = sensitive_patterns.iter().any(|pattern| key_upper.contains(pattern));
+
+        if is_sensitive {
+            // Show first 4 chars (or less if shorter), then mask the rest
+            if value.len() <= 4 {
+                "<REDACTED>".to_string()
+            } else {
+                let prefix = &value[..4.min(value.len())];
+                format!("{}****<REDACTED>", prefix)
+            }
+        } else {
+            // Non-sensitive values logged as-is
+            value.to_string()
+        }
+    }
+
     /// Establish MCP connection with enterprise-grade reliability and monitoring
     pub async fn establish_mcp_connection(
         connection: Arc<ManagedConnection>,
@@ -161,7 +190,8 @@ impl TransportLayer {
             connection.config.environment_variables.len()
         );
         for (key, value) in &connection.config.environment_variables {
-            tracing::info!("    {}={}", key, value);
+            let safe_value = Self::redact_env_value(key, value);
+            tracing::info!("    {}={}", key, safe_value);
         }
 
         // Initialize TurboMCP ChildProcessTransport directly - let it handle the process lifecycle
@@ -209,7 +239,7 @@ impl TransportLayer {
                 *connection.status.write() = ConnectionStatus::Connected;
                 *connection.last_seen.write() = Some(Utc::now());
                 tracing::info!(
-                    "✅ TurboMCP HTTP/SSE client connected successfully: {} (MCP 2025-06-18)",
+                    "TurboMCP HTTP/SSE client connected successfully: {} (MCP 2025-06-18)",
                     url
                 );
                 Ok(())
@@ -413,10 +443,11 @@ impl TransportLayer {
             // Suppress logging to prevent stdout pollution in MCP protocol
             env.push(("RUST_LOG".to_string(), "".to_string()));
 
-            // Log the final environment that will be passed
+            // Log the final environment that will be passed (with sensitive values redacted)
             tracing::info!("  Final environment variables that will be passed to process:");
             for (k, v) in &env {
-                tracing::info!("    {}={}", k, v);
+                let safe_value = Self::redact_env_value(k, v);
+                tracing::info!("    {}={}", k, safe_value);
             }
 
             env
@@ -636,7 +667,7 @@ impl TransportLayer {
             McpStudioError::ConnectionFailed(error_msg)
         })?;
 
-        tracing::info!("✅ WebSocket bidirectional transport connected successfully");
+        tracing::info!("WebSocket bidirectional transport connected successfully");
 
         // Build client with enterprise connection config
         let connection_config = Configuration::create_enterprise_connection_config();

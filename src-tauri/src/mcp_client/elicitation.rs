@@ -83,7 +83,7 @@ impl StudioElicitationHandler {
         CURRENT_SERVER_CONTEXT
             .try_with(|ctx| (**ctx).clone())
             .unwrap_or_else(|_| {
-                tracing::error!("⚠️ No server context in task-local storage for elicitation!");
+                tracing::error!("WARNING: No server context in task-local storage for elicitation!");
                 ServerContext::default()
             })
     }

@@ -63,8 +63,8 @@ use super::transport_layer::TransportLayer;
 /// The central coordinator for all MCP server connections in the application.
 /// Manages connection lifecycle, health monitoring, and protocol operations.
 pub struct McpClientManager {
-    /// Active connections to MCP servers
-    connections: DashMap<Uuid, Arc<ManagedConnection>>,
+    /// Active connections to MCP servers (Arc-wrapped for sharing with monitoring task)
+    connections: Arc<DashMap<Uuid, Arc<ManagedConnection>>>,
 
     /// System information for process monitoring
     system: Arc<RwLock<System>>,
@@ -101,7 +101,7 @@ impl McpClientManager {
         let elicitation_handler = Arc::new(StudioElicitationHandler::new(app_handle, db));
 
         let manager = Self {
-            connections: DashMap::new(),
+            connections: Arc::new(DashMap::new()),
             system: Arc::new(RwLock::new(System::new_all())),
             event_sender,
             sampling_handler,
@@ -478,8 +478,9 @@ impl McpClientManager {
 
     /// Start enhanced background monitoring task with health checks and automatic recovery
     pub fn start_monitoring(&self) -> tokio::task::JoinHandle<()> {
-        // Wrap DashMap in Arc for sharing across the monitoring task
-        let connections_arc = Arc::new(self.connections.clone());
+        // Clone the Arc to share the same DashMap with the monitoring task
+        // This ensures the monitoring loop sees connections added after startup
+        let connections_arc = Arc::clone(&self.connections);
         MonitoringLoop::start_monitoring(
             connections_arc,
             self.event_sender.clone(),

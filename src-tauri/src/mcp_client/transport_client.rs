@@ -72,7 +72,7 @@ impl McpTransportClient {
     /// This method is now an alias for list_tools() since TurboMCP 2.0.0-rc.1
     /// returns full Tool objects with schemas by default
     pub async fn list_tools_with_schemas(&self) -> Result<Vec<Tool>, Box<Error>> {
-        tracing::info!("✅ Getting tool schemas using TurboMCP 2.0.0-rc.1 API");
+        tracing::info!("Getting tool schemas using TurboMCP 2.0.0-rc.1 API");
         self.list_tools().await
     }
 

@@ -147,7 +147,7 @@ impl StudioSamplingHandler {
         CURRENT_SERVER_CONTEXT
             .try_with(|ctx| (**ctx).clone())
             .unwrap_or_else(|_| {
-                tracing::error!("⚠️ No server context in task-local storage!");
+                tracing::error!("WARNING: No server context in task-local storage!");
                 tracing::error!(
                     "This indicates the manager didn't set context before calling the handler"
                 );
@@ -220,16 +220,16 @@ impl StudioSamplingHandler {
             // and directly call the configured LLM provider
             match llm_config.invoke_llm_directly(approved_request, None).await {
                 Ok(result) => {
-                    tracing::info!("✅ LLM call succeeded for request: {}", request_id);
+                    tracing::info!("LLM call succeeded for request: {}", request_id);
                     if tx.send(Ok(result)).is_err() {
                         tracing::error!(
-                            "❌ Failed to send LLM response (channel closed): {}",
+                            "Failed to send LLM response (channel closed): {}",
                             request_id
                         );
                     }
                 }
                 Err(e) => {
-                    tracing::error!("❌ LLM call failed: {} for request: {}", e, request_id);
+                    tracing::error!("LLM call failed: {} for request: {}", e, request_id);
                     // Use HandlerError::Generic for LLM failures (retryable)
                     let llm_error = HandlerError::Generic {
                         message: format!("LLM call failed: {}", e),
@@ -237,7 +237,7 @@ impl StudioSamplingHandler {
                     let boxed_error: Box<dyn std::error::Error + Send + Sync> = Box::new(llm_error);
                     if tx.send(Err(boxed_error)).is_err() {
                         tracing::error!(
-                            "❌ Failed to send LLM error (channel closed): {}",
+                            "Failed to send LLM error (channel closed): {}",
                             request_id
                         );
                     }
@@ -272,13 +272,13 @@ impl StudioSamplingHandler {
         // Send manual response as success through channel
         if tx.send(Ok(manual_response)).is_err() {
             tracing::error!(
-                "❌ Failed to send manual response (channel closed): {}",
+                "Failed to send manual response (channel closed): {}",
                 request_id
             );
             return Err("Channel closed".to_string());
         }
 
-        tracing::info!("✅ Manual response sent for request: {}", request_id);
+        tracing::info!("Manual response sent for request: {}", request_id);
         Ok(())
     }
 
@@ -309,13 +309,13 @@ impl StudioSamplingHandler {
         let boxed_error: Box<dyn std::error::Error + Send + Sync> = Box::new(rejection_error);
         if tx.send(Err(boxed_error)).is_err() {
             tracing::error!(
-                "❌ Failed to send rejection (channel closed): {}",
+                "Failed to send rejection (channel closed): {}",
                 request_id
             );
             return Err("Channel closed".to_string());
         }
 
-        tracing::info!("✅ Rejection sent for request: {} - {}", request_id, reason);
+        tracing::info!("Rejection sent for request: {} - {}", request_id, reason);
         Ok(())
     }
 }
@@ -330,7 +330,7 @@ impl SamplingHandler for StudioSamplingHandler {
         let start = Instant::now();
 
         tracing::info!(
-            "🎯 Received sampling request from server (request_id: {} from JSON-RPC)",
+            "Received sampling request from server (request_id: {} from JSON-RPC)",
             request_id
         );
 
@@ -405,10 +405,10 @@ impl SamplingHandler for StudioSamplingHandler {
             .emit("sampling_requested", event_payload)
             .map_err(|e| format!("Failed to emit event: {}", e))?;
 
-        tracing::info!("✅ Emitted sampling_requested event: {}", request_id);
+        tracing::info!("Emitted sampling_requested event: {}", request_id);
 
         // Wait for user approval + LLM result (with timeout)
-        tracing::info!("⏳ Waiting for user approval: {}", request_id);
+        tracing::info!("Waiting for user approval: {}", request_id);
 
         let response_result = tokio::time::timeout(Duration::from_secs(300), rx)
             .await
@@ -467,7 +467,7 @@ impl SamplingHandler for StudioSamplingHandler {
                 Ok(result)
             }
             Err(error) => {
-                tracing::info!("❌ Sampling request rejected/failed: {}", request_id);
+                tracing::info!("Sampling request rejected/failed: {}", request_id);
 
                 // Log error response to protocol inspector
                 if let Some(db) = self.db.read().await.as_ref() {
