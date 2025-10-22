@@ -16,6 +16,7 @@ use mcp_client::McpClientManager;
 use std::sync::Arc;
 use tauri::{Emitter, Listener, Manager};
 use types::InitializationError;
+use workflow_engine::WorkflowEngine;
 
 /// Application state shared across all commands
 #[derive(Clone)]
@@ -24,6 +25,8 @@ pub struct AppState {
     pub llm_config: Arc<LLMConfigManager>,
     pub hitl_sampling: Arc<HITLSamplingManager>,
     pub database: Arc<tokio::sync::RwLock<Option<Arc<Database>>>>,
+    /// Workflow engine for executing and managing workflow collections
+    pub workflow_engine: Arc<WorkflowEngine>,
     /// Issue #18 fix: Store monitoring loop handle for graceful shutdown
     pub monitoring_handle: Arc<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
@@ -41,7 +44,7 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_focus();
                 let _ = window.unminimize();
-                tracing::info!("✅ Focused main window for single instance");
+                tracing::info!("Focused main window for single instance");
             }
         }))
         // Initialize logging with tauri-plugin-log
@@ -95,7 +98,7 @@ pub fn run() {
                 };
 
                 // Log panic details
-                tracing::error!("💥 PANIC: {} at {}", panic_message, location);
+                tracing::error!("PANIC: {} at {}", panic_message, location);
                 tracing::error!("Panic info: {:?}", panic_info);
 
                 // Emit critical error to frontend
@@ -116,7 +119,7 @@ pub fn run() {
                 }
             }));
 
-            tracing::info!("✅ Panic hook installed - will emit events on crashes");
+            tracing::info!("Panic hook installed - will emit events on crashes");
 
             // Initialize LLM config first (needed by MCP manager)
             let llm_config = Arc::new(LLMConfigManager::new());
@@ -139,12 +142,21 @@ pub fn run() {
             // Issue #18 fix: Create monitoring handle storage for graceful shutdown
             let monitoring_handle = Arc::new(tokio::sync::Mutex::new(None));
 
+            // Initialize workflow engine for workflow execution and management
+            let workflow_engine = Arc::new(WorkflowEngine::new(
+                mcp_manager.clone(),
+                llm_config.clone(),
+                app_handle.clone(),
+                database.clone(),
+            ));
+
             // Store lightweight state immediately to unblock UI
             app.manage(AppState {
                 mcp_manager: mcp_manager.clone(),
                 llm_config: llm_config.clone(),
                 hitl_sampling: hitl_sampling.clone(),
                 database: database.clone(),
+                workflow_engine: workflow_engine.clone(),
                 monitoring_handle: monitoring_handle.clone(),
             });
 
@@ -155,9 +167,9 @@ pub fn run() {
 
             let app_handle_for_ready_handshake = app_handle.clone();
             app.once("frontend-ready", move |_event| {
-                tracing::info!("🔔 Received frontend-ready signal, emitting app-early-ready");
+                tracing::info!("Received frontend-ready signal, emitting app-early-ready");
                 let _ = app_handle_for_ready_handshake.emit("app-early-ready", ());
-                tracing::info!("✅ Emitted app-early-ready event (handshake pattern - deterministic)");
+                tracing::info!("Emitted app-early-ready event (handshake pattern - deterministic)");
 
                 // Signal the background task that frontend is ready for app-ready event
                 let _ = frontend_ready_tx.send(());
@@ -234,12 +246,12 @@ pub fn run() {
 
                 let database = match Database::new_with_full_migration(db_path_str).await {
                     Ok(db) => {
-                        tracing::info!("✅ Successfully using persistent database at {:?}", db_path);
+                        tracing::info!("Successfully using persistent database at {:?}", db_path);
                         db
                     }
                     Err(e) => {
-                        tracing::error!("❌ Failed to initialize persistent database: {}", e);
-                        tracing::warn!("🔄 Attempting fallback strategies...");
+                        tracing::error!("Failed to initialize persistent database: {}", e);
+                        tracing::warn!("Attempting fallback strategies...");
 
                         // Try alternative database location in user's home directory
                         let home_fallback = match std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
@@ -263,16 +275,16 @@ pub fn run() {
 
                         match home_fallback {
                             Ok(db) => {
-                                tracing::info!("✅ Using home directory fallback database");
+                                tracing::info!("Using home directory fallback database");
                                 db
                             }
                             Err(e) => {
-                                tracing::error!("❌ Home directory fallback failed: {}", e);
-                                tracing::warn!("💾 Using in-memory database as final fallback");
+                                tracing::error!("Home directory fallback failed: {}", e);
+                                tracing::warn!("Using in-memory database as final fallback");
 
                                 match Database::new_with_full_migration(":memory:").await {
                                     Ok(db) => {
-                                        tracing::warn!("⚠️ Using in-memory database - data will not persist between sessions!");
+                                        tracing::warn!("WARNING: Using in-memory database - data will not persist between sessions!");
                                         // Emit warning to frontend using InitializationError
                                         let _ = app_handle_clone.emit("initialization-error", InitializationError {
                                             critical: false,
@@ -284,7 +296,7 @@ pub fn run() {
                                         db
                                     }
                                     Err(e) => {
-                                        tracing::error!("💥 Critical error: Even in-memory database failed: {}", e);
+                                        tracing::error!("CRITICAL: Even in-memory database failed: {}", e);
 
                                         // Issue #16 fix: Emit error AND app-ready to unblock frontend
                                         let _ = app_handle_clone.emit("initialization-error", InitializationError {
@@ -323,7 +335,7 @@ pub fn run() {
                 }
 
                 let bg_init_duration = bg_init_start.elapsed();
-                tracing::info!("✅ MCP Studio background initialization complete in {:?}", bg_init_duration);
+                tracing::info!("MCP Studio background initialization complete in {:?}", bg_init_duration);
 
                 // Emit ready event to frontend
                 let _ = app_handle_clone.emit("app-ready", ());
@@ -335,7 +347,7 @@ pub fn run() {
                     if let Err(e) = window.show() {
                         tracing::error!("Failed to show main window: {}", e);
                     } else {
-                        tracing::info!("✅ Main window shown");
+                        tracing::info!("Main window shown");
                     }
                 } else {
                     tracing::warn!("Main window not found, cannot show");
@@ -368,7 +380,7 @@ pub fn run() {
         // Issue #18 fix: Handle window close event on Rust side for cleanup
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
-                tracing::info!("🛑 Window close requested, shutting down background tasks...");
+                tracing::info!("Window close requested, shutting down background tasks...");
 
                 // Get app state and shutdown background tasks
                 let app_handle = window.app_handle();
@@ -377,13 +389,13 @@ pub fn run() {
                         // Stop monitoring loop by aborting the task
                         if let Some(handle) = state.monitoring_handle.lock().await.take() {
                             handle.abort();
-                            tracing::info!("✅ Monitoring loop stopped");
+                            tracing::info!("Monitoring loop stopped");
                         }
 
                         // Give tasks time to clean up gracefully
                         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-                        tracing::info!("✅ Background tasks shutdown complete");
+                        tracing::info!("Background tasks shutdown complete");
                     });
                 }
 

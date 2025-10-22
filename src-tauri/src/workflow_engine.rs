@@ -7,6 +7,7 @@
 //! - Parallel execution optimization
 //! - Security-first design with sandboxed execution
 
+use crate::database::Database;
 use crate::error::{McpResult, McpStudioError};
 use crate::llm_config::LLMConfigManager;
 use crate::mcp_client::McpClientManager;
@@ -26,6 +27,7 @@ pub struct WorkflowEngine {
     llm_config: Arc<LLMConfigManager>,
     active_executions: Arc<RwLock<HashMap<Uuid, ExecutionContext>>>,
     app_handle: AppHandle,
+    database: Arc<tokio::sync::RwLock<Option<Arc<Database>>>>,
 }
 
 /// Execution context for a running workflow
@@ -62,12 +64,14 @@ impl WorkflowEngine {
         mcp_manager: Arc<McpClientManager>,
         llm_config: Arc<LLMConfigManager>,
         app_handle: AppHandle,
+        database: Arc<tokio::sync::RwLock<Option<Arc<Database>>>>,
     ) -> Self {
         Self {
             mcp_manager,
             llm_config,
             active_executions: Arc::new(RwLock::new(HashMap::new())),
             app_handle,
+            database,
         }
     }
 
@@ -225,11 +229,36 @@ impl WorkflowEngine {
                         None,
                         Some(format!("Workflow completed in {}ms", duration)),
                     );
+
+                    // Persist execution to database for history/audit trail
+                    let execution_to_save = context.execution.clone();
+                    let db_clone = engine_clone.database.clone();
+                    tokio::spawn(async move {
+                        let db_lock = db_clone.read().await;
+                        if let Some(database) = db_lock.as_ref() {
+                            if let Err(e) = database.save_workflow_execution(&execution_to_save).await {
+                                tracing::error!("Failed to persist workflow execution {}: {}", execution_to_save.id, e);
+                            } else {
+                                tracing::info!("Successfully persisted workflow execution {} to database", execution_to_save.id);
+                            }
+                        } else {
+                            tracing::warn!("Database not available, workflow execution {} not persisted", execution_to_save.id);
+                        }
+                    });
                 }
             }
         });
 
         Ok(execution)
+    }
+
+    /// Check if a workflow execution has been cancelled
+    async fn is_cancelled(&self, execution_id: Uuid) -> bool {
+        if let Some(context) = self.active_executions.read().await.get(&execution_id) {
+            matches!(context.execution.status, ExecutionStatus::Cancelled)
+        } else {
+            false
+        }
     }
 
     /// Execute workflow steps with dependency resolution and error handling
@@ -252,6 +281,12 @@ impl WorkflowEngine {
 
         // Execute steps in dependency order
         for step in execution_order {
+            // Check for cancellation before each step
+            if self.is_cancelled(execution_id).await {
+                tracing::info!("Workflow execution {} cancelled, stopping", execution_id);
+                return Err(McpStudioError::WorkflowError("Execution cancelled by user".to_string()));
+            }
+
             if !step.enabled {
                 self.mark_step_skipped(execution_id, step.id).await?;
                 continue;
@@ -270,6 +305,12 @@ impl WorkflowEngine {
             let max_retries = 3;
 
             loop {
+                // Check for cancellation before each retry attempt
+                if self.is_cancelled(execution_id).await {
+                    tracing::info!("Workflow execution {} cancelled during retry, stopping", execution_id);
+                    return Err(McpStudioError::WorkflowError("Execution cancelled by user".to_string()));
+                }
+
                 match self.execute_single_step(execution_id, &step).await {
                     Ok(_) => break,
                     Err(e) => {
@@ -861,6 +902,7 @@ impl Clone for WorkflowEngine {
             llm_config: self.llm_config.clone(),
             active_executions: self.active_executions.clone(),
             app_handle: self.app_handle.clone(),
+            database: self.database.clone(),
         }
     }
 }
