@@ -204,7 +204,7 @@ impl HITLSamplingManager {
             request_history: Arc::new(RwLock::new(Vec::new())),
         };
 
-        info!("🎯 HITL Sampling Manager initialized with manual mode");
+        info!("HITL Sampling Manager initialized with manual mode");
         (manager, event_receiver)
     }
 
@@ -217,7 +217,7 @@ impl HITLSamplingManager {
             old
         };
 
-        info!("🔄 Sampling mode changed: {:?} -> {:?}", old_mode, new_mode);
+        info!("Sampling mode changed: {:?} -> {:?}", old_mode, new_mode);
 
         let _ = self
             .event_sender
@@ -241,7 +241,7 @@ impl HITLSamplingManager {
         let request_id = Uuid::new_v4().to_string();
 
         debug!(
-            "🎯 Processing sampling request {} from server {}",
+            "Processing sampling request {} from server {}",
             request_id, server_name
         );
 
@@ -422,21 +422,21 @@ impl HITLSamplingManager {
                 match rule.action {
                     RuleAction::AutoApprove => {
                         info!(
-                            "✅ Auto-approving request {} via rule: {}",
+                            "Auto-approving request {} via rule: {}",
                             pending_request.id, rule.name
                         );
                         return self.handle_llm_mode(pending_request).await;
                     }
                     RuleAction::RequireReview => {
                         info!(
-                            "👁️ Rule {} requires human review for request {}",
+                            "Rule {} requires human review for request {}",
                             rule.name, pending_request.id
                         );
                         return self.handle_manual_mode(pending_request).await;
                     }
                     RuleAction::Reject(reason) => {
                         warn!(
-                            "❌ Rejecting request {} via rule {}: {}",
+                            "Rejecting request {} via rule {}: {}",
                             pending_request.id, rule.name, reason
                         );
                         let _ = self.event_sender.send(HITLSamplingEvent::RequestRejected {
@@ -587,7 +587,7 @@ impl HITLSamplingManager {
         // Use modified request if provided
         let final_request = modified_request.unwrap_or(pending_request.request.clone());
 
-        info!("✅ Request {} approved by {}", request_id, approved_by);
+        info!("Request {} approved by {}", request_id, approved_by);
 
         let _ = self.event_sender.send(HITLSamplingEvent::RequestApproved {
             request_id: request_id.to_string(),
@@ -609,7 +609,7 @@ impl HITLSamplingManager {
             .remove(request_id)
             .ok_or_else(|| McpStudioError::Unknown(format!("Request not found: {}", request_id)))?;
 
-        info!("❌ Request {} rejected: {}", request_id, reason);
+        info!("Request {} rejected: {}", request_id, reason);
 
         let _ = self.event_sender.send(HITLSamplingEvent::RequestRejected {
             request_id: request_id.to_string(),

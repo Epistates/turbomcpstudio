@@ -209,19 +209,19 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
 pub async fn shutdown_background_tasks(
     state: tauri::State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    tracing::info!("🛑 Shutting down background tasks...");
+    tracing::info!("Shutting down background tasks...");
 
     // Stop monitoring loop by aborting the task
     if let Some(handle) = state.monitoring_handle.lock().await.take() {
         handle.abort();
-        tracing::info!("✅ Monitoring loop stopped");
+        tracing::info!("Monitoring loop stopped");
     } else {
-        tracing::warn!("⚠️ No monitoring handle found (already stopped or never started)");
+        tracing::warn!("No monitoring handle found (already stopped or never started)");
     }
 
     // Give tasks time to clean up gracefully
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    tracing::info!("✅ Background tasks shutdown complete");
+    tracing::info!("Background tasks shutdown complete");
     Ok(())
 }

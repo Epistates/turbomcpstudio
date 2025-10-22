@@ -337,7 +337,7 @@ impl LLMConfigManager {
                     .await
                 {
                     Ok(handler) => {
-                        info!("✅ Local sampling handler created for {}", provider_id);
+                        info!("Local sampling handler created for {}", provider_id);
                         handler
                     }
                     Err(e) => {
@@ -364,7 +364,7 @@ impl LLMConfigManager {
                     .await
                 {
                     Ok(handler) => {
-                        info!("✅ Cloud sampling handler created for {}", provider_id);
+                        info!("Cloud sampling handler created for {}", provider_id);
                         handler
                     }
                     Err(e) => {
@@ -448,7 +448,7 @@ impl LLMConfigManager {
             }
         };
 
-        info!("✅ Created LLM client for local provider: {}", provider_id);
+        info!("Created LLM client for local provider: {}", provider_id);
 
         // Create user interaction handler (auto-approving for now)
         // TODO: Replace with actual HITL handler from sampling store
@@ -532,7 +532,7 @@ impl LLMConfigManager {
             }
         };
 
-        info!("✅ Created LLM client for provider: {}", provider_id);
+        info!("Created LLM client for provider: {}", provider_id);
 
         // Create user interaction handler (auto-approving for now)
         // TODO: Replace with actual HITL handler from sampling store
@@ -615,7 +615,7 @@ impl LLMConfigManager {
 
     /// Validate that at least one provider is properly configured
     pub async fn validate_configuration(&self) -> Result<Vec<String>, McpStudioError> {
-        debug!("✅ validate_configuration called");
+        debug!("validate_configuration called");
         let config = self.config.read().await;
         let mut issues = Vec::new();
 
@@ -624,15 +624,15 @@ impl LLMConfigManager {
 
         for (provider_id, provider_config) in &config.providers {
             debug!(
-                "✅ Validating provider: {} (enabled: {})",
+                "Validating provider: {} (enabled: {})",
                 provider_id, provider_config.enabled
             );
             if provider_config.enabled {
                 if self.get_api_key(provider_id).await.is_some() {
-                    debug!("✅ Provider {} has API key configured", provider_id);
+                    debug!("Provider {} has API key configured", provider_id);
                     has_configured_provider = true;
                 } else {
-                    debug!("✅ Provider {} is enabled but has no API key", provider_id);
+                    debug!("Provider {} is enabled but has no API key", provider_id);
                     issues.push(format!(
                         "Provider {} is enabled but has no API key",
                         provider_id
@@ -642,16 +642,16 @@ impl LLMConfigManager {
         }
 
         if !has_configured_provider {
-            debug!("✅ No configured providers found");
+            debug!("No configured providers found");
             issues.push("No LLM providers are properly configured".to_string());
         }
 
         if config.active_provider.is_none() && has_configured_provider {
-            debug!("✅ No active provider selected despite having configured providers");
+            debug!("No active provider selected despite having configured providers");
             issues.push("No active provider selected".to_string());
         }
 
-        debug!("✅ Validation complete, {} issues found", issues.len());
+        debug!("Validation complete, {} issues found", issues.len());
         Ok(issues)
     }
 
@@ -717,9 +717,9 @@ impl LLMConfigManager {
         };
 
         // Call the LLM directly
-        info!("💬 Calling LLM for provider: {}", provider_id);
+        info!("Calling LLM for provider: {}", provider_id);
         let result = llm_client.create_message(request).await?;
-        info!("✅ LLM call succeeded for provider: {}", provider_id);
+        info!("LLM call succeeded for provider: {}", provider_id);
 
         Ok(result)
     }

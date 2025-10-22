@@ -630,7 +630,7 @@ pub async fn activate_profile(
     .await
     .map_err(|e| format!("Failed to set active profile: {}", e))?;
 
-    tracing::info!("✅ Profile {} added to active profiles", profile_id);
+    tracing::info!("Profile {} added to active profiles", profile_id);
 
     let activation = ProfileActivation {
         id: activation_id,
@@ -796,7 +796,7 @@ pub async fn deactivate_profile(
         .map_err(|e| format!("Failed to clear active profile: {}", e))?;
 
     tracing::info!(
-        "✅ Profile {} deactivated ({} servers disconnected)",
+        "Profile {} deactivated ({} servers disconnected)",
         profile_id,
         servers_to_disconnect.len()
     );
