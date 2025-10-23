@@ -1,8 +1,7 @@
 /// Database Tests for TurboMCP Studio Backend
 ///
 /// Tests database migrations, schema integrity, and query correctness
-
-use sqlx::{SqlitePool, Row};
+use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
 
 #[tokio::test]
@@ -35,23 +34,37 @@ async fn test_workflow_executions_schema_exists() {
     .expect("Failed to create workflow_executions table");
 
     // Verify table exists and has correct columns
-    let columns: Vec<(String,)> = sqlx::query_as(
-        "SELECT name FROM pragma_table_info('workflow_executions') ORDER BY name"
-    )
-    .fetch_all(&pool)
-    .await
-    .expect("Failed to query table info");
+    let columns: Vec<(String,)> =
+        sqlx::query_as("SELECT name FROM pragma_table_info('workflow_executions') ORDER BY name")
+            .fetch_all(&pool)
+            .await
+            .expect("Failed to query table info");
 
     let column_names: Vec<String> = columns.into_iter().map(|c| c.0).collect();
 
     // Verify critical columns exist
-    assert!(column_names.contains(&"id".to_string()), "Missing id column");
-    assert!(column_names.contains(&"step_results".to_string()), "Missing step_results column");
-    assert!(column_names.contains(&"status".to_string()), "Missing status column");
-    assert!(column_names.contains(&"started_at".to_string()), "Missing started_at column");
-    
+    assert!(
+        column_names.contains(&"id".to_string()),
+        "Missing id column"
+    );
+    assert!(
+        column_names.contains(&"step_results".to_string()),
+        "Missing step_results column"
+    );
+    assert!(
+        column_names.contains(&"status".to_string()),
+        "Missing status column"
+    );
+    assert!(
+        column_names.contains(&"started_at".to_string()),
+        "Missing started_at column"
+    );
+
     // Verify we DON'T have the old 'results' column
-    assert!(!column_names.contains(&"results".to_string()), "Old 'results' column should not exist");
+    assert!(
+        !column_names.contains(&"results".to_string()),
+        "Old 'results' column should not exist"
+    );
 
     pool.close().await;
 }
@@ -88,7 +101,7 @@ async fn test_workflow_execution_insert_and_query() {
     // Insert test data
     let test_id = Uuid::new_v4().to_string();
     let test_collection_id = Uuid::new_v4().to_string();
-    
+
     sqlx::query(
         r#"
         INSERT INTO workflow_executions 
@@ -113,13 +126,11 @@ async fn test_workflow_execution_insert_and_query() {
     .expect("Failed to insert test data");
 
     // Query back the data using the CORRECT column name
-    let row = sqlx::query(
-        "SELECT id, step_results, status FROM workflow_executions WHERE id = ?"
-    )
-    .bind(&test_id)
-    .fetch_one(&pool)
-    .await
-    .expect("Failed to query workflow execution");
+    let row = sqlx::query("SELECT id, step_results, status FROM workflow_executions WHERE id = ?")
+        .bind(&test_id)
+        .fetch_one(&pool)
+        .await
+        .expect("Failed to query workflow execution");
 
     let id: String = row.get("id");
     let step_results: String = row.get("step_results");
@@ -187,13 +198,16 @@ async fn test_migration_from_old_results_column() {
     // Perform migration (same logic as in database.rs)
     // 1. Check if old column exists
     let has_old_column: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM pragma_table_info('workflow_executions') WHERE name = 'results'"
+        "SELECT COUNT(*) FROM pragma_table_info('workflow_executions') WHERE name = 'results'",
     )
     .fetch_one(&pool)
     .await
     .expect("Failed to check for old column");
 
-    assert_eq!(has_old_column, 1, "Old 'results' column should exist before migration");
+    assert_eq!(
+        has_old_column, 1,
+        "Old 'results' column should exist before migration"
+    );
 
     // 2. Create new table with correct schema
     sqlx::query(
@@ -244,22 +258,28 @@ async fn test_migration_from_old_results_column() {
 
     // Verify migration succeeded
     let has_new_column: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM pragma_table_info('workflow_executions') WHERE name = 'step_results'"
+        "SELECT COUNT(*) FROM pragma_table_info('workflow_executions') WHERE name = 'step_results'",
     )
     .fetch_one(&pool)
     .await
     .expect("Failed to check for new column");
 
-    assert_eq!(has_new_column, 1, "New 'step_results' column should exist after migration");
+    assert_eq!(
+        has_new_column, 1,
+        "New 'step_results' column should exist after migration"
+    );
 
     let has_old_column_after: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM pragma_table_info('workflow_executions') WHERE name = 'results'"
+        "SELECT COUNT(*) FROM pragma_table_info('workflow_executions') WHERE name = 'results'",
     )
     .fetch_one(&pool)
     .await
     .expect("Failed to check for old column after migration");
 
-    assert_eq!(has_old_column_after, 0, "Old 'results' column should not exist after migration");
+    assert_eq!(
+        has_old_column_after, 0,
+        "Old 'results' column should not exist after migration"
+    );
 
     // Verify data was preserved
     let row = sqlx::query("SELECT step_results FROM workflow_executions WHERE id = ?")
@@ -269,7 +289,10 @@ async fn test_migration_from_old_results_column() {
         .expect("Failed to query migrated data");
 
     let step_results: String = row.get("step_results");
-    assert!(step_results.contains("test"), "Data should be preserved during migration");
+    assert!(
+        step_results.contains("test"),
+        "Data should be preserved during migration"
+    );
 
     pool.close().await;
 }
@@ -302,7 +325,7 @@ async fn test_workflow_status_variants() {
 
     // Test all status variants from Phase 1 fix
     let statuses = vec!["Running", "Completed", "Failed", "Cancelled", "Paused"];
-    
+
     for status in &statuses {
         let id = Uuid::new_v4().to_string();
         sqlx::query(
@@ -324,18 +347,20 @@ async fn test_workflow_status_variants() {
         .bind("{}")
         .execute(&pool)
         .await
-        .expect(&format!("Failed to insert status: {}", status));
+        .unwrap_or_else(|_| panic!("Failed to insert status: {}", status));
 
         // Query back
-        let retrieved_status: String = sqlx::query_scalar(
-            "SELECT status FROM workflow_executions WHERE id = ?"
-        )
-        .bind(&id)
-        .fetch_one(&pool)
-        .await
-        .expect(&format!("Failed to query status: {}", status));
+        let retrieved_status: String =
+            sqlx::query_scalar("SELECT status FROM workflow_executions WHERE id = ?")
+                .bind(&id)
+                .fetch_one(&pool)
+                .await
+                .unwrap_or_else(|_| panic!("Failed to query status: {}", status));
 
-        assert_eq!(&retrieved_status, status, "Status should round-trip correctly");
+        assert_eq!(
+            &retrieved_status, status,
+            "Status should round-trip correctly"
+        );
     }
 
     pool.close().await;
@@ -365,13 +390,18 @@ async fn test_query_prevents_column_mismatch_panic() {
         .fetch_optional(&pool)
         .await;
 
-    assert!(result.is_err(), "Query with wrong column name should return error, not panic");
-    
+    assert!(
+        result.is_err(),
+        "Query with wrong column name should return error, not panic"
+    );
+
     // Verify the error message mentions the column
     if let Err(e) = result {
         let error_msg = e.to_string();
         assert!(
-            error_msg.contains("results") || error_msg.contains("column") || error_msg.contains("no such column"),
+            error_msg.contains("results")
+                || error_msg.contains("column")
+                || error_msg.contains("no such column"),
             "Error should mention the problematic column, got: {}",
             error_msg
         );
@@ -379,4 +409,3 @@ async fn test_query_prevents_column_mismatch_panic() {
 
     pool.close().await;
 }
-
