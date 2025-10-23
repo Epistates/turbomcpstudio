@@ -5616,7 +5616,7 @@ checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
 dependencies = [
  "dyn-clone",
  "indexmap 1.9.3",
- "schemars_derive",
+ "schemars_derive 0.8.22",
  "serde",
  "serde_json",
  "url",
@@ -5641,10 +5641,13 @@ version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82d20c4491bc164fa2f6c5d44565947a52ad80b9505d8e36f8d54c27c739fcd0"
 dependencies = [
+ "chrono",
  "dyn-clone",
  "ref-cast",
+ "schemars_derive 1.0.4",
  "serde",
  "serde_json",
+ "uuid",
 ]
 
 [[package]]
@@ -5652,6 +5655,18 @@ name = "schemars_derive"
 version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn 2.0.107",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33d020396d1d138dc19f1165df7545479dcd58d93810dc5d646a16e55abefa80"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7657,9 +7672,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp"
-version = "2.0.2"
+version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9dcdb6759746d2164019b73adddb0d5c06b979e5c17219bebfa7374cbde7a4f2"
+checksum = "86f78e3fa22cd8624ec815821ff0ef0709b6228af9ab2f3a86055d21e29379da"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7669,6 +7684,7 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
+ "schemars 1.0.4",
  "serde",
  "serde_json",
  "syn 2.0.107",
@@ -7687,9 +7703,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-client"
-version = "2.0.2"
+version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee1ce9636504dd19d020ed50656b1ac55f7dd72f434759b4a22ec5c91eea65c2"
+checksum = "dc33e486f18f4982c67c266c2a497bf47c5d43af194199ad973cb745aa1419e8"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7707,9 +7723,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-macros"
-version = "2.0.2"
+version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29f0ab61e81115f0303d4abf093b6a31243b279a8c6d2f737fec9b1ac519b918"
+checksum = "7e9e81603f8a66bc57522ef70865f50d5c988137e0da7793cf5a69e287e0a1b4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7722,9 +7738,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-protocol"
-version = "2.0.2"
+version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31a2c95094ae43c03c3e3a0cadcb92a9507732ff428e33df97a568a0a6a4a0fb"
+checksum = "b1cdcfa307d4183039499ccf0d889441a78561e687748e49b08f565cfb067a94"
 dependencies = [
  "ahash 0.8.12",
  "arc-swap",
@@ -7756,9 +7772,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-server"
-version = "2.0.2"
+version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb9b8985ed04264d3e5dac7ed43e08abbc414522ffafc0b007c6fec63e74ddb9"
+checksum = "a63ccc870b4f71905c15ee411f2e75ac06f28a6daa9d4a554a1aca6b192da678"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7788,9 +7804,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-transport"
-version = "2.0.2"
+version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a256bbbbce804b15d60fb6f2aec6964be86eade6727add376753475f9f1b90e5"
+checksum = "345b608e9dc93450622e83c8c2a7713d179dff0bc9d5593a615350c050d2c5c2"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",

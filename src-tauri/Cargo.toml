@@ -35,11 +35,11 @@ reqwest = { version = "0.12", features = ["json"] }
 # LLM Provider SDKs
 async-openai = "0.30"  # Official OpenAI SDK for Rust
 
-# TurboMCP integration - v2.0.2 (stable)
-turbomcp = "2.0.2"
-turbomcp-client = "2.0.2"
+# TurboMCP integration - v2.0.4 (from crates.io)
+turbomcp = "2.0.4"
+turbomcp-client = "2.0.4"
 # turbomcp-transport is defined in target-specific sections below
-turbomcp-protocol = "2.0.2"
+turbomcp-protocol = "2.0.4"
 
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
@@ -85,11 +85,11 @@ log = "0.4.28"
 
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
 # Unix socket support on Linux and macOS
-turbomcp-transport = { version = "2.0.2", features = ["stdio", "http", "websocket", "tcp", "unix", "compression", "tls"] }
+turbomcp-transport = { version = "2.0.4", features = ["stdio", "http", "websocket", "tcp", "unix", "compression", "tls"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 # Exclude unix feature on Windows
-turbomcp-transport = { version = "2.0.2", features = ["stdio", "http", "websocket", "tcp", "compression", "tls"] }
+turbomcp-transport = { version = "2.0.4", features = ["stdio", "http", "websocket", "tcp", "compression", "tls"] }
 
 [features]
 default = ["stdio", "http", "websocket", "tcp", "plugins"]
