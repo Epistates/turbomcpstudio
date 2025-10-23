@@ -456,10 +456,7 @@ pub async fn delete_server_config(
     server_id: String,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    log::debug!(
-        "delete_server_config called with server_id: {}",
-        server_id
-    );
+    log::debug!("delete_server_config called with server_id: {}", server_id);
 
     // Try to get database, return graceful error if not ready
     let app_state = app_handle.try_state::<AppState>().ok_or_else(|| {
@@ -488,9 +485,6 @@ pub async fn delete_server_config(
         format!("Failed to delete server config: {}", e)
     })?;
 
-    log::info!(
-        "Successfully deleted server configuration: {}",
-        server_id
-    );
+    log::info!("Successfully deleted server configuration: {}", server_id);
     Ok(())
 }

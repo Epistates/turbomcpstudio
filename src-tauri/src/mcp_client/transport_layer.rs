@@ -54,13 +54,24 @@ impl TransportLayer {
     fn redact_env_value(key: &str, value: &str) -> String {
         // List of patterns that indicate sensitive data
         let sensitive_patterns = [
-            "KEY", "TOKEN", "SECRET", "PASSWORD", "PASS", "PWD",
-            "AUTH", "CREDENTIAL", "API", "BEARER", "ACCESS"
+            "KEY",
+            "TOKEN",
+            "SECRET",
+            "PASSWORD",
+            "PASS",
+            "PWD",
+            "AUTH",
+            "CREDENTIAL",
+            "API",
+            "BEARER",
+            "ACCESS",
         ];
 
         // Check if the key contains any sensitive pattern (case-insensitive)
         let key_upper = key.to_uppercase();
-        let is_sensitive = sensitive_patterns.iter().any(|pattern| key_upper.contains(pattern));
+        let is_sensitive = sensitive_patterns
+            .iter()
+            .any(|pattern| key_upper.contains(pattern));
 
         if is_sensitive {
             // Show first 4 chars (or less if shorter), then mask the rest

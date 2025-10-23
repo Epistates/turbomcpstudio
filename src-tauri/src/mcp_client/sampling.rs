@@ -308,10 +308,7 @@ impl StudioSamplingHandler {
         let rejection_error = HandlerError::UserCancelled;
         let boxed_error: Box<dyn std::error::Error + Send + Sync> = Box::new(rejection_error);
         if tx.send(Err(boxed_error)).is_err() {
-            tracing::error!(
-                "Failed to send rejection (channel closed): {}",
-                request_id
-            );
+            tracing::error!("Failed to send rejection (channel closed): {}", request_id);
             return Err("Channel closed".to_string());
         }
 

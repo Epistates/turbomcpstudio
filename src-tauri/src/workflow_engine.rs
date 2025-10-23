@@ -236,13 +236,25 @@ impl WorkflowEngine {
                     tokio::spawn(async move {
                         let db_lock = db_clone.read().await;
                         if let Some(database) = db_lock.as_ref() {
-                            if let Err(e) = database.save_workflow_execution(&execution_to_save).await {
-                                tracing::error!("Failed to persist workflow execution {}: {}", execution_to_save.id, e);
+                            if let Err(e) =
+                                database.save_workflow_execution(&execution_to_save).await
+                            {
+                                tracing::error!(
+                                    "Failed to persist workflow execution {}: {}",
+                                    execution_to_save.id,
+                                    e
+                                );
                             } else {
-                                tracing::info!("Successfully persisted workflow execution {} to database", execution_to_save.id);
+                                tracing::info!(
+                                    "Successfully persisted workflow execution {} to database",
+                                    execution_to_save.id
+                                );
                             }
                         } else {
-                            tracing::warn!("Database not available, workflow execution {} not persisted", execution_to_save.id);
+                            tracing::warn!(
+                                "Database not available, workflow execution {} not persisted",
+                                execution_to_save.id
+                            );
                         }
                     });
                 }
@@ -284,7 +296,9 @@ impl WorkflowEngine {
             // Check for cancellation before each step
             if self.is_cancelled(execution_id).await {
                 tracing::info!("Workflow execution {} cancelled, stopping", execution_id);
-                return Err(McpStudioError::WorkflowError("Execution cancelled by user".to_string()));
+                return Err(McpStudioError::WorkflowError(
+                    "Execution cancelled by user".to_string(),
+                ));
             }
 
             if !step.enabled {
@@ -307,8 +321,13 @@ impl WorkflowEngine {
             loop {
                 // Check for cancellation before each retry attempt
                 if self.is_cancelled(execution_id).await {
-                    tracing::info!("Workflow execution {} cancelled during retry, stopping", execution_id);
-                    return Err(McpStudioError::WorkflowError("Execution cancelled by user".to_string()));
+                    tracing::info!(
+                        "Workflow execution {} cancelled during retry, stopping",
+                        execution_id
+                    );
+                    return Err(McpStudioError::WorkflowError(
+                        "Execution cancelled by user".to_string(),
+                    ));
                 }
 
                 match self.execute_single_step(execution_id, &step).await {

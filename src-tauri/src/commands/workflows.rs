@@ -23,7 +23,8 @@ pub async fn execute_workflow(
 ) -> Result<WorkflowExecution, String> {
     // Use the shared workflow engine from AppState
     // This ensures all workflow commands see the same execution state
-    let execution = app_state.workflow_engine
+    let execution = app_state
+        .workflow_engine
         .execute_workflow(collection, user_variables, None)
         .await
         .map_err(|e| format!("Failed to execute workflow: {}", e))?;
@@ -71,7 +72,8 @@ pub async fn stop_workflow_execution(
         Uuid::parse_str(&execution_id).map_err(|e| format!("Invalid execution ID: {}", e))?;
 
     // Use the shared workflow engine to stop execution
-    app_state.workflow_engine
+    app_state
+        .workflow_engine
         .stop_execution(uuid)
         .await
         .map_err(|e| format!("Failed to stop workflow execution: {}", e))?;

@@ -59,10 +59,7 @@ impl Database {
                     tracing::info!("Cleared active profile state for fresh startup (in-memory)");
                 }
                 Err(e) => {
-                    tracing::warn!(
-                        "Failed to clear active profile state (non-critical): {}",
-                        e
-                    );
+                    tracing::warn!("Failed to clear active profile state (non-critical): {}", e);
                 }
             }
 
@@ -299,7 +296,7 @@ impl Database {
                         user_variables TEXT NOT NULL,
                         FOREIGN KEY(collection_id) REFERENCES collections(id) ON DELETE CASCADE
                     )
-                    "#
+                    "#,
                 )
                 .execute(&self.pool)
                 .await?;
@@ -313,7 +310,7 @@ impl Database {
                     SELECT id, collection_id, collection_version, started_at, completed_at, status,
                            results, final_variables, summary, environment_name, user_variables
                     FROM workflow_executions
-                    "#
+                    "#,
                 )
                 .execute(&self.pool)
                 .await?;
@@ -734,10 +731,7 @@ impl Database {
         );
 
         if result.rows_affected() == 0 {
-            log::warn!(
-                "No rows affected - server {} may not exist in database",
-                id
-            );
+            log::warn!("No rows affected - server {} may not exist in database", id);
         } else {
             log::info!("Successfully deleted server configuration from database");
         }
@@ -1169,10 +1163,7 @@ impl Database {
                     Ok(())
                 } else {
                     // Other errors should be logged but not fail startup
-                    tracing::warn!(
-                        "Failed to clear active profile state: {} (non-critical)",
-                        e
-                    );
+                    tracing::warn!("Failed to clear active profile state: {} (non-critical)", e);
                     Ok(())
                 }
             }
