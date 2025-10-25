@@ -15,16 +15,16 @@ A native desktop application for developing, testing, and debugging Model Contex
 
 ---
 
-## ✨ Why TurboMCP Studio?
+## Why TurboMCP Studio?
 
-- 🚀 **Native Performance** - Built with Rust and Tauri for blazing-fast native desktop experience
-- 🎨 **Beautiful UI** - Modern design system with light/dark themes and responsive layouts
-- 🔌 **Multi-Transport** - STDIO, HTTP, WebSocket, TCP, and Unix socket support
-- 🏢 **Enterprise Ready** - Production-grade error handling and state management
-- 🔒 **Type Safe** - Full TypeScript integration throughout
-- 🌍 **Cross-Platform** - Single codebase for macOS, Windows, and Linux
+- **Native Performance** - Built with Rust and Tauri for blazing-fast native desktop experience
+- **Beautiful UI** - Modern design system with light/dark themes and responsive layouts
+- **Multi-Transport** - STDIO, HTTP, WebSocket, TCP, and Unix socket support
+- **Enterprise Ready** - Production-grade error handling and state management
+- **Type Safe** - Full TypeScript integration throughout
+- **Cross-Platform** - Single codebase for macOS, Windows, and Linux
 
-## 🎯 Quick Start
+## Quick Start
 
 1. **Download** the latest release for your platform
 2. **Install** and launch TurboMCP Studio
@@ -32,7 +32,7 @@ A native desktop application for developing, testing, and debugging Model Contex
 4. **Explore** tools, resources, and prompts
 5. **Test** your MCP implementation
 
-## 🎯 Features
+## Features
 
 ### Current (v0.1.0)
 
@@ -520,12 +520,12 @@ TurboMCP Studio is powered by **[TurboMCP](https://github.com/Epistates/turbomcp
 
 ### Why TurboMCP?
 
-- **🚀 SIMD-Accelerated JSON**: 2-3x faster protocol operations with SIMD optimization
-- **🏢 Enterprise Security**: OAuth 2.1, CORS, TLS, rate limiting, and circuit breakers built-in
-- **🔌 Multi-Transport Native**: Full support for STDIO, HTTP, WebSocket, TCP, and Unix sockets
-- **💪 Production Resilience**: Connection pooling, health monitoring, and automatic retry logic
-- **📋 100% MCP Compliant**: Complete implementation of the MCP 2025-06-18 specification
-- **🎯 Type Safety**: Comprehensive Rust types for all protocol operations
+- ** SIMD-Accelerated JSON**: 2-3x faster protocol operations with SIMD optimization
+- ** Enterprise Security**: OAuth 2.1, CORS, TLS, rate limiting, and circuit breakers built-in
+- ** Multi-Transport Native**: Full support for STDIO, HTTP, WebSocket, TCP, and Unix sockets
+- ** Production Resilience**: Connection pooling, health monitoring, and automatic retry logic
+- ** 100% MCP Compliant**: Complete implementation of the MCP 2025-06-18 specification
+- ** Type Safety**: Comprehensive Rust types for all protocol operations
 
 TurboMCP enables TurboMCP Studio to deliver a production-ready, enterprise-grade developer experience for MCP server development and testing.
 
