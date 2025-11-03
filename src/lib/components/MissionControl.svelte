@@ -374,7 +374,7 @@
   }
 
   /* CSS Variables (fallback to light theme) */
-  :global {
+  :global(:root) {
     --bg-primary: #ffffff;
     --bg-secondary: #f9fafb;
     --bg-tertiary: #f3f4f6;
