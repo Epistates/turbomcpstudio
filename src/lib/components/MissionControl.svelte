@@ -43,6 +43,9 @@
   const isGeneratingTests = $derived(currentState.isGeneratingTests);
   const isRunningTests = $derived(currentState.isRunningTests);
 
+  // Tab state for right panel
+  let activeTab = $state<'copilot' | 'coverage' | 'insights'>('copilot');
+
   // Handlers for pane interactions
   function handleSelectMessage(messageId: string) {
     workspaceStore.selectMessage(messageId);
@@ -93,39 +96,58 @@
     </div>
   </div>
 
-  <!-- Main grid: Protocol + Copilot (top), Coverage + Insights (bottom) -->
-  <div class="workspace-grid">
-    <!-- Top row: 60/40 split -->
-    <div class="top-row">
-      <!-- Left pane: Live Protocol Inspector (primary) -->
-      <div class="pane protocol-pane">
-        <div class="pane-header">
-          <h3>📊 Live Protocol</h3>
-          <div class="pane-controls">
-            <span class="message-count">
-              {currentState.protocolMessages.length} messages
-            </span>
-          </div>
-        </div>
-        <div class="pane-content">
-          <ProtocolInspector
-            serverId={context.selectedServerId || ''}
-            onSelectMessage={handleSelectMessage}
-          />
-        </div>
+  <!-- Main workspace: Protocol (70%) + Context Panel (30%) -->
+  <div class="workspace-container">
+    <!-- Left: Live Protocol (Primary) -->
+    <div class="protocol-column">
+      <div class="pane-header compact">
+        <h3>📊 Live Protocol</h3>
+        <span class="message-badge">{currentState.protocolMessages.length}</span>
+      </div>
+      <div class="pane-content">
+        <ProtocolInspector
+          serverId={context.selectedServerId || ''}
+          onSelectMessage={handleSelectMessage}
+        />
+      </div>
+    </div>
+
+    <!-- Right: Context Panel (Tabbed) -->
+    <div class="context-panel">
+      <!-- Tab bar -->
+      <div class="tab-bar">
+        <button
+          class="tab"
+          class:active={activeTab === 'copilot'}
+          on:click={() => (activeTab = 'copilot')}
+        >
+          🤖
+          <span class="tab-label">Copilot</span>
+          <span class="tab-badge">{suggestions.length}</span>
+        </button>
+        <button
+          class="tab"
+          class:active={activeTab === 'coverage'}
+          on:click={() => (activeTab = 'coverage')}
+        >
+          ✅
+          <span class="tab-label">Coverage</span>
+          <span class="tab-badge">{Math.round(coverage.overallPassRate)}%</span>
+        </button>
+        <button
+          class="tab"
+          class:active={activeTab === 'insights'}
+          on:click={() => (activeTab = 'insights')}
+        >
+          📈
+          <span class="tab-label">Insights</span>
+          <span class="tab-badge">{insights.length}</span>
+        </button>
       </div>
 
-      <!-- Right pane: AI Copilot (contextual intelligence) -->
-      <div class="pane copilot-pane">
-        <div class="pane-header">
-          <h3>🤖 AI Copilot</h3>
-          <div class="pane-controls">
-            <span class="suggestion-count">
-              {suggestions.length} suggestions
-            </span>
-          </div>
-        </div>
-        <div class="pane-content">
+      <!-- Tab content -->
+      <div class="tab-content">
+        {#if activeTab === 'copilot'}
           <AICopilot
             selectedMessage={selectedMessage}
             selectedTest={selectedTest}
@@ -134,46 +156,20 @@
             onSuggestion={handleSuggestionAction}
             onInsight={handleInsightAction}
           />
-        </div>
-      </div>
-    </div>
-
-    <!-- Middle row: Coverage Matrix (full width) -->
-    <div class="coverage-pane">
-      <div class="pane-header">
-        <h3>✅ Test Coverage</h3>
-        <div class="pane-controls">
-          <span class="coverage-stats">
-            {Math.round(coverage.overallPassRate)}% pass · {coverage.testedTools}/{coverage.totalTools} tools tested
-          </span>
-        </div>
-      </div>
-      <div class="pane-content">
-        <CoverageMatrix
-          coverage={coverage}
-          selectedTestId={selectedTest?.id || null}
-          onSelectTest={handleSelectTest}
-        />
-      </div>
-    </div>
-
-    <!-- Bottom row: Insights (full width) -->
-    <div class="insights-pane">
-      <div class="pane-header">
-        <h3>📈 Insights</h3>
-        <div class="pane-controls">
-          <span class="insight-count">
-            {insights.length} patterns detected
-          </span>
-        </div>
-      </div>
-      <div class="pane-content">
-        <InsightsPanel
-          insights={insights}
-          selectedTestId={selectedTest?.id || null}
-          onSelectTest={handleSelectTest}
-          onAction={handleInsightAction}
-        />
+        {:else if activeTab === 'coverage'}
+          <CoverageMatrix
+            coverage={coverage}
+            selectedTestId={selectedTest?.id || null}
+            onSelectTest={handleSelectTest}
+          />
+        {:else if activeTab === 'insights'}
+          <InsightsPanel
+            insights={insights}
+            selectedTestId={selectedTest?.id || null}
+            onSelectTest={handleSelectTest}
+            onAction={handleInsightAction}
+          />
+        {/if}
       </div>
     </div>
   </div>
@@ -240,56 +236,96 @@
     color: var(--info-text);
   }
 
-  /* Workspace grid layout */
-  .workspace-grid {
+  /* Main workspace container (70/30 split) */
+  .workspace-container {
     display: grid;
-    grid-template-rows: 1fr auto auto;
-    grid-template-columns: 1fr;
+    grid-template-columns: 7fr 3fr;
     flex: 1;
     gap: 0;
     overflow: hidden;
+    border-top: 1px solid var(--border-color);
   }
 
-  /* Top row: Protocol + Copilot (60/40 split) */
-  .top-row {
-    display: grid;
-    grid-template-columns: 1.5fr 1fr;
-    gap: 0;
-    border-bottom: 1px solid var(--border-color);
-    min-height: 0;
-  }
-
-  /* Panes */
-  .pane {
+  /* Left column: Protocol Inspector */
+  .protocol-column {
     display: flex;
     flex-direction: column;
     border-right: 1px solid var(--border-color);
     min-height: 0;
   }
 
-  .pane:last-child {
-    border-right: none;
+  /* Right column: Context Panel with tabs */
+  .context-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
   }
 
-  .protocol-pane {
-    /* Left primary pane */
-  }
-
-  .copilot-pane {
-    /* Right secondary pane */
-    border-left: 1px solid var(--border-color);
-    border-right: none;
-  }
-
-  .coverage-pane {
+  /* Tab bar */
+  .tab-bar {
+    display: flex;
+    gap: 0;
     border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    flex-shrink: 0;
+    padding: 0 0.5rem;
   }
 
-  .insights-pane {
-    /* Bottom pane */
+  .tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0.5rem;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
   }
 
-  /* Pane internals */
+  .tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+  }
+
+  .tab.active {
+    color: var(--info-text);
+    border-bottom-color: var(--info-text);
+  }
+
+  .tab-label {
+    display: none;
+  }
+
+  .tab-badge {
+    display: inline-block;
+    padding: 0.15rem 0.35rem;
+    background: var(--bg-tertiary);
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .tab.active .tab-badge {
+    background: var(--info-bg);
+    color: var(--info-text);
+  }
+
+  /* Tab content area */
+  .tab-content {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+    padding: 0;
+  }
+
+  /* Pane header (both types) */
   .pane-header {
     display: flex;
     align-items: center;
@@ -300,31 +336,28 @@
     flex-shrink: 0;
   }
 
-  .pane-header h3 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
+  .pane-header.compact {
+    padding: 0.5rem 0.75rem;
     gap: 0.5rem;
   }
 
-  .pane-controls {
+  .pane-header h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
     display: flex;
-    gap: 0.75rem;
-    font-size: 0.875rem;
-    color: var(--text-secondary);
+    align-items: center;
+    gap: 0.4rem;
   }
 
-  .message-count,
-  .suggestion-count,
-  .coverage-stats,
-  .insight-count {
+  .message-badge {
     display: inline-block;
-    padding: 0.25rem 0.5rem;
+    padding: 0.2rem 0.4rem;
     background: var(--bg-tertiary);
     border-radius: 0.25rem;
-    font-weight: 500;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
   }
 
   .pane-content {
@@ -335,41 +368,52 @@
 
   /* Responsive adjustments */
   @media (max-width: 1440px) {
-    .top-row {
-      grid-template-columns: 1.25fr 1fr;
+    .tab-label {
+      display: inline;
+    }
+
+    .tab {
+      padding: 0.75rem 0.75rem;
+    }
+  }
+
+  @media (max-width: 1200px) {
+    .workspace-container {
+      grid-template-columns: 65% 35%;
     }
   }
 
   @media (max-width: 1024px) {
-    .top-row {
-      grid-template-columns: 1fr 1fr;
+    .workspace-container {
+      grid-template-columns: 60% 40%;
+    }
+
+    .tab-label {
+      display: inline;
     }
   }
 
   @media (max-width: 768px) {
-    .workspace-grid {
-      grid-template-rows: 1fr auto auto auto;
-    }
-
-    .top-row {
+    .workspace-container {
       grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
     }
 
-    .pane {
+    .protocol-column {
       border-right: none;
       border-bottom: 1px solid var(--border-color);
     }
 
-    .copilot-pane {
-      border-left: none;
+    .context-panel {
+      /* Full width on mobile */
     }
 
-    .coverage-pane {
-      border-bottom: 1px solid var(--border-color);
+    .tab-label {
+      display: inline;
     }
 
-    .insights-pane {
-      border-bottom: none;
+    .tab {
+      padding: 0.5rem;
     }
   }
 
