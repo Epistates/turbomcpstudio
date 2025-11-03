@@ -653,8 +653,42 @@ impl Database {
             .execute(&self.pool)
             .await?;
 
+        // =====================================================================
+        // Proxy Configuration Table
+        // =====================================================================
+        tracing::info!("Creating proxies table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS proxies (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                backend_type TEXT NOT NULL,
+                backend_config TEXT NOT NULL,
+                frontend_type TEXT NOT NULL,
+                frontend_config TEXT NOT NULL,
+                auth_type TEXT,
+                auth_config TEXT,
+                metrics_enabled BOOLEAN NOT NULL DEFAULT 1,
+                max_requests_tracked INTEGER NOT NULL DEFAULT 10000,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                last_started_at TEXT,
+                last_stopped_at TEXT
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("proxies table created successfully");
+
+        tracing::info!("Creating idx_proxies_created_at index");
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_proxies_created_at ON proxies(created_at)")
+            .execute(&self.pool)
+            .await?;
+
         let migration_duration = migration_start.elapsed();
-        tracing::info!("Database migrations completed successfully in {:?} (11 tables + 3 indexes, typically 3-15ms)", migration_duration);
+        tracing::info!("Database migrations completed successfully in {:?} (12 tables + 4 indexes, typically 3-15ms)", migration_duration);
         Ok(())
     }
 
@@ -1263,36 +1297,238 @@ impl Database {
         }
     }
 
-    // Proxy-related database methods (TODO: implement full schema)
+    // Proxy-related database methods
 
-    /// Save proxy configuration
+    /// Save proxy configuration (insert or replace)
     pub async fn save_proxy_config(
         &self,
-        _config: &crate::proxy::ProxyConfig,
+        config: &crate::proxy::ProxyConfig,
     ) -> McpResult<()> {
-        // TODO: Implement full proxy schema and persistence
-        // For now, this is a stub that succeeds
+        let backend_config_json = serde_json::to_string(&config.backend_config)?;
+        let frontend_config_json = serde_json::to_string(&config.frontend_config)?;
+        let auth_config_json = serde_json::to_string(&config.auth_config)?;
+
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO proxies
+            (id, name, description, backend_type, backend_config, frontend_type, frontend_config,
+             auth_type, auth_config, metrics_enabled, max_requests_tracked, created_at, updated_at,
+             last_started_at, last_stopped_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(&config.id.0)
+        .bind(&config.name)
+        .bind(&config.description)
+        .bind(&config.backend_type)
+        .bind(&backend_config_json)
+        .bind(format!("{:?}", config.frontend_type).to_lowercase())
+        .bind(&frontend_config_json)
+        .bind(format!("{:?}", match &config.auth_config {
+            crate::proxy::AuthConfig::None => "none",
+            crate::proxy::AuthConfig::Bearer { .. } => "bearer",
+            crate::proxy::AuthConfig::ApiKey { .. } => "api_key",
+            crate::proxy::AuthConfig::Jwt { .. } => "jwt",
+        }))
+        .bind(&auth_config_json)
+        .bind(config.metrics_enabled as i32)
+        .bind(config.max_requests_tracked as i32)
+        .bind(config.created_at.duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            .to_string())
+        .bind(config.updated_at.duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            .to_string())
+        .bind(config.last_started_at.map(|t| {
+            t.duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                .to_string()
+        }))
+        .bind(config.last_stopped_at.map(|t| {
+            t.duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                .to_string()
+        }))
+        .execute(&self.pool)
+        .await?;
+
         Ok(())
     }
 
     /// Get proxy configuration by ID
-    pub async fn get_proxy_config(&self, _proxy_id: &str) -> McpResult<Option<crate::proxy::ProxyConfig>> {
-        // TODO: Implement full proxy schema and retrieval
-        // For now, return None
-        Ok(None)
+    pub async fn get_proxy_config(&self, proxy_id: &str) -> McpResult<Option<crate::proxy::ProxyConfig>> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, name, description, backend_type, backend_config, frontend_type, frontend_config,
+                   auth_type, auth_config, metrics_enabled, max_requests_tracked, created_at, updated_at,
+                   last_started_at, last_stopped_at
+            FROM proxies WHERE id = ?
+            "#,
+        )
+        .bind(proxy_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        if let Some(row) = row {
+            let frontend_type = match row.get::<String, _>("frontend_type").as_str() {
+                "http" => crate::proxy::FrontendType::Http,
+                "websocket" => crate::proxy::FrontendType::WebSocket,
+                "tcp" => crate::proxy::FrontendType::Tcp,
+                _ => crate::proxy::FrontendType::Http,
+            };
+
+            let auth_config = match row.get::<Option<String>, _>("auth_type").as_deref() {
+                Some("bearer") => {
+                    let json: serde_json::Value = serde_json::from_str(
+                        &row.get::<String, _>("auth_config")
+                    )?;
+                    if let Some(token) = json.get("token").and_then(|t| t.as_str()) {
+                        crate::proxy::AuthConfig::Bearer { token: token.to_string() }
+                    } else {
+                        crate::proxy::AuthConfig::None
+                    }
+                }
+                Some("api_key") => {
+                    let json: serde_json::Value = serde_json::from_str(
+                        &row.get::<String, _>("auth_config")
+                    )?;
+                    if let (Some(key), Some(header)) = (
+                        json.get("key").and_then(|k| k.as_str()),
+                        json.get("header").and_then(|h| h.as_str()),
+                    ) {
+                        crate::proxy::AuthConfig::ApiKey {
+                            key: key.to_string(),
+                            header: header.to_string(),
+                        }
+                    } else {
+                        crate::proxy::AuthConfig::None
+                    }
+                }
+                Some("jwt") => {
+                    let json: serde_json::Value = serde_json::from_str(
+                        &row.get::<String, _>("auth_config")
+                    )?;
+                    if let (Some(issuer), Some(audience)) = (
+                        json.get("issuer").and_then(|i| i.as_str()),
+                        json.get("audience").and_then(|a| a.as_str()),
+                    ) {
+                        crate::proxy::AuthConfig::Jwt {
+                            issuer: issuer.to_string(),
+                            audience: audience.to_string(),
+                            secret: json.get("secret").and_then(|s| s.as_str()).map(|s| s.to_string()),
+                        }
+                    } else {
+                        crate::proxy::AuthConfig::None
+                    }
+                }
+                _ => crate::proxy::AuthConfig::None,
+            };
+
+            let created_at_secs: i64 = row.get::<String, _>("created_at").parse().unwrap_or(0);
+            let updated_at_secs: i64 = row.get::<String, _>("updated_at").parse().unwrap_or(0);
+
+            Ok(Some(crate::proxy::ProxyConfig {
+                id: crate::proxy::ProxyId(row.get("id")),
+                name: row.get("name"),
+                description: row.get("description"),
+                backend_type: row.get("backend_type"),
+                backend_config: serde_json::from_str(&row.get::<String, _>("backend_config"))?,
+                frontend_type,
+                frontend_config: serde_json::from_str(&row.get::<String, _>("frontend_config"))?,
+                auth_config,
+                metrics_enabled: row.get::<i32, _>("metrics_enabled") != 0,
+                max_requests_tracked: row.get::<i32, _>("max_requests_tracked") as usize,
+                created_at: std::time::UNIX_EPOCH + std::time::Duration::from_secs(created_at_secs as u64),
+                updated_at: std::time::UNIX_EPOCH + std::time::Duration::from_secs(updated_at_secs as u64),
+                last_started_at: row.get::<Option<String>, _>("last_started_at")
+                    .and_then(|s| s.parse::<i64>().ok())
+                    .map(|secs| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs as u64)),
+                last_stopped_at: row.get::<Option<String>, _>("last_stopped_at")
+                    .and_then(|s| s.parse::<i64>().ok())
+                    .map(|secs| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs as u64)),
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
     /// List all proxy configurations
     pub async fn list_proxy_configs(&self) -> McpResult<Vec<crate::proxy::ProxyConfig>> {
-        // TODO: Implement full proxy schema and listing
-        // For now, return empty vec
-        Ok(Vec::new())
+        let rows = sqlx::query(
+            r#"
+            SELECT id, name, description, backend_type, backend_config, frontend_type, frontend_config,
+                   auth_type, auth_config, metrics_enabled, max_requests_tracked, created_at, updated_at,
+                   last_started_at, last_stopped_at
+            FROM proxies
+            ORDER BY created_at DESC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut configs = Vec::new();
+
+        for row in rows {
+            let frontend_type = match row.get::<String, _>("frontend_type").as_str() {
+                "http" => crate::proxy::FrontendType::Http,
+                "websocket" => crate::proxy::FrontendType::WebSocket,
+                "tcp" => crate::proxy::FrontendType::Tcp,
+                _ => crate::proxy::FrontendType::Http,
+            };
+
+            let auth_config = match row.get::<Option<String>, _>("auth_type").as_deref() {
+                Some("bearer") => {
+                    let json: serde_json::Value = serde_json::from_str(
+                        &row.get::<String, _>("auth_config")
+                    )?;
+                    if let Some(token) = json.get("token").and_then(|t| t.as_str()) {
+                        crate::proxy::AuthConfig::Bearer { token: token.to_string() }
+                    } else {
+                        crate::proxy::AuthConfig::None
+                    }
+                }
+                _ => crate::proxy::AuthConfig::None,
+            };
+
+            let created_at_secs: i64 = row.get::<String, _>("created_at").parse().unwrap_or(0);
+            let updated_at_secs: i64 = row.get::<String, _>("updated_at").parse().unwrap_or(0);
+
+            configs.push(crate::proxy::ProxyConfig {
+                id: crate::proxy::ProxyId(row.get("id")),
+                name: row.get("name"),
+                description: row.get("description"),
+                backend_type: row.get("backend_type"),
+                backend_config: serde_json::from_str(&row.get::<String, _>("backend_config"))?,
+                frontend_type,
+                frontend_config: serde_json::from_str(&row.get::<String, _>("frontend_config"))?,
+                auth_config,
+                metrics_enabled: row.get::<i32, _>("metrics_enabled") != 0,
+                max_requests_tracked: row.get::<i32, _>("max_requests_tracked") as usize,
+                created_at: std::time::UNIX_EPOCH + std::time::Duration::from_secs(created_at_secs as u64),
+                updated_at: std::time::UNIX_EPOCH + std::time::Duration::from_secs(updated_at_secs as u64),
+                last_started_at: row.get::<Option<String>, _>("last_started_at")
+                    .and_then(|s| s.parse::<i64>().ok())
+                    .map(|secs| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs as u64)),
+                last_stopped_at: row.get::<Option<String>, _>("last_stopped_at")
+                    .and_then(|s| s.parse::<i64>().ok())
+                    .map(|secs| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs as u64)),
+            });
+        }
+
+        Ok(configs)
     }
 
     /// Delete proxy configuration
-    pub async fn delete_proxy_config(&self, _proxy_id: &str) -> McpResult<()> {
-        // TODO: Implement full proxy schema and deletion
-        // For now, this is a stub that succeeds
+    pub async fn delete_proxy_config(&self, proxy_id: &str) -> McpResult<()> {
+        sqlx::query("DELETE FROM proxies WHERE id = ?")
+            .bind(proxy_id)
+            .execute(&self.pool)
+            .await?;
+
         Ok(())
     }
 }
