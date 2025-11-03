@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 
-export type View = 'dashboard' | 'servers' | 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | 'protocol' | 'chat' | 'tests' | 'collections' | 'settings' | 'mission-control';
+export type View = 'dashboard' | 'servers' | 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | 'protocol' | 'chat' | 'testing' | 'collections' | 'settings';
 
 /**
  * ✅ NEW: Unified modal state structure
