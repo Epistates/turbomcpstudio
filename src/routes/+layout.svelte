@@ -235,27 +235,12 @@
       appStore.markStepError('servers', 'Database not ready yet');
     });
 
-    // Safety timeout: If no response from backend in 10 seconds, force initialization
-    // This prevents infinite loading if backend crashes or hangs
-    const safetyTimeout = setTimeout(() => {
-      if (!appReadyReceived) {
-        console.warn('⚠️ Backend initialization timeout - forcing app ready after 10s');
-        console.warn('This may indicate a backend crash or hang');
-
-        // Force complete initialization to unblock UI
-        appStore.setDatabaseReady(true);
-        appStore.setMcpManagerReady(true);
-        appStore.completeInitialization();
-
-        // Show warning to user
-        uiStore.showError('Backend initialization timed out. Some features may not work correctly. Check the console for errors.');
-      }
-    }, 10000);
-
-    // Clean up timeout when component unmounts
-    return () => {
-      clearTimeout(safetyTimeout);
-    };
+    // Issue #5 fix: Timeout removed - backend panic hook now handles all failure cases
+    // Backend always emits either:
+    // 1. "app-ready" on successful initialization (even with fallbacks)
+    // 2. "initialization-error" + "app-ready" on critical failures
+    // 3. "initialization-error" + "app-ready" on panic (caught by panic hook)
+    // No timeout needed - event-based synchronization is robust and follows Tauri best practices
 
     // Issue #18 fix: Window close cleanup is handled on Rust side via .on_window_event()
     // No JavaScript handler needed - Rust side has full control without permission issues
