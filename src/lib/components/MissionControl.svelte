@@ -103,7 +103,7 @@
           <h3>📊 Live Protocol</h3>
           <div class="pane-controls">
             <span class="message-count">
-              {$workspaceStore.getCurrentState().protocolMessages.length} messages
+              {currentState.protocolMessages.length} messages
             </span>
           </div>
         </div>
