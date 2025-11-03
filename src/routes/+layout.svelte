@@ -163,14 +163,16 @@
           await profileStore.loadProfiles();
           await profileStore.loadActiveProfiles();
 
-          appStore.completeInitialization();
-
           const totalTime = Date.now() - initializationStartTime;
           console.log(`🎉 Full initialization completed in ${totalTime}ms`);
         } catch (err) {
           console.error('❌ FRONTEND: Failed to initialize servers after database ready:', err);
           appStore.markStepError('servers', err instanceof Error ? err.message : 'Unknown error');
           appStore.setInitializationError('Failed to load server configurations');
+          // Continue anyway - UI should still be usable
+        } finally {
+          // CRITICAL: Always complete initialization to unblock UI, even if there are errors
+          appStore.completeInitialization();
         }
       } catch (err) {
         console.error('❌ Failed to process app-ready event:', err);
