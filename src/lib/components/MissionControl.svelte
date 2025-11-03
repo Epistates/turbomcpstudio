@@ -1,28 +1,25 @@
 <!--
   MissionControl.svelte
 
-  Unified workspace gestalt view coordinating:
-  - Live protocol stream (left, primary)
-  - AI copilot (right, contextual intelligence)
-  - Coverage matrix (bottom-left, validation state)
-  - Insights panel (bottom-right, emergent wisdom)
+  High-level AI testing analysis dashboard:
+  - Test Coverage Matrix (comprehensive tool testing status)
+  - AI Copilot (intelligent suggestions based on testing patterns)
+  - Insights Panel (detected patterns and recommendations)
 
-  Design principle: One continuous workflow, not separate tools.
-  User observes → understands → validates → improves (all visible at once).
+  Design principle: Strategic testing overview, not operational protocol details.
+  For detailed message inspection, use the Protocol tab.
 -->
 
 <script lang="ts">
   import {
     workspaceStore,
     workspaceServerContext,
-    workspaceSelectedMessage,
     workspaceSelectedTest,
     workspaceCoverage,
     workspaceInsights,
     workspaceSuggestions
   } from '$lib/stores/workspaceStore';
   import { contextStore } from '$lib/stores/contextStore';
-  import ProtocolInspector from './ProtocolInspector.svelte';
   import CoverageMatrix from './gestalts/CoverageMatrix.svelte';
   import InsightsPanel from './gestalts/InsightsPanel.svelte';
   import AICopilot from './gestalts/AICopilot.svelte';
@@ -32,7 +29,6 @@
 
   // Reactive derived state from workspaceStore
   const context = $derived($workspaceServerContext);
-  const selectedMessage = $derived($workspaceSelectedMessage);
   const selectedTest = $derived($workspaceSelectedTest);
   const coverage = $derived($workspaceCoverage);
   const insights = $derived($workspaceInsights);
@@ -43,29 +39,22 @@
   const isGeneratingTests = $derived(currentState.isGeneratingTests);
   const isRunningTests = $derived(currentState.isRunningTests);
 
-  // Tab state for right panel
-  let activeTab = $state<'copilot' | 'coverage' | 'insights'>('copilot');
+  // Tab state for main content
+  let activeTab = $state<'coverage' | 'copilot' | 'insights'>('coverage');
 
-  // Handlers for pane interactions
-  function handleSelectMessage(messageId: string) {
-    workspaceStore.selectMessage(messageId);
-    logger.debug('Message selected via MissionControl:', messageId);
-  }
-
+  // Handlers
   function handleSelectTest(testId: string) {
     workspaceStore.selectTest(testId);
-    logger.debug('Test selected via MissionControl:', testId);
+    logger.debug('Test selected:', testId);
   }
 
   function handleSuggestionAction(suggestion: any) {
     logger.info('Executing suggestion:', suggestion.id);
-    // Dispatch event or call action
     suggestion.action?.();
   }
 
   function handleInsightAction(insight: any) {
     logger.info('Addressing insight:', insight.type);
-    // Dispatch event for insight-specific action
   }
 </script>
 
@@ -96,81 +85,70 @@
     </div>
   </div>
 
-  <!-- Main workspace: Protocol (70%) + Context Panel (30%) -->
-  <div class="workspace-container">
-    <!-- Left: Live Protocol (Primary) -->
-    <div class="protocol-column">
-      <div class="pane-header compact">
-        <h3>📊 Live Protocol</h3>
-        <span class="message-badge">{currentState.protocolMessages.length}</span>
-      </div>
-      <div class="pane-content">
-        <ProtocolInspector
-          serverId={context.selectedServerId || ''}
-          onSelectMessage={handleSelectMessage}
-        />
-      </div>
+  <!-- Analysis Dashboard -->
+  <div class="analysis-dashboard">
+    <!-- Tab navigation -->
+    <div class="tab-nav">
+      <button
+        class="nav-tab"
+        class:active={activeTab === 'coverage'}
+        on:click={() => (activeTab = 'coverage')}
+      >
+        <span class="tab-icon">✅</span>
+        <span class="tab-label">Test Coverage</span>
+        <span class="tab-badge">{coverage.testedTools}/{coverage.totalTools} tools</span>
+      </button>
+      <button
+        class="nav-tab"
+        class:active={activeTab === 'copilot'}
+        on:click={() => (activeTab = 'copilot')}
+      >
+        <span class="tab-icon">🤖</span>
+        <span class="tab-label">AI Copilot</span>
+        <span class="tab-badge">{suggestions.length} suggestions</span>
+      </button>
+      <button
+        class="nav-tab"
+        class:active={activeTab === 'insights'}
+        on:click={() => (activeTab = 'insights')}
+      >
+        <span class="tab-icon">📈</span>
+        <span class="tab-label">Insights</span>
+        <span class="tab-badge">{insights.length} patterns</span>
+      </button>
     </div>
 
-    <!-- Right: Context Panel (Tabbed) -->
-    <div class="context-panel">
-      <!-- Tab bar -->
-      <div class="tab-bar">
-        <button
-          class="tab"
-          class:active={activeTab === 'copilot'}
-          on:click={() => (activeTab = 'copilot')}
-        >
-          🤖
-          <span class="tab-label">Copilot</span>
-          <span class="tab-badge">{suggestions.length}</span>
-        </button>
-        <button
-          class="tab"
-          class:active={activeTab === 'coverage'}
-          on:click={() => (activeTab = 'coverage')}
-        >
-          ✅
-          <span class="tab-label">Coverage</span>
-          <span class="tab-badge">{Math.round(coverage.overallPassRate)}%</span>
-        </button>
-        <button
-          class="tab"
-          class:active={activeTab === 'insights'}
-          on:click={() => (activeTab = 'insights')}
-        >
-          📈
-          <span class="tab-label">Insights</span>
-          <span class="tab-badge">{insights.length}</span>
-        </button>
-      </div>
-
-      <!-- Tab content -->
-      <div class="tab-content">
-        {#if activeTab === 'copilot'}
+    <!-- Tab content -->
+    <div class="tab-panel">
+      {#if activeTab === 'coverage'}
+        <div class="panel-content">
+          <CoverageMatrix
+            coverage={coverage}
+            selectedTestId={selectedTest?.id || null}
+            onSelectTest={handleSelectTest}
+          />
+        </div>
+      {:else if activeTab === 'copilot'}
+        <div class="panel-content">
           <AICopilot
-            selectedMessage={selectedMessage}
+            selectedMessage={null}
             selectedTest={selectedTest}
             suggestions={suggestions}
             insights={insights}
             onSuggestion={handleSuggestionAction}
             onInsight={handleInsightAction}
           />
-        {:else if activeTab === 'coverage'}
-          <CoverageMatrix
-            coverage={coverage}
-            selectedTestId={selectedTest?.id || null}
-            onSelectTest={handleSelectTest}
-          />
-        {:else if activeTab === 'insights'}
+        </div>
+      {:else if activeTab === 'insights'}
+        <div class="panel-content">
           <InsightsPanel
             insights={insights}
             selectedTestId={selectedTest?.id || null}
             onSelectTest={handleSelectTest}
             onAction={handleInsightAction}
           />
-        {/if}
-      </div>
+        </div>
+      {/if}
     </div>
   </div>
 </div>
@@ -236,184 +214,120 @@
     color: var(--info-text);
   }
 
-  /* Main workspace container (70/30 split) */
-  .workspace-container {
-    display: grid;
-    grid-template-columns: 7fr 3fr;
+  /* Analysis Dashboard */
+  .analysis-dashboard {
+    display: flex;
+    flex-direction: column;
     flex: 1;
-    gap: 0;
     overflow: hidden;
-    border-top: 1px solid var(--border-color);
   }
 
-  /* Left column: Protocol Inspector */
-  .protocol-column {
-    display: flex;
-    flex-direction: column;
-    border-right: 1px solid var(--border-color);
-    min-height: 0;
-  }
-
-  /* Right column: Context Panel with tabs */
-  .context-panel {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  /* Tab bar */
-  .tab-bar {
+  /* Tab Navigation */
+  .tab-nav {
     display: flex;
     gap: 0;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 2px solid var(--border-color);
     background: var(--bg-secondary);
     flex-shrink: 0;
-    padding: 0 0.5rem;
+    padding: 0 1rem;
   }
 
-  .tab {
+  .nav-tab {
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    padding: 0.75rem 0.5rem;
+    padding: 1rem 1.5rem;
     border: none;
     background: transparent;
     color: var(--text-secondary);
-    font-size: 0.875rem;
+    font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
-    border-bottom: 2px solid transparent;
+    border-bottom: 3px solid transparent;
     transition: all 0.2s;
-    white-space: nowrap;
+    position: relative;
+    bottom: -2px;
   }
 
-  .tab:hover {
+  .nav-tab:hover {
     color: var(--text-primary);
     background: var(--bg-tertiary);
   }
 
-  .tab.active {
+  .nav-tab.active {
     color: var(--info-text);
     border-bottom-color: var(--info-text);
+    background: var(--bg-primary);
+  }
+
+  .tab-icon {
+    font-size: 1.25rem;
   }
 
   .tab-label {
-    display: none;
+    font-weight: 600;
   }
 
   .tab-badge {
     display: inline-block;
-    padding: 0.15rem 0.35rem;
+    padding: 0.2rem 0.5rem;
     background: var(--bg-tertiary);
-    border-radius: 0.25rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-
-  .tab.active .tab-badge {
-    background: var(--info-bg);
-    color: var(--info-text);
-  }
-
-  /* Tab content area */
-  .tab-content {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-    padding: 0;
-  }
-
-  /* Pane header (both types) */
-  .pane-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--border-color);
-    background: var(--bg-secondary);
-    flex-shrink: 0;
-  }
-
-  .pane-header.compact {
-    padding: 0.5rem 0.75rem;
-    gap: 0.5rem;
-  }
-
-  .pane-header h3 {
-    margin: 0;
-    font-size: 0.95rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  .message-badge {
-    display: inline-block;
-    padding: 0.2rem 0.4rem;
-    background: var(--bg-tertiary);
-    border-radius: 0.25rem;
+    border-radius: 0.3rem;
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--text-secondary);
   }
 
-  .pane-content {
+  .nav-tab.active .tab-badge {
+    background: var(--info-bg);
+    color: var(--info-text);
+  }
+
+  /* Tab Panel */
+  .tab-panel {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-content {
     flex: 1;
     overflow: auto;
     min-height: 0;
   }
 
   /* Responsive adjustments */
-  @media (max-width: 1440px) {
-    .tab-label {
-      display: inline;
-    }
-
-    .tab {
-      padding: 0.75rem 0.75rem;
-    }
-  }
-
-  @media (max-width: 1200px) {
-    .workspace-container {
-      grid-template-columns: 65% 35%;
-    }
-  }
-
   @media (max-width: 1024px) {
-    .workspace-container {
-      grid-template-columns: 60% 40%;
+    .nav-tab {
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
     }
 
-    .tab-label {
-      display: inline;
+    .tab-icon {
+      font-size: 1.1rem;
     }
   }
 
   @media (max-width: 768px) {
-    .workspace-container {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
+    .tab-nav {
+      padding: 0 0.5rem;
     }
 
-    .protocol-column {
-      border-right: none;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .context-panel {
-      /* Full width on mobile */
+    .nav-tab {
+      flex-direction: column;
+      padding: 0.5rem;
+      gap: 0.25rem;
     }
 
     .tab-label {
-      display: inline;
+      font-size: 0.75rem;
     }
 
-    .tab {
-      padding: 0.5rem;
+    .tab-badge {
+      font-size: 0.7rem;
     }
   }
 
