@@ -23,7 +23,10 @@
     ChevronDown,
     Play,
     Square,
-    Network
+    Network,
+    Sparkles,
+    Beaker,
+    Radar
   } from 'lucide-svelte';
 
   // Props using Svelte 5 runes
@@ -55,6 +58,9 @@
     { id: 'sampling', label: 'Sampling', icon: MessageSquare },
     { id: 'elicitation', label: 'Elicitation', icon: Activity },
     { id: 'protocol', label: 'Protocol', icon: Network },
+    { id: 'chat', label: 'LLM Playground', icon: Sparkles },
+    { id: 'tests', label: 'AI Testing', icon: Beaker },
+    { id: 'mission-control', label: 'Mission Control', icon: Radar },
     // { id: 'collections', label: 'Collections', icon: Layers3 }, // TODO: Enable for v2 with multi-server UI
   ];
 
@@ -72,6 +78,9 @@
     'sampling': 'sampling',
     'elicitation': 'elicitation',
     'protocol': null,         // Protocol inspector supports all servers
+    'chat': null,             // LLM Playground doesn't require MCP servers
+    'tests': null,            // AI Testing supports all servers
+    'mission-control': null,  // Mission Control works with any connected server
     'collections': null,      // Collections supports all servers
     'settings': null          // Settings doesn't require MCP capability
   };

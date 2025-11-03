@@ -33,6 +33,8 @@ pub struct LLMProviderConfig {
     pub max_retries: u32,
     /// Timeout in seconds
     pub timeout_seconds: u64,
+    /// Maximum tokens for LLM responses
+    pub max_tokens: u32,
     /// Rate limiting configuration
     pub rate_limit: RateLimitConfig,
     /// Cost configuration for usage tracking
@@ -200,6 +202,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 30,
+                max_tokens: 16000, // Cloud APIs - maximum
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 100,         // Higher limits for 2025
                     tokens_per_minute: Some(1000000), // 1M token context support
@@ -261,6 +264,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 30,
+                max_tokens: 12000, // OpenAI nano still high
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 1000,        // Higher limits for nano model
                     tokens_per_minute: Some(5000000), // 5M tokens for ultra-cheap model
@@ -311,6 +315,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 45, // Higher timeout for complex reasoning
+                max_tokens: 16000, // Cloud provider - maximum
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 100,
                     tokens_per_minute: Some(1000000), // 1M token context support
@@ -367,6 +372,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 60, // Higher timeout for complex reasoning
+                max_tokens: 16000, // Claude Opus - maximum
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 50, // Lower rate limit for premium model
                     tokens_per_minute: Some(500000),
@@ -423,6 +429,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 120, // Much higher timeout for thinking token processing
+                max_tokens: 16000, // Claude thinking - maximum
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 30, // Lower rate limit for premium thinking model
                     tokens_per_minute: Some(300000),
@@ -480,6 +487,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 45,
+                max_tokens: 16000, // Cloud provider - maximum
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 60,
                     tokens_per_minute: Some(500000),
@@ -539,7 +547,8 @@ impl Default for LLMConfiguration {
                 base_url: Some("http://localhost:1234/v1".to_string()),
                 organization: None,
                 max_retries: 3,
-                timeout_seconds: 60,
+                timeout_seconds: 180, // Increased from 60 - LM Studio can be slow with large prompts
+                max_tokens: 15000, // LM Studio - near maximum
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 1000, // No rate limits for local
                     tokens_per_minute: None,
@@ -593,6 +602,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 120, // Ollama can be slower
+                max_tokens: 15000, // Ollama - near maximum
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 1000,
                     tokens_per_minute: None,
@@ -651,6 +661,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 60,
+                max_tokens: 8000, // GPT4All - moderate
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 1000,
                     tokens_per_minute: None,
@@ -698,6 +709,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 60,
+                max_tokens: 8000, // Jan - moderate
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 1000,
                     tokens_per_minute: None,
@@ -745,6 +757,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 60,
+                max_tokens: 15000, // Custom - high default
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 1000,
                     tokens_per_minute: None,

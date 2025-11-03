@@ -532,6 +532,99 @@ impl Database {
         .await?;
         tracing::info!("active_profile_state table created successfully (multi-profile)");
 
+        // =====================================================================
+        // Test Generation & Execution Tables
+        // =====================================================================
+
+        tracing::info!("Creating test_suites table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS test_suites (
+                id TEXT PRIMARY KEY,
+                server_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                version INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                generated_at TEXT,
+                schema_hash TEXT,
+                FOREIGN KEY(server_id) REFERENCES server_configs(id) ON DELETE CASCADE
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("test_suites table created successfully");
+
+        tracing::info!("Creating tests table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS tests (
+                id TEXT PRIMARY KEY,
+                suite_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                kind TEXT NOT NULL,
+                test_data TEXT NOT NULL,
+                assertions TEXT NOT NULL,
+                category TEXT NOT NULL,
+                complexity TEXT NOT NULL,
+                auto_generated BOOLEAN NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                edited_at TEXT,
+                FOREIGN KEY(suite_id) REFERENCES test_suites(id) ON DELETE CASCADE
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("tests table created successfully");
+
+        tracing::info!("Creating test_runs table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS test_runs (
+                id TEXT PRIMARY KEY,
+                suite_id TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                duration_ms INTEGER,
+                total_tests INTEGER NOT NULL,
+                passed INTEGER NOT NULL DEFAULT 0,
+                failed INTEGER NOT NULL DEFAULT 0,
+                errors INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL,
+                triggered_by TEXT NOT NULL,
+                FOREIGN KEY(suite_id) REFERENCES test_suites(id) ON DELETE CASCADE
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("test_runs table created successfully");
+
+        tracing::info!("Creating test_results table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS test_results (
+                id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                test_id TEXT NOT NULL,
+                passed BOOLEAN NOT NULL,
+                error_message TEXT,
+                actual_result TEXT,
+                duration_ms INTEGER NOT NULL,
+                timestamp TEXT NOT NULL,
+                FOREIGN KEY(run_id) REFERENCES test_runs(id) ON DELETE CASCADE,
+                FOREIGN KEY(test_id) REFERENCES tests(id) ON DELETE CASCADE
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("test_results table created successfully");
+
         // Create indexes for performance
         tracing::info!("Creating database indexes");
 
@@ -1168,5 +1261,38 @@ impl Database {
                 }
             }
         }
+    }
+
+    // Proxy-related database methods (TODO: implement full schema)
+
+    /// Save proxy configuration
+    pub async fn save_proxy_config(
+        &self,
+        _config: &crate::proxy::ProxyConfig,
+    ) -> McpResult<()> {
+        // TODO: Implement full proxy schema and persistence
+        // For now, this is a stub that succeeds
+        Ok(())
+    }
+
+    /// Get proxy configuration by ID
+    pub async fn get_proxy_config(&self, _proxy_id: &str) -> McpResult<Option<crate::proxy::ProxyConfig>> {
+        // TODO: Implement full proxy schema and retrieval
+        // For now, return None
+        Ok(None)
+    }
+
+    /// List all proxy configurations
+    pub async fn list_proxy_configs(&self) -> McpResult<Vec<crate::proxy::ProxyConfig>> {
+        // TODO: Implement full proxy schema and listing
+        // For now, return empty vec
+        Ok(Vec::new())
+    }
+
+    /// Delete proxy configuration
+    pub async fn delete_proxy_config(&self, _proxy_id: &str) -> McpResult<()> {
+        // TODO: Implement full proxy schema and deletion
+        // For now, this is a stub that succeeds
+        Ok(())
     }
 }

@@ -77,6 +77,9 @@ pub struct McpClientManager {
 
     /// Elicitation handler for server-initiated user input requests
     elicitation_handler: Arc<StudioElicitationHandler>,
+
+    /// Tauri app handle for emitting events
+    app_handle: tauri::AppHandle,
 }
 
 impl McpClientManager {
@@ -98,7 +101,7 @@ impl McpClientManager {
         ));
 
         // Initialize elicitation handler with Tauri app handle and protocol logging
-        let elicitation_handler = Arc::new(StudioElicitationHandler::new(app_handle, db));
+        let elicitation_handler = Arc::new(StudioElicitationHandler::new(app_handle.clone(), db));
 
         let manager = Self {
             connections: Arc::new(DashMap::new()),
@@ -106,6 +109,7 @@ impl McpClientManager {
             event_sender,
             sampling_handler,
             elicitation_handler,
+            app_handle,
         };
 
         tracing::info!("MCP Client Manager initialized - ready for enterprise connections");
@@ -229,6 +233,7 @@ impl McpClientManager {
             client: RwLock::new(None),
             event_sender: self.event_sender.clone(),
             server_id,
+            app_handle: self.app_handle.clone(),
         });
 
         // Store connection

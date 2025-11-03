@@ -66,12 +66,28 @@ pub enum McpStudioError {
     #[error("Timeout error: {0}")]
     TimeoutError(String),
 
+    #[error("Proxy error: {0}")]
+    ProxyError(String),
+
     #[error("Unknown error: {0}")]
     Unknown(String),
 }
 
 /// Result type alias for MCP Studio operations
 pub type McpResult<T> = Result<T, McpStudioError>;
+
+/// Application error (alias for McpStudioError)
+pub type AppError = McpStudioError;
+
+/// Application result type (alias for McpResult)
+pub type AppResult<T> = McpResult<T>;
+
+impl McpStudioError {
+    /// Create a proxy error
+    pub fn proxy(msg: impl Into<String>) -> Self {
+        Self::ProxyError(msg.into())
+    }
+}
 
 impl serde::Serialize for McpStudioError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

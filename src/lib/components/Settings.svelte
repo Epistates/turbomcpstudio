@@ -75,19 +75,22 @@
     provider: LLMProvider | null;
     api_key: string;
     base_url: string;
+    max_tokens: number;
     testing: boolean;
     test_result: 'none' | 'success' | 'error';
     test_message: string;
     available_models: string[];
     selected_model: string;
+    showAdvanced: boolean;
+    lastTestedUrl: string;
   }
 
   // ===============================================
   // STATE MANAGEMENT
   // ===============================================
 
-  // Note: 'providers' and 'usage' tabs commented out - vestigial code for future LLM integration
-  let activeTab: 'providers' | 'global' | 'usage' = $state('global');
+  // Default to providers tab for easy LLM configuration
+  let activeTab: 'providers' | 'global' | 'usage' = $state('providers');
 
   // Provider management
   let providers: LLMProvider[] = $state([]);
@@ -100,11 +103,14 @@
     provider: null,
     api_key: '',
     base_url: '',
+    max_tokens: 8000,  // Default for cloud/large models
     testing: false,
     test_result: 'none',
     test_message: '',
     available_models: [],
-    selected_model: ''
+    selected_model: '',
+    showAdvanced: false,
+    lastTestedUrl: ''
   });
 
   // Show API keys toggle
@@ -127,7 +133,7 @@
       icon: '🤖',
       default_base_url: 'https://api.openai.com/v1',
       requires_api_key: true,
-      description: 'GPT-4o, GPT-4o-mini, GPT-3.5-turbo, DALL-E'
+      description: 'GPT-5, gpt-5-turbo, GPT-4o, o4-mini, GPT-4.1'
     },
     {
       id: 'anthropic',
@@ -136,7 +142,7 @@
       icon: '🧠',
       default_base_url: 'https://api.anthropic.com/v1',
       requires_api_key: true,
-      description: 'Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3 Opus'
+      description: 'Claude Sonnet 4.5, Claude Haiku 4.5, Claude Opus 4.1, Claude 3.7 Sonnet'
     },
 
     // Local Providers (2025)
@@ -254,11 +260,18 @@
   // ===============================================
 
   function openQuickSetup(provider: LLMProvider) {
+    // Set smart default max_tokens based on provider type
+    let defaultMaxTokens = 8000;  // Default for cloud and large models
+    if (provider.type === 'local') {
+      defaultMaxTokens = 4000;  // Smaller default for local models
+    }
+
     quickSetup = {
       show: true,
       provider,
       api_key: provider.api_key || '',
       base_url: provider.base_url || provider.default_base_url,
+      max_tokens: defaultMaxTokens,
       testing: false,
       test_result: 'none',
       test_message: '',
@@ -268,12 +281,19 @@
   }
 
   function closeQuickSetup() {
-    quickSetup.show = false;
-    quickSetup.provider = null;
-    quickSetup.api_key = '';
-    quickSetup.base_url = '';
-    quickSetup.test_result = 'none';
-    quickSetup.test_message = '';
+    // Reset modal state completely
+    quickSetup = {
+      show: false,
+      provider: null,
+      api_key: '',
+      base_url: '',
+      max_tokens: 8000,
+      testing: false,
+      test_result: 'none',
+      test_message: '',
+      available_models: [],
+      selected_model: ''
+    };
   }
 
   async function testConnection() {
@@ -373,6 +393,7 @@
         organization: null,
         max_retries: 3,
         timeout_seconds: quickSetup.provider.type === 'local' ? 30 : 60,
+        max_tokens: quickSetup.max_tokens,  // User-configured max tokens
         rate_limit: {
           requests_per_minute: quickSetup.provider.type === 'local' ? 1000 : 100,
           tokens_per_minute: quickSetup.provider.type === 'local' ? null : 1000000,
@@ -580,14 +601,14 @@
 
   <!-- Tab Navigation -->
   <div class="tab-navigation">
-    <!-- LLM Providers tab - vestigial, commented out for future use -->
-    <!-- <button
+    <!-- LLM Providers tab - re-enabled for LLM Playground feature -->
+    <button
       onclick={() => activeTab = 'providers'}
       class="tab-button {activeTab === 'providers' ? 'active' : ''}"
     >
       <Zap size={16} />
       LLM Providers
-    </button> -->
+    </button>
     <button
       onclick={() => activeTab = 'global'}
       class="tab-button {activeTab === 'global' ? 'active' : ''}"
@@ -595,7 +616,7 @@
       <SettingsIcon size={16} />
       Global Settings
     </button>
-    <!-- Usage & Costs tab - vestigial, commented out for future use -->
+    <!-- Usage & Costs tab - future use -->
     <!-- <button
       onclick={() => activeTab = 'usage'}
       class="tab-button {activeTab === 'usage' ? 'active' : ''}"
@@ -1021,6 +1042,69 @@
           />
         </div>
 
+        <!-- Max Tokens Configuration -->
+        <div class="form-group">
+          <label for="settings-max-tokens" class="form-label">
+            Max Tokens: <span class="font-semibold text-mcp-primary-600">{quickSetup.max_tokens}</span>
+          </label>
+          <input
+            id="settings-max-tokens"
+            type="range"
+            bind:value={quickSetup.max_tokens}
+            min="1000"
+            max="16000"
+            step="500"
+            class="form-input range-slider"
+          />
+          <p class="text-xs text-gray-500 mt-2">
+            {#if quickSetup.max_tokens <= 2000}
+              Suitable for 7B models or small outputs
+            {:else if quickSetup.max_tokens <= 4000}
+              Good for 20B models with reasoning
+            {:else if quickSetup.max_tokens <= 8000}
+              Ideal for large models (120B+)
+            {:else}
+              Maximum tokens for complex reasoning tasks
+            {/if}
+          </p>
+
+          <!-- Quick Preset Buttons -->
+          <div class="preset-buttons-grid">
+            <button
+              type="button"
+              onclick={() => quickSetup.max_tokens = 2000}
+              class="preset-button {quickSetup.max_tokens === 2000 ? 'active' : ''}"
+            >
+              <span class="text-xs font-medium">7B Model</span>
+              <span class="text-xs text-gray-500">2000</span>
+            </button>
+            <button
+              type="button"
+              onclick={() => quickSetup.max_tokens = 4000}
+              class="preset-button {quickSetup.max_tokens === 4000 ? 'active' : ''}"
+            >
+              <span class="text-xs font-medium">20B Model</span>
+              <span class="text-xs text-gray-500">4000</span>
+            </button>
+            <button
+              type="button"
+              onclick={() => quickSetup.max_tokens = 8000}
+              class="preset-button {quickSetup.max_tokens === 8000 ? 'active' : ''}"
+            >
+              <span class="text-xs font-medium">120B Model</span>
+              <span class="text-xs text-gray-500">8000</span>
+            </button>
+            <button
+              type="button"
+              onclick={() => quickSetup.max_tokens = 12000}
+              class="preset-button {quickSetup.max_tokens === 12000 ? 'active' : ''}"
+            >
+              <span class="text-xs font-medium">Cloud API</span>
+              <span class="text-xs text-gray-500">12000</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Test Result -->
         {#if quickSetup.test_result !== 'none'}
           <div class="test-result {quickSetup.test_result}">
@@ -1368,5 +1452,38 @@
 
   .link-external {
     @apply text-mcp-primary-600 hover:text-mcp-primary-700 transition-colors;
+  }
+
+  /* Range Slider */
+  .range-slider {
+    @apply w-full mt-2 cursor-pointer accent-mcp-primary-600;
+  }
+
+  /* Preset Buttons Grid */
+  .preset-buttons-grid {
+    @apply grid grid-cols-2 gap-2 mt-3;
+  }
+
+  .preset-button {
+    @apply flex flex-col items-center justify-center px-3 py-2 border rounded-md text-xs transition-all;
+    background: var(--mcp-surface-secondary);
+    border-color: var(--mcp-border-primary);
+    color: var(--mcp-text-secondary);
+  }
+
+  .preset-button:hover {
+    background: var(--mcp-primary-50);
+    border-color: var(--mcp-primary-200);
+    color: var(--mcp-primary-700);
+  }
+
+  .preset-button.active {
+    background: var(--mcp-primary-600);
+    border-color: var(--mcp-primary-600);
+    color: white;
+  }
+
+  .preset-button span {
+    display: block;
   }
 </style>

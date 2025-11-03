@@ -21,6 +21,9 @@ pub mod mcp_tools;
 // Advanced Features
 pub mod elicitation;
 pub mod sampling;
+pub mod llm_playground;
+pub mod test_generation;
+pub mod proxy;
 
 // Data Management
 pub mod collections;
@@ -45,14 +48,17 @@ pub mod utility;
 pub use client_install::*;
 pub use collections::*;
 pub use elicitation::*;
+pub use llm_playground::*;
 pub use mcp_prompts::*;
 pub use mcp_resources::*;
 pub use mcp_tools::*;
 pub use profiles::*;
 pub use protocol_inspector::*;
+pub use proxy::*;
 pub use registry::*;
 pub use sampling::*;
 pub use server_config::*;
 pub use server_lifecycle::*;
+pub use test_generation::*;
 pub use utility::*;
 pub use workflows::*;

@@ -11,13 +11,17 @@
 //! bidirectional features (sampling + elicitation).
 
 use crate::error::{McpResult, McpStudioError};
+use crate::interceptor::{Direction, InterceptedTransport, InterceptedMessage};
 use crate::mcp_client::connection::ManagedConnection;
 use crate::mcp_client::elicitation::StudioElicitationHandler;
 use crate::mcp_client::sampling::StudioSamplingHandler;
 use crate::mcp_client::transport_client::McpTransportClient;
 use crate::types::{ConnectionStatus, TransportConfig};
 use chrono::Utc;
+use dashmap::DashMap;
 use std::sync::Arc;
+use std::time::Instant;
+use tauri::Emitter;
 use turbomcp_client::Client;
 use turbomcp_transport::child_process::{ChildProcessConfig, ChildProcessTransport};
 
@@ -85,6 +89,68 @@ impl TransportLayer {
             // Non-sensitive values logged as-is
             value.to_string()
         }
+    }
+
+    /// Spawn event emitter task with latency tracking for Protocol Inspector
+    ///
+    /// This helper function creates a background task that:
+    /// - Receives intercepted MCP messages
+    /// - Tracks request timestamps
+    /// - Calculates latency for request→response pairs
+    /// - Emits events to the Tauri frontend
+    fn spawn_protocol_inspector_task(
+        mut interceptor_rx: tokio::sync::mpsc::UnboundedReceiver<Arc<crate::interceptor::InternalInterceptedMessage>>,
+        app_handle: tauri::AppHandle,
+        server_id: uuid::Uuid,
+        server_name: String,
+    ) {
+        tokio::spawn(async move {
+            // Track request timestamps for latency calculation
+            // Key: message_id, Value: timestamp when request was sent
+            let request_timestamps: Arc<DashMap<String, Instant>> = Arc::new(DashMap::new());
+
+            while let Some(internal_msg) = interceptor_rx.recv().await {
+                let frontend_msg = InterceptedMessage::from(&*internal_msg);
+
+                // Calculate latency for request→response pairs
+                let latency_ms = match internal_msg.direction {
+                    Direction::Outgoing => {
+                        // Store timestamp for outgoing requests (that have IDs)
+                        if !frontend_msg.message_id.is_empty() && frontend_msg.message_id != "null" {
+                            request_timestamps.insert(
+                                frontend_msg.message_id.clone(),
+                                Instant::now(),
+                            );
+                        }
+                        None // No latency for outgoing messages
+                    }
+                    Direction::Incoming => {
+                        // Look up request timestamp and calculate latency
+                        if !frontend_msg.message_id.is_empty() && frontend_msg.message_id != "null" {
+                            request_timestamps.remove(&frontend_msg.message_id).map(|(_, request_time)| {
+                                request_time.elapsed().as_millis() as u64
+                            })
+                        } else {
+                            None // Notifications don't have IDs
+                        }
+                    }
+                };
+
+                // Emit to frontend via Tauri event
+                let _ = app_handle.emit("protocol-message", serde_json::json!({
+                    "serverId": server_id.to_string(),
+                    "serverName": server_name,
+                    "direction": frontend_msg.direction,
+                    "timestamp": frontend_msg.timestamp.elapsed().as_millis(),
+                    "messageId": frontend_msg.message_id,
+                    "payload": frontend_msg.payload,
+                    "size": frontend_msg.size,
+                    "latencyMs": latency_ms, // NEW: Optional latency for responses
+                }));
+            }
+
+            tracing::debug!("Protocol interceptor task ended for server: {}", server_name);
+        });
     }
 
     /// Establish MCP connection with enterprise-grade reliability and monitoring
@@ -245,8 +311,8 @@ impl TransportLayer {
             .await
         {
             Ok(client) => {
-                // Wrap TurboMCP client in SharedClient for thread-safe access
-                *connection.client.write() = Some(McpTransportClient::Http(client));
+                // Wrap TurboMCP client with Protocol Inspector support
+                *connection.client.write() = Some(McpTransportClient::InterceptedHttp(client));
                 *connection.status.write() = ConnectionStatus::Connected;
                 *connection.last_seen.write() = Some(Utc::now());
                 tracing::info!(
@@ -288,7 +354,7 @@ impl TransportLayer {
         .await
         {
             Ok(client) => {
-                *connection.client.write() = Some(McpTransportClient::WebSocket(client));
+                *connection.client.write() = Some(McpTransportClient::InterceptedWebSocket(client));
                 *connection.status.write() = ConnectionStatus::Connected;
                 *connection.last_seen.write() = Some(Utc::now());
                 tracing::info!(
@@ -344,7 +410,7 @@ impl TransportLayer {
         .await
         {
             Ok(client) => {
-                *connection.client.write() = Some(McpTransportClient::Tcp(client));
+                *connection.client.write() = Some(McpTransportClient::InterceptedTcp(client));
                 *connection.status.write() = ConnectionStatus::Connected;
                 *connection.last_seen.write() = Some(Utc::now());
                 tracing::info!(
@@ -395,7 +461,7 @@ impl TransportLayer {
             .await
         {
             Ok(client) => {
-                *connection.client.write() = Some(McpTransportClient::Unix(client));
+                *connection.client.write() = Some(McpTransportClient::InterceptedUnix(client));
                 *connection.status.write() = ConnectionStatus::Connected;
                 *connection.last_seen.write() = Some(Utc::now());
                 tracing::info!(
@@ -477,12 +543,23 @@ impl TransportLayer {
         };
 
         // Create the ChildProcessTransport
-        let transport = ChildProcessTransport::new(config);
+        let base_transport = ChildProcessTransport::new(config);
+
+        // Wrap transport with interceptor for Protocol Inspector
+        let (intercepted_transport, interceptor_rx) = InterceptedTransport::new(base_transport);
+
+        // Spawn task to emit intercepted messages with latency tracking
+        Self::spawn_protocol_inspector_task(
+            interceptor_rx,
+            connection.app_handle.clone(),
+            connection.server_id,
+            connection.config.name.clone(),
+        );
 
         // Build TurboMCP client with enterprise connection config
         let connection_config = Configuration::create_enterprise_connection_config();
         Configuration::configure_client_capabilities();
-        let client = Configuration::build_client_with_capabilities(transport, connection_config);
+        let client = Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
 
         // Initialize with custom error handling for ChildProcess-specific issues
         let init_result = client.initialize().await.map_err(|e| {
@@ -533,7 +610,7 @@ impl TransportLayer {
             elicitation_handler,
         );
 
-        Ok(McpTransportClient::ChildProcess(client))
+        Ok(McpTransportClient::InterceptedChildProcess(client))
     }
 
     /// Initialize TurboMCP HTTP/SSE client transport (TurboMCP 2.0 DOGFOODING)
@@ -543,7 +620,7 @@ impl TransportLayer {
         url: &str,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
-    ) -> McpResult<Client<StreamableHttpClientTransport>> {
+    ) -> McpResult<Client<InterceptedTransport<StreamableHttpClientTransport>>> {
         tracing::info!(
             "🔗 Initializing TurboMCP Streamable HTTP client for URL: {}",
             url
@@ -603,12 +680,23 @@ impl TransportLayer {
             headers: custom_headers, // Use custom headers from configuration
             ..Default::default()
         };
-        let transport = StreamableHttpClientTransport::new(config);
+        let base_transport = StreamableHttpClientTransport::new(config);
+
+        // Wrap transport with interceptor for Protocol Inspector
+        let (intercepted_transport, interceptor_rx) = InterceptedTransport::new(base_transport);
+
+        // Spawn task to emit intercepted messages with latency tracking
+        Self::spawn_protocol_inspector_task(
+            interceptor_rx,
+            connection.app_handle.clone(),
+            connection.server_id,
+            connection.config.name.clone(),
+        );
 
         // Build client with enterprise connection config
         let connection_config = Configuration::create_enterprise_connection_config();
         Configuration::configure_client_capabilities();
-        let client = Configuration::build_client_with_capabilities(transport, connection_config);
+        let client = Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
 
         // Finalize with init handshake and handler registration (DRY helper)
         Initialization::finalize_client_initialization(
@@ -629,7 +717,7 @@ impl TransportLayer {
         _headers: &std::collections::HashMap<String, String>,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
-    ) -> McpResult<Client<WebSocketBidirectionalTransport>> {
+    ) -> McpResult<Client<InterceptedTransport<WebSocketBidirectionalTransport>>> {
         tracing::info!(
             "🔗 Initializing TurboMCP WebSocket bidirectional transport for URL: {}",
             url
@@ -657,7 +745,7 @@ impl TransportLayer {
         );
 
         // Create bidirectional transport
-        let transport = WebSocketBidirectionalTransport::new(config)
+        let base_transport = WebSocketBidirectionalTransport::new(config)
             .await
             .map_err(|e| {
                 let error_msg = format!(
@@ -669,7 +757,7 @@ impl TransportLayer {
             })?;
 
         // Connect the transport
-        transport.connect().await.map_err(|e| {
+        base_transport.connect().await.map_err(|e| {
             let error_msg = format!(
                 "Failed to connect WebSocket bidirectional transport for {}: {}",
                 connection.config.name, e
@@ -680,10 +768,21 @@ impl TransportLayer {
 
         tracing::info!("WebSocket bidirectional transport connected successfully");
 
+        // Wrap transport with interceptor for Protocol Inspector
+        let (intercepted_transport, interceptor_rx) = InterceptedTransport::new(base_transport);
+
+        // Spawn task to emit intercepted messages with latency tracking
+        Self::spawn_protocol_inspector_task(
+            interceptor_rx,
+            connection.app_handle.clone(),
+            connection.server_id,
+            connection.config.name.clone(),
+        );
+
         // Build client with enterprise connection config
         let connection_config = Configuration::create_enterprise_connection_config();
         Configuration::configure_client_capabilities();
-        let client = Configuration::build_client_with_capabilities(transport, connection_config);
+        let client = Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
 
         // Finalize with init handshake and handler registration (DRY helper)
         Initialization::finalize_client_initialization(
@@ -704,7 +803,7 @@ impl TransportLayer {
         port: u16,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
-    ) -> McpResult<Client<TcpTransport>> {
+    ) -> McpResult<Client<InterceptedTransport<TcpTransport>>> {
         tracing::info!("Establishing TurboMCP TCP connection to: {}:{}", host, port);
 
         // Create TCP transport
@@ -714,12 +813,23 @@ impl TransportLayer {
             tracing::error!("{}", error_msg);
             McpStudioError::ConnectionFailed(error_msg)
         })?;
-        let transport = TcpTransport::new_client(socket_addr, socket_addr);
+        let base_transport = TcpTransport::new_client(socket_addr, socket_addr);
+
+        // Wrap transport with interceptor for Protocol Inspector
+        let (intercepted_transport, interceptor_rx) = InterceptedTransport::new(base_transport);
+
+        // Spawn task to emit intercepted messages with latency tracking
+        Self::spawn_protocol_inspector_task(
+            interceptor_rx,
+            connection.app_handle.clone(),
+            connection.server_id,
+            connection.config.name.clone(),
+        );
 
         // Build client with enterprise connection config
         let connection_config = Configuration::create_enterprise_connection_config();
         Configuration::configure_client_capabilities();
-        let client = Configuration::build_client_with_capabilities(transport, connection_config);
+        let client = Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
 
         // Finalize with init handshake and handler registration (DRY helper)
         Initialization::finalize_client_initialization(
@@ -739,17 +849,28 @@ impl TransportLayer {
         path: &str,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
-    ) -> McpResult<Client<UnixTransport>> {
+    ) -> McpResult<Client<InterceptedTransport<UnixTransport>>> {
         tracing::info!("Establishing TurboMCP Unix socket connection to: {}", path);
 
         // Create Unix socket transport
         let socket_path = std::path::PathBuf::from(path);
-        let transport = UnixTransport::new_client(socket_path);
+        let base_transport = UnixTransport::new_client(socket_path);
+
+        // Wrap transport with interceptor for Protocol Inspector
+        let (intercepted_transport, interceptor_rx) = InterceptedTransport::new(base_transport);
+
+        // Spawn task to emit intercepted messages with latency tracking
+        Self::spawn_protocol_inspector_task(
+            interceptor_rx,
+            connection.app_handle.clone(),
+            connection.server_id,
+            connection.config.name.clone(),
+        );
 
         // Build client with enterprise connection config
         let connection_config = Configuration::create_enterprise_connection_config();
         Configuration::configure_client_capabilities();
-        let client = Configuration::build_client_with_capabilities(transport, connection_config);
+        let client = Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
 
         // Finalize with init handshake and handler registration (DRY helper)
         Initialization::finalize_client_initialization(

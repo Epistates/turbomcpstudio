@@ -21,6 +21,18 @@
 		processing_time_ms: number | null;
 	}
 
+	// Real-time intercepted message from the Protocol Interceptor
+	interface InterceptedMessage {
+		serverId: string;
+		serverName: string;
+		direction: 'outgoing' | 'incoming';
+		timestamp: number;
+		messageId: string;
+		payload: string;
+		size: number;
+		latencyMs?: number; // NEW: Request→response latency in milliseconds
+	}
+
 	// ✅ Use contextStore for server selection (no local state, no manual sync)
 	const context = $derived($contextStore);
 	const selectedServer = $derived(context.selectedServer);
@@ -40,7 +52,12 @@
 	// Simple effect: reload messages when server changes
 	$effect(() => {
 		if (selectedServerId) {
+			// Clear existing messages and reload for new server
+			messages = [];
 			loadMessages();
+		} else {
+			// Clear messages when no server is selected
+			messages = [];
 		}
 	});
 
@@ -168,16 +185,42 @@
 			messages.filter((m) => m.processing_time_ms !== null).length
 	});
 
+	// Convert intercepted message to MessageHistory format
+	function convertInterceptedMessage(msg: InterceptedMessage): MessageHistory {
+		return {
+			id: `${msg.serverId}-${msg.timestamp}-${msg.messageId}`,
+			server_id: msg.serverId,
+			timestamp: new Date(Date.now() - msg.timestamp).toISOString(), // Convert relative timestamp to absolute
+			direction: msg.direction === 'outgoing' ? 'ClientToServer' : 'ServerToClient',
+			content: msg.payload,
+			size_bytes: msg.size,
+			processing_time_ms: msg.latencyMs ?? null // NEW: Use latency from interceptor
+		};
+	}
+
 	onMount(() => {
-		// Initial load
+		// Initial load from database (for historical messages)
 		loadMessages();
 
-		// Set up real-time event listener for protocol messages
+		// Set up real-time event listener for NEW protocol messages from the interceptor
 		let unlisten: (() => void) | undefined;
 
-		listen('protocol_message', async () => {
-			// Reload messages when new protocol message is captured
-			await loadMessages();
+		listen<InterceptedMessage>('protocol-message', (event) => {
+			const interceptedMsg = event.payload;
+
+			// Only add messages for the currently selected server
+			if (selectedServerId && interceptedMsg.serverId === selectedServerId) {
+				// Convert and prepend to messages array (newest first)
+				const newMessage = convertInterceptedMessage(interceptedMsg);
+				messages = [newMessage, ...messages];
+
+				// Log for debugging
+				logger.debug('Intercepted protocol message:', {
+					direction: interceptedMsg.direction,
+					size: interceptedMsg.size,
+					messageId: interceptedMsg.messageId
+				});
+			}
 		}).then((fn) => {
 			unlisten = fn;
 		});
@@ -193,9 +236,20 @@
 	<!-- Header with Stats -->
 	<div class="flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 p-6">
 		<div class="flex items-center justify-between mb-4">
-			<div>
-				<h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Protocol Inspector</h2>
-				<p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{serverName}</p>
+			<div class="flex items-center gap-3">
+				<div>
+					<h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Protocol Inspector</h2>
+					<p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{serverName}</p>
+				</div>
+				{#if selectedServerId}
+					<div class="flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-full">
+						<span class="relative flex h-2 w-2">
+							<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+							<span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+						</span>
+						<span class="text-xs font-semibold text-green-700 dark:text-green-300 uppercase tracking-wider">Live</span>
+					</div>
+				{/if}
 			</div>
 		</div>
 

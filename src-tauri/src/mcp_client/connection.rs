@@ -31,4 +31,8 @@ pub struct ManagedConnection {
 
     /// Server ID for event emission
     pub server_id: uuid::Uuid,
+
+    /// Tauri app handle for emitting protocol inspector events
+    /// Used by the interceptor to emit intercepted messages to the frontend
+    pub app_handle: tauri::AppHandle,
 }

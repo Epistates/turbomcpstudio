@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use turbomcp_client::sampling::{LLMServerClient, ServerInfo};
@@ -33,6 +34,16 @@ struct ChatCompletionRequest {
     temperature: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     stop: Option<Vec<String>>,
+    /// Request JSON response format (2025 best practice for structured output)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    response_format: Option<ResponseFormat>,
+}
+
+/// Response format configuration for JSON output (OpenAI API 2025 standard)
+#[derive(Debug, Serialize)]
+struct ResponseFormat {
+    #[serde(rename = "type")]
+    format_type: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -42,6 +53,7 @@ struct ChatMessage {
 }
 
 /// OpenAI-compatible chat completion response
+/// Allows extra fields to handle variations between OpenAI, LM Studio, and other compatible APIs
 #[derive(Debug, Deserialize)]
 struct ChatCompletionResponse {
     model: String,
@@ -50,12 +62,15 @@ struct ChatCompletionResponse {
     #[allow(dead_code)]
     #[serde(default)]
     usage: Option<Usage>,
+    // Other fields like id, object, created, stats, system_fingerprint are allowed but ignored by serde default
 }
 
 #[derive(Debug, Deserialize)]
 struct Choice {
     message: ChatResponseMessage,
+    #[serde(default)]
     finish_reason: Option<String>,
+    // Other fields like index, logprobs are allowed but ignored by serde default
 }
 
 #[derive(Debug, Deserialize)]
@@ -64,6 +79,10 @@ struct ChatResponseMessage {
     #[allow(dead_code)]
     role: String,
     content: String,
+    /// Extended reasoning (used by LM Studio with OpenAI extended reasoning format)
+    #[serde(default)]
+    reasoning: Option<String>,
+    // Other fields like tool_calls are allowed but ignored by serde default
 }
 
 /// OpenAI-compatible token usage (future metrics feature)
@@ -120,7 +139,12 @@ impl OpenAICompatibleClient {
             provider_name, default_model, base_url
         );
 
-        let client = HttpClientBuilder::build(timeout_seconds)?;
+        // Ensure minimum timeout for large prompts and slow models
+        // Extended reasoning models need more time - 600 seconds (10 minutes) minimum
+        let effective_timeout = std::cmp::max(timeout_seconds, 600);
+        info!("Creating HTTP client with timeout: {} seconds (input was: {} seconds)", effective_timeout, timeout_seconds);
+
+        let client = HttpClientBuilder::build(effective_timeout)?;
 
         Ok(Self {
             client: Arc::new(client),
@@ -182,7 +206,22 @@ impl LLMServerClient for OpenAICompatibleClient {
         );
 
         // Convert messages to OpenAI format
-        let messages = Self::to_chat_messages(&request.messages);
+        let mut messages = Self::to_chat_messages(&request.messages);
+        info!("Messages before prepending system prompt: {}", messages.len());
+
+        // Prepend system prompt if provided (MCP protocol has separate system_prompt field)
+        // OpenAI-compatible APIs expect system messages in the messages array
+        if let Some(system_prompt) = &request.system_prompt {
+            info!("SYSTEM PROMPT FOUND - prepending to messages array");
+            info!("System prompt length: {}", system_prompt.len());
+            messages.insert(0, ChatMessage {
+                role: "system".to_string(),
+                content: system_prompt.clone(),
+            });
+            info!("Messages after prepending: {}", messages.len());
+        } else {
+            error!("WARNING: No system prompt provided in request!");
+        }
 
         // Extract model name from MCP 2025-06-18 model preferences structure
         let model = request
@@ -197,17 +236,27 @@ impl LLMServerClient for OpenAICompatibleClient {
         debug!("Using {} model: {}", self.provider_name, model);
 
         // Build request
+        // Note: LM Studio and Ollama don't support response_format, so we only add it for cloud providers
+        // The user must select a non-thinking model for proper JSON output
         let chat_request = ChatCompletionRequest {
             model,
             messages,
             max_tokens: Some(request.max_tokens), // Wrap in Option for OpenAI-compatible API
             temperature: request.temperature,
             stop: request.stop_sequences,
+            response_format: None, // Local providers don't support structured output format
         };
 
         // Call API
         debug!("Sending request to {} API...", self.provider_name);
         let endpoint = format!("{}/chat/completions", self.base_url);
+        info!("Endpoint: {}", endpoint);
+
+        // Log the actual request body for debugging
+        let request_body = serde_json::to_string(&chat_request)
+            .unwrap_or_else(|_| "Failed to serialize request".to_string());
+        debug!("Request body (first 500 chars): {}",
+            if request_body.len() > 500 { format!("{}...", &request_body[..500]) } else { request_body.clone() });
 
         let http_response = self
             .client
@@ -215,7 +264,13 @@ impl LLMServerClient for OpenAICompatibleClient {
             .header("content-type", "application/json")
             .json(&chat_request)
             .send()
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("HTTP request failed for {}: {}", self.provider_name, e);
+                error!("Endpoint was: {}", endpoint);
+                error!("Error source: {}", e.source().map(|s| s.to_string()).unwrap_or_default());
+                e
+            })?;
 
         // Check for HTTP errors
         let status = http_response.status();
@@ -237,9 +292,23 @@ impl LLMServerClient for OpenAICompatibleClient {
         }
 
         // Parse response
-        let response: ChatCompletionResponse = http_response.json().await.map_err(|e| {
-            error!("Failed to parse {} response: {}", self.provider_name, e);
-            LLMProviderError::InvalidResponse(e.to_string())
+        info!("Response status: {}", http_response.status());
+        let response_text = http_response.text().await.map_err(|e| {
+            error!("Failed to read response body as text: {}", e);
+            e
+        })?;
+
+        info!("Response body length: {} bytes", response_text.len());
+        debug!("Response body (first 300 chars): {}",
+            if response_text.len() > 300 { format!("{}...", &response_text[..300]) } else { response_text.clone() });
+
+        let response: ChatCompletionResponse = serde_json::from_str(&response_text).map_err(|e| {
+            error!("Failed to parse {} JSON response", self.provider_name);
+            error!("Parse error: {}", e);
+            error!("Response body was: {}", response_text);
+            LLMProviderError::InvalidResponse(format!("JSON parse error: {} - Body: {}", e,
+                if response_text.len() > 300 { format!("{}...", &response_text[..300]) } else { response_text.clone() }
+            ))
         })?;
 
         debug!("Received response from {} API", self.provider_name);
@@ -250,7 +319,42 @@ impl LLMServerClient for OpenAICompatibleClient {
             LLMProviderError::InvalidResponse("No choices in response".to_string())
         })?;
 
-        let content = choice.message.content.clone();
+        // Log what we received in the response
+        info!("Response message content length: {} bytes", choice.message.content.len());
+        info!("Response message has reasoning: {}", choice.message.reasoning.is_some());
+        if let Some(reasoning) = &choice.message.reasoning {
+            info!("Response reasoning length: {} bytes", reasoning.len());
+        }
+        debug!("Response content (first 200 chars): {}",
+            if choice.message.content.len() > 200 { format!("{}...", &choice.message.content[..200]) } else { choice.message.content.clone() });
+
+        // Use content field, but fall back to reasoning field if content is empty
+        // (handles LM Studio extended reasoning format where content is empty and reasoning contains the actual response)
+        let content = if choice.message.content.is_empty() {
+            info!("Content field is empty, using reasoning field");
+            choice.message.reasoning.as_ref().cloned().unwrap_or_default()
+        } else {
+            choice.message.content.clone()
+        };
+
+        if content.is_empty() {
+            error!("{} response has no content and no reasoning", self.provider_name);
+            return Err(LLMProviderError::InvalidResponse("Empty response from LLM".to_string()).into());
+        }
+
+        // Detect if response contains thinking tags (indicates thinking model)
+        // Log as warning but don't fail - let JSON extraction handle it
+        if content.contains("<think>") || content.contains("</think>") {
+            warn!("{} returned thinking model output with <think> tags. Attempting to extract JSON from response.", self.provider_name);
+            info!("Note: Thinking models include their reasoning process in responses. Our JSON extraction will attempt to recover the structured output after the </think> closing tag.");
+        }
+
+        // Check for completely empty responses (token limit exceeded or model failure)
+        if content.trim().is_empty() {
+            let error_msg = "LLM returned empty response. This typically indicates:\n1. Token limit was exceeded\n2. Model failed to generate output\n\nTry increasing max_tokens or switching to a different model.".to_string();
+            error!("{}", error_msg);
+            return Err(error_msg.into());
+        }
 
         // Map finish_reason to MCP StopReason enum
         let stop_reason = if let Some(finish_reason) = &choice.finish_reason {
@@ -285,5 +389,65 @@ impl LLMServerClient for OpenAICompatibleClient {
             models: vec![self.default_model.clone()],
             capabilities: vec!["streaming".to_string(), "function_calling".to_string()],
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_lmstudio_response() {
+        // Exact response from LM Studio curl
+        let response_json = r#"{
+  "id": "chatcmpl-xeo2sep964mtq9cw3ixj5o",
+  "object": "chat.completion",
+  "created": 1761700234,
+  "model": "openai/gpt-oss-20b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"suite_name\":\"YouTube Transcript Retrieval\",\"description\":\"Tests for retrieving transcripts from YouTube URLs using the youtube_transcript server.\",\"tests\":[{\"name\":\"Retrieve transcript for valid YouTube URL\",\"description\":\"Ensures that the server returns a successful response with transcript data for a known video.\",\"category\":\"happy_path\",\"complexity\":\"simple\",\"kind\":{\"tool_call\":{\"tool_name\":\"youtube_transcript\",\"arguments\":{\"url\":\"https://www.youtube.com/watch?v=dQw4w9WgXcQ\"}}},\"test_data\":{\"url\":\"https://www.youtube.com/watch?v=dQw4w9WgXcQ\"},\"assertions\":[{\"status_equals\":{\"expected\":\"success\"}}]},{\"name\":\"Handle invalid YouTube URL\",\"description\":\"Verifies that the server returns an error status when provided with a non-existent or invalid video URL.\",\"category\":\"error_handling\",\"complexity\":\"simple\",\"kind\":{\"tool_call\":{\"tool_name\":\"youtube_transcript\",\"arguments\":{\"url\":\"https://www.youtube.com/watch?v=invalidvideo\"}}},\"test_data\":{\"url\":\"https://www.youtube.com/watch?v=invalidvideo\"},\"assertions\":[{\"status_equals\":{\"expected\":\"error\"}}]}]}",
+        "reasoning": "We need to produce JSON object matching expected structure..."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 323,
+    "completion_tokens": 1564,
+    "total_tokens": 1887
+  },
+  "stats": {},
+  "system_fingerprint": "openai/gpt-oss-20b"
+}"#;
+
+        // Try to deserialize
+        let result: Result<ChatCompletionResponse, serde_json::Error> =
+            serde_json::from_str(response_json);
+
+        match result {
+            Ok(response) => {
+                println!("✅ Successfully parsed LM Studio response");
+                println!("Model: {}", response.model);
+                println!("Choices count: {}", response.choices.len());
+                if let Some(choice) = response.choices.first() {
+                    println!("Message content length: {}", choice.message.content.len());
+                    println!("Has reasoning: {}", choice.message.reasoning.is_some());
+                    println!("Finish reason: {:?}", choice.finish_reason);
+                }
+            }
+            Err(e) => {
+                eprintln!("❌ Failed to parse LM Studio response");
+                eprintln!("Error: {}", e);
+                eprintln!("Error type: {:?}", e.classify());
+                eprintln!("Error line: {}", e.line());
+                eprintln!("Error column: {}", e.column());
+                panic!("Deserialization failed: {}", e);
+            }
+        }
     }
 }

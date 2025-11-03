@@ -14,7 +14,10 @@
   import ElicitationView from '../ElicitationView.svelte';
   import ProtocolInspector from '../ProtocolInspector.svelte';
   import CollectionsManager from '../CollectionsManager.svelte';
+  import ChatPlayground from '../ChatPlayground.svelte';
+  import TestCatalog from '../TestCatalog.svelte';
   import Settings from '../Settings.svelte';
+  import MissionControl from '../MissionControl.svelte';
   import AddServerModal from '../AddServerModal.svelte';
   import EditServerModal from '../EditServerModal.svelte';
   import ModeIndicator from '../ModeIndicator.svelte';
@@ -39,7 +42,9 @@
     currentView === 'prompts' ||
     currentView === 'sampling' ||
     currentView === 'elicitation' ||
-    currentView === 'protocol'
+    currentView === 'protocol' ||
+    currentView === 'tests' ||
+    currentView === 'mission-control'
   );
 
   // ✅ NEW: Get required capability for current view (for filtering servers)
@@ -151,6 +156,12 @@
       <!-- NOTE: Collections view disabled in Sidebar for v1 but code preserved -->
       <!-- TODO: Enable in v2 with proper multi-server UI design -->
       <CollectionsManager />
+    {:else if currentView === 'chat'}
+      <ChatPlayground />
+    {:else if currentView === 'tests'}
+      <TestCatalog serverId={contextState.selectedServer?.id} />
+    {:else if currentView === 'mission-control'}
+      <MissionControl />
     {:else if currentView === 'settings'}
       <Settings />
     {/if}

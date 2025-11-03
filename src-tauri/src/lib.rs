@@ -2,10 +2,13 @@ mod commands;
 mod database;
 mod error;
 mod hitl_sampling;
+pub mod interceptor;
 mod llm_config;
 mod llm_providers;
 mod mcp_client;
+pub mod proxy;
 pub mod registry;
+pub mod testing;
 mod types;
 mod workflow_engine;
 use database::Database;
@@ -13,6 +16,7 @@ use error::McpStudioError;
 use hitl_sampling::HITLSamplingManager;
 use llm_config::LLMConfigManager;
 use mcp_client::McpClientManager;
+use proxy::ProxyManager;
 use std::sync::Arc;
 use tauri::{Emitter, Listener, Manager};
 use types::InitializationError;
@@ -29,6 +33,8 @@ pub struct AppState {
     pub workflow_engine: Arc<WorkflowEngine>,
     /// Issue #18 fix: Store monitoring loop handle for graceful shutdown
     pub monitoring_handle: Arc<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
+    /// Proxy manager for creating and managing MCP proxies
+    pub proxy_manager: Arc<ProxyManager>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -150,6 +156,9 @@ pub fn run() {
                 database.clone(),
             ));
 
+            // Initialize proxy manager for universal MCP proxying
+            let proxy_manager = Arc::new(ProxyManager::new(database.clone()));
+
             // Store lightweight state immediately to unblock UI
             app.manage(AppState {
                 mcp_manager: mcp_manager.clone(),
@@ -158,6 +167,7 @@ pub fn run() {
                 database: database.clone(),
                 workflow_engine: workflow_engine.clone(),
                 monitoring_handle: monitoring_handle.clone(),
+                proxy_manager: proxy_manager.clone(),
             });
 
             // Issue #5 fix: Proper handshake pattern to prevent race condition
@@ -442,6 +452,24 @@ pub fn run() {
             commands::update_llm_provider_config,
             commands::is_sampling_available,
             commands::validate_llm_config,
+            // LLM Playground commands
+            commands::list_llm_providers,
+            commands::send_llm_message,
+            commands::get_active_llm_provider,
+            // Test Generation commands
+            commands::generate_test_suite,
+            commands::get_test_suites,
+            commands::get_test_suite,
+            commands::get_tests,
+            commands::update_test,
+            commands::delete_test,
+            commands::delete_test_suite,
+            commands::get_test_runs,
+            // Test Execution commands
+            commands::run_test_suite,
+            commands::run_single_test,
+            commands::get_test_results,
+            commands::compare_test_runs,
             // TurboMCP 1.0.10 features
             commands::get_completions,
             commands::list_filesystem_roots,
@@ -506,6 +534,15 @@ pub fn run() {
             commands::get_server_details,
             commands::add_server_from_registry,
             commands::check_docker_available,
+            // Proxy management commands
+            commands::create_proxy,
+            commands::start_proxy,
+            commands::stop_proxy,
+            commands::delete_proxy,
+            commands::get_proxy_status,
+            commands::list_proxies,
+            commands::get_proxy_metrics,
+            commands::introspect_backend,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
