@@ -336,12 +336,19 @@ Start with {{ and end with }}.
         };
         tracing::info!("Extracted JSON preview: {}", json_preview);
 
+        // Try to repair truncated JSON before parsing
+        let repaired_json = self.repair_truncated_json(&json_text);
+        if repaired_json != json_text {
+            tracing::warn!("JSON appeared truncated, attempted repair");
+            tracing::debug!("Repaired JSON length: {} (was {})", repaired_json.len(), json_text.len());
+        }
+
         // Parse response
-        let generated_suite: GeneratedTestSuite = serde_json::from_str(&json_text)
+        let generated_suite: GeneratedTestSuite = serde_json::from_str(&repaired_json)
             .map_err(|e| {
                 tracing::error!("Failed to parse LLM response for tool {}: {}", tool_name, e);
                 tracing::error!("Extracted JSON (first 500 chars): {}",
-                    if json_text.len() > 500 { &json_text[..500] } else { &json_text });
+                    if repaired_json.len() > 500 { &repaired_json[..500] } else { &repaired_json });
                 McpStudioError::ConfigError(format!(
                     "Failed to parse test JSON for tool {}: {}",
                     tool_name, e
@@ -633,6 +640,65 @@ Start with {{ and end with }}. ONLY JSON.
         working_text
     }
 
+    /// Attempt to repair truncated JSON by completing incomplete structures
+    fn repair_truncated_json(&self, json: &str) -> String {
+        let trimmed = json.trim();
+
+        // Check if JSON looks complete
+        if trimmed.starts_with('{') && trimmed.ends_with('}') {
+            // Appears complete, no repair needed
+            return json.to_string();
+        }
+
+        // Check for EOF while parsing (truncated arrays or objects)
+        let mut repaired = json.to_string();
+
+        // Count brackets and braces to detect truncation
+        let mut brace_depth = 0;
+        let mut bracket_depth = 0;
+        let mut in_string = false;
+        let mut escape_next = false;
+
+        for ch in json.chars() {
+            if escape_next {
+                escape_next = false;
+                continue;
+            }
+
+            match ch {
+                '\\' if in_string => escape_next = true,
+                '"' => in_string = !in_string,
+                '{' if !in_string => brace_depth += 1,
+                '}' if !in_string => brace_depth -= 1,
+                '[' if !in_string => bracket_depth += 1,
+                ']' if !in_string => bracket_depth -= 1,
+                _ => {}
+            }
+        }
+
+        // If we're in a string, close it
+        if in_string {
+            repaired.push('"');
+            tracing::debug!("Closed unclosed string");
+        }
+
+        // Close any unclosed arrays
+        while bracket_depth > 0 {
+            repaired.push(']');
+            bracket_depth -= 1;
+            tracing::debug!("Closed unclosed array");
+        }
+
+        // Close any unclosed objects
+        while brace_depth > 0 {
+            repaired.push('}');
+            brace_depth -= 1;
+            tracing::debug!("Closed unclosed object");
+        }
+
+        repaired
+    }
+
     /// Validate generated tests for basic correctness
     fn validate_generated_tests(&self, suite: &GeneratedTestSuite) -> McpResult<()> {
         if suite.tests.is_empty() {
@@ -780,38 +846,58 @@ GUIDELINES:
 /// Focused prompt for generating tests for a SINGLE tool at a time
 const TOOL_TEST_GENERATION_SYSTEM_PROMPT: &str = r#"You are a QA engineer generating tests for a SINGLE MCP tool.
 
-OUTPUT REQUIREMENT:
-- Your response MUST be ONLY a valid JSON object with a "tests" array
-- Start with { and end with }
-- No markdown, no explanations, no thinking process in the content
-- If you are a reasoning model, use reasoning internally but output ONLY JSON
+CRITICAL: Output MUST be valid, complete JSON. No markdown, no truncation.
 
-FOCUS: Generate comprehensive tests for ONE SPECIFIC TOOL only.
+EXACT JSON SCHEMA (follow this structure exactly):
+{
+  "suite_name": "tool_name_tests",
+  "description": "Brief description of test suite",
+  "tests": [
+    {
+      "name": "test_identifier",
+      "description": "What this test validates",
+      "category": "happy_path",
+      "complexity": "simple",
+      "kind": {
+        "tool_call": {
+          "tool_name": "actual_tool_name",
+          "arguments": {"param1": "value1"}
+        }
+      },
+      "test_data": {},
+      "assertions": [
+        {"type": "status_equals", "expected": "success"}
+      ]
+    }
+  ]
+}
 
-TEST CATEGORIES (MUST use exact names):
-- "happy_path" (normal scenarios, valid inputs)
-- "edge_case" (boundaries, special characters, optional params omitted)
-- "error" (invalid params, missing fields, wrong types)
-- "security" (injection, validation bypass attempts)
+FIELD DEFINITIONS (use EXACTLY these values):
 
-TEST COMPLEXITY (MUST use exact names):
-- "simple" (straightforward test)
-- "medium" (moderately complex)
-- "complex" (advanced scenario)
+"category" field - Test type (choose ONE):
+  - "happy_path" - Normal scenarios with valid inputs
+  - "edge_case" - Boundary conditions, optional params
+  - "error" - Invalid inputs, missing required fields
+  - "security" - Injection attempts, validation bypass
+  - "workflow" - Multi-step sequences
+  - "performance" - Speed/load testing
 
-ASSERTION FORMAT IN TESTS:
-- {"type": "status_equals", "expected": "success"|"error"}
-- {"type": "content_contains", "substring": "..."}
-- {"type": "response_time_under", "milliseconds": 1000}
+"complexity" field - Test difficulty (choose ONE):
+  - "simple" - Basic straightforward test
+  - "medium" - Moderate complexity
+  - "complex" - Advanced multi-condition test
+
+ASSERTION "type" options:
+  - "status_equals" with "expected": "success" or "error"
+  - "content_contains" with "substring": "text"
+  - "response_time_under" with "milliseconds": number
 
 GUIDELINES:
-- Happy paths (40%): use category "happy_path"
-- Edge cases (30%): use category "edge_case"
-- Error handling (20%): use category "error"
-- Security (10%): use category "security"
-- Test realistic parameter combinations
-- Cover required vs optional parameters
-- Test error scenarios (missing required params, wrong types)
+- Generate 5-8 tests maximum per tool
+- 40% happy_path, 30% edge_case, 20% error, 10% security
+- DO NOT truncate JSON - complete all tests properly
+- Every test MUST have valid category and complexity
+- Close all braces and brackets
 "#;
 
 #[cfg(test)]
