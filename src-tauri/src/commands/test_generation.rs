@@ -169,6 +169,24 @@ pub async fn get_test_runs(
         .map_err(|e| e.to_string())
 }
 
+/// Delete a test run
+#[tauri::command]
+pub async fn delete_test_run(
+    run_id: String,
+    app_state: State<'_, AppState>,
+) -> Result<(), String> {
+    let db_lock = app_state.database.read().await;
+    let Some(db) = db_lock.as_ref() else {
+        return Err("Database not initialized".to_string());
+    };
+
+    let test_db = TestDatabase::new(db.pool().clone());
+    test_db
+        .delete_run(&run_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // =============================================================================
 // Test Execution Commands
 // =============================================================================

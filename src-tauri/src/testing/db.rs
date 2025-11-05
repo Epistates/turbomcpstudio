@@ -378,6 +378,23 @@ impl TestDatabase {
         Ok(runs)
     }
 
+    /// Delete a test run and its results
+    pub async fn delete_run(&self, run_id: &str) -> McpResult<()> {
+        // Delete test results first (foreign key constraint)
+        sqlx::query("DELETE FROM test_results WHERE run_id = ?")
+            .bind(run_id)
+            .execute(&self.pool)
+            .await?;
+
+        // Delete the run
+        sqlx::query("DELETE FROM test_runs WHERE id = ?")
+            .bind(run_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
     // =========================================================================
     // Test Results
     // =========================================================================

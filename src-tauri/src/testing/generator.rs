@@ -8,8 +8,8 @@ use crate::llm_config::LLMConfigManager;
 use crate::testing::{SchemaAnalyzer, TestDatabase};
 use crate::testing::analyzer::{ToolAnalysis, ToolInfo};
 use crate::types::{
-    server_types::ServerInfo, Assertion, GeneratedTest, GeneratedTestSuite, NewTest, NewTestSuite,
-    TestCategory, TestComplexity, TestKind,
+    server_types::ServerInfo, GeneratedTest, GeneratedTestSuite, NewTest, NewTestSuite,
+    TestCategory, TestKind,
 };
 use futures::future::join_all;
 use std::sync::Arc;
@@ -167,109 +167,188 @@ impl TestGenerator {
         provider_id: Option<String>,
         model_id: Option<String>,
     ) -> McpResult<Vec<GeneratedTest>> {
-        tracing::info!("Generating tests for tool: {} (complexity: {})", tool.name, tool_analysis.complexity_score);
+        tracing::info!("Generating tests for tool: {} (complexity: {}) using per-category calls",
+            tool.name, tool_analysis.complexity_score);
 
-        // Build focused prompt for this tool only
-        let prompt = self.build_tool_test_prompt(server, &tool);
+        // Define test categories with max_tokens (let LLM decide test count based on complexity)
+        let categories = vec![
+            (TestCategory::HappyPath, 3000),     // Happy path tests (up to ~4 tests)
+            (TestCategory::EdgeCase, 2500),      // Edge case tests (up to ~3 tests)
+            (TestCategory::Error, 2500),         // Error handling tests (up to ~3 tests)
+            (TestCategory::Security, 2000),      // Security tests (up to ~2 tests)
+        ];
 
-        // Call LLM for this specific tool
-        let tool_suite = self.call_llm_for_tool_tests(
-            &prompt,
-            &tool.name,
-            provider_id,
-            model_id,
-        ).await?;
+        // Create parallel tasks for each category
+        let mut tasks = Vec::new();
+        for (category, max_tokens) in categories {
+            let prompt = self.build_category_test_prompt(server, &tool, category.clone(), &tool_analysis);
+            let task = self.call_llm_for_category_tests(
+                prompt,  // Pass owned String instead of reference
+                tool.name.clone(),
+                category,  // Use the original category here
+                max_tokens,
+                provider_id.clone(),
+                model_id.clone(),
+            );
+            tasks.push(task);
+        }
 
-        tracing::info!("Generated {} tests for tool: {}", tool_suite.tests.len(), tool.name);
-        Ok(tool_suite.tests)
+        // Execute all category generations in parallel
+        let category_count = tasks.len();  // Get length before moving tasks
+        tracing::info!("Executing {} parallel category calls for tool: {}", category_count, tool.name);
+        let results = join_all(tasks).await;
+
+        // Aggregate category results
+        let mut all_tests = Vec::new();
+        for result in results {
+            match result {
+                Ok(category_tests) => {
+                    all_tests.extend(category_tests);
+                }
+                Err(e) => {
+                    tracing::warn!("Category test generation failed (continuing): {}", e);
+                    // Continue with other categories even if one fails
+                }
+            }
+        }
+
+        if all_tests.is_empty() {
+            return Err(McpStudioError::ConfigError(
+                format!("Failed to generate any tests for tool: {}", tool.name)
+            ));
+        }
+
+        tracing::info!("Generated {} tests for tool: {} across {} categories",
+            all_tests.len(), tool.name, category_count);
+        Ok(all_tests)
     }
 
-    /// Build focused prompt for a SINGLE tool
-    fn build_tool_test_prompt(
+    /// Build category-specific prompt for focused test generation
+    fn build_category_test_prompt(
         &self,
         server: &ServerInfo,
         tool: &ToolInfo,
+        category: TestCategory,
+        tool_analysis: &ToolAnalysis,
     ) -> String {
+        let category_name = match category {
+            TestCategory::HappyPath => "happy_path",
+            TestCategory::EdgeCase => "edge_case",
+            TestCategory::Error => "error",
+            TestCategory::Security => "security",
+            TestCategory::Workflow => "workflow",
+            TestCategory::Performance => "performance",
+        };
+
+        let category_description = match category {
+            TestCategory::HappyPath => "normal scenarios with valid inputs that should succeed",
+            TestCategory::EdgeCase => "boundary conditions, special characters, empty values, optional parameters",
+            TestCategory::Error => "invalid inputs, missing required fields, wrong types that should fail gracefully",
+            TestCategory::Security => "injection attempts, validation bypass, potential exploits",
+            TestCategory::Workflow => "multi-step sequences",
+            TestCategory::Performance => "speed and load testing",
+        };
+
+        let expected_status = match category {
+            TestCategory::HappyPath => "success",
+            TestCategory::EdgeCase => "success (but test edge behavior)",
+            TestCategory::Error => "error",
+            TestCategory::Security => "error (should reject malicious input)",
+            TestCategory::Workflow => "success",
+            TestCategory::Performance => "success",
+        };
+
+        // Determine test count guidance based on tool complexity
+        let complexity_guidance = if tool_analysis.complexity_score < 30 {
+            "simple tool - generate 1-2 focused tests"
+        } else if tool_analysis.complexity_score < 60 {
+            "moderate tool - generate 2-3 comprehensive tests"
+        } else {
+            "complex tool - generate 3-4 thorough tests covering various scenarios"
+        };
+
         format!(
-            r#"GENERATE TEST CASES FOR SINGLE TOOL. OUTPUT ONLY VALID JSON.
+            r#"GENERATE TEST(S) FOR CATEGORY: {category}
 
-Expected JSON structure (MUST follow exactly):
-{}
+TOOL COMPLEXITY: {complexity_score}/100 ({guidance})
 
-Server: {}
-Tool to test: {}
-Description: {}
+OUTPUT ONLY VALID JSON. NO MARKDOWN. NO EXPLANATIONS.
 
-Generate focused test cases for THIS TOOL ONLY by test category:
-- Generate 1-2 "happy_path" tests for valid inputs and normal scenarios
-- Generate 1-2 "edge_case" tests for boundary values, empty strings, special characters
-- Generate 1-2 "error" tests for invalid params, wrong types, missing fields
-- Generate 1 "security" test for injection/validation bypass attempts
+EXACT JSON STRUCTURE:
+{{
+  "suite_name": "{tool_name}_{category}_tests",
+  "description": "{category} tests for {tool_name}",
+  "tests": [
+    {{
+      "name": "test_identifier",
+      "description": "What this specific test validates",
+      "category": "{category}",
+      "complexity": "simple",
+      "kind": {{
+        "tool_call": {{
+          "tool_name": "{tool_name}",
+          "arguments": {{"param": "value"}}
+        }}
+      }},
+      "test_data": {{}},
+      "assertions": [
+        {{"type": "status_equals", "expected": "{status}"}}
+      ]
+    }}
+  ]
+}}
 
-Total: aim for 4-7 tests. You may generate more for complex tools, but prioritize quality over quantity.
+SERVER: {server_name}
+TOOL: {tool_name}
+DESCRIPTION: {tool_description}
 
-For each test, provide: name, description, category, complexity, kind, test_data, assertions.
+CATEGORY: {category}
+FOCUS: {category_desc}
 
-TEST CATEGORIES (MUST use exact names):
-- "happy_path" (normal scenarios, valid inputs)
-- "edge_case" (boundaries, special characters, optional params omitted)
-- "error" (invalid params, missing fields, wrong types)
-- "security" (injection, validation bypass attempts)
+REQUIREMENTS:
+1. Generate tests appropriate for tool complexity: {guidance}
+2. Each test MUST have category: "{category}"
+3. Expected outcome: {status}
+4. Output ONLY the JSON object starting with {{ and ending with }}
+5. Include realistic test data based on tool description
+6. Quality over quantity - ensure each test is meaningful
+7. NO markdown formatting, NO code blocks
 
-TEST COMPLEXITY:
-- "simple" (straightforward test)
-- "medium" (moderately complex)
-- "complex" (advanced scenario)
-
-ASSERTION FORMAT:
-- {{"type": "status_equals", "expected": "success"|"error"}}
-- {{"type": "content_contains", "substring": "..."}}
-- {{"type": "response_time_under", "milliseconds": 1000}}
-
-CRITICAL: Output ONLY the JSON object with "tests" array. No markdown. No explanations.
-Start with {{ and end with }}.
-"#,
-            TEST_SCHEMA,
-            server.config.name,
-            tool.name,
-            tool.description.as_deref().unwrap_or("No description"),
+START YOUR RESPONSE WITH {{ and END WITH }}"#,
+            category = category_name,
+            complexity_score = tool_analysis.complexity_score,
+            guidance = complexity_guidance,
+            tool_name = tool.name,
+            server_name = server.config.name,
+            tool_description = tool.description.as_deref().unwrap_or("No description"),
+            category_desc = category_description,
+            status = expected_status,
         )
     }
 
-    /// Call LLM for a SINGLE tool's tests
-    async fn call_llm_for_tool_tests(
+    /// Call LLM for a specific category's tests with controlled max_tokens
+    async fn call_llm_for_category_tests(
         &self,
-        prompt: &str,
-        tool_name: &str,
+        prompt: String,
+        tool_name: String,
+        category: TestCategory,
+        max_tokens: u32,
         provider_id: Option<String>,
         model_id: Option<String>,
-    ) -> McpResult<GeneratedTestSuite> {
-        tracing::info!("Calling LLM for tool: {}", tool_name);
-
-        // Get max_tokens from provider config
-        let max_tokens = if let Some(ref prov_id) = provider_id {
-            let config = self.llm.get_config().await;
-            config
-                .providers
-                .get(prov_id)
-                .map(|p| p.max_tokens)
-                .unwrap_or(8000)
-        } else {
-            let config = self.llm.get_config().await;
-            if let Some(active_id) = config.active_provider {
-                config
-                    .providers
-                    .get(&active_id)
-                    .map(|p| p.max_tokens)
-                    .unwrap_or(8000)
-            } else {
-                8000
-            }
+    ) -> McpResult<Vec<GeneratedTest>> {
+        let category_name = match category {
+            TestCategory::HappyPath => "happy_path",
+            TestCategory::EdgeCase => "edge_case",
+            TestCategory::Error => "error",
+            TestCategory::Security => "security",
+            TestCategory::Workflow => "workflow",
+            TestCategory::Performance => "performance",
         };
 
-        tracing::info!("Using max_tokens: {} for tool: {}", max_tokens, tool_name);
+        tracing::info!("Calling LLM for tool: {} category: {} (max_tokens: {})",
+            tool_name, category_name, max_tokens);
 
-        // Build request
+        // Build request with controlled max_tokens
         let request = CreateMessageRequest {
             messages: vec![SamplingMessage {
                 role: Role::User,
@@ -280,8 +359,8 @@ Start with {{ and end with }}.
                 }),
                 metadata: None,
             }],
-            system_prompt: Some(TOOL_TEST_GENERATION_SYSTEM_PROMPT.to_string()),
-            max_tokens,
+            system_prompt: Some("You are a QA engineer generating focused test cases. Output ONLY valid JSON with no markdown formatting.".to_string()),
+            max_tokens,  // Use category-specific limit
             temperature: Some(0.3),
             model_preferences: model_id.clone().map(|m| {
                 tracing::info!("Creating model preferences with hint: {}", m);
@@ -306,7 +385,8 @@ Start with {{ and end with }}.
             .invoke_llm_directly(request, provider_id.clone())
             .await
             .map_err(|e| {
-                let error_msg = format!("LLM invocation failed for tool {}: {}", tool_name, e);
+                let error_msg = format!("LLM invocation failed for tool {} category {}: {}",
+                    tool_name, category_name, e);
                 tracing::error!("{}", error_msg);
                 McpStudioError::ConfigError(error_msg)
             })?;
@@ -316,58 +396,60 @@ Start with {{ and end with }}.
             Content::Text(text_content) => text_content.text,
             _ => {
                 return Err(McpStudioError::ConfigError(format!(
-                    "Unexpected response format for tool {}",
-                    tool_name
-                )))
+                    "Unexpected response format for tool {} category {}",
+                    tool_name, category_name
+                )));
             }
         };
 
-        tracing::info!("LLM response length: {} chars for tool: {}", response_text.len(), tool_name);
+        tracing::debug!("LLM response for {} {}: {} chars", tool_name, category_name, response_text.len());
 
-        // Extract JSON from response
-        let json_text = self.extract_json_from_response(&response_text);
-        tracing::info!("Extracted JSON length: {} chars for tool: {}", json_text.len(), tool_name);
-
-        // Log first and last 100 chars of extracted JSON for debugging
-        let json_preview = if json_text.len() > 200 {
-            format!("{}...{}", &json_text[..100], &json_text[json_text.len()-100..])
+        // Extract JSON from response (strip markdown if present)
+        let json_text = if let Some(start) = response_text.find('{') {
+            if let Some(end) = response_text.rfind('}') {
+                &response_text[start..=end]
+            } else {
+                &response_text
+            }
         } else {
-            json_text.clone()
+            &response_text
         };
-        tracing::info!("Extracted JSON preview: {}", json_preview);
 
-        // Try to repair truncated JSON before parsing
-        let repaired_json = self.repair_truncated_json(&json_text);
-        if repaired_json != json_text {
-            tracing::warn!("JSON appeared truncated, attempted repair");
-            tracing::debug!("Repaired JSON length: {} (was {})", repaired_json.len(), json_text.len());
-        }
-
-        // Parse response
-        let generated_suite: GeneratedTestSuite = serde_json::from_str(&repaired_json)
+        // Parse response - with smaller max_tokens, truncation should not occur
+        let generated_suite: GeneratedTestSuite = serde_json::from_str(json_text)
             .map_err(|e| {
-                tracing::error!("Failed to parse LLM response for tool {}: {}", tool_name, e);
-                tracing::error!("Extracted JSON (first 500 chars): {}",
-                    if repaired_json.len() > 500 { &repaired_json[..500] } else { &repaired_json });
+                tracing::error!("Failed to parse LLM response for tool {} category {}: {}",
+                    tool_name, category_name, e);
+                tracing::error!("Response JSON (first 500 chars): {}",
+                    if json_text.len() > 500 { &json_text[..500] } else { json_text });
                 McpStudioError::ConfigError(format!(
-                    "Failed to parse test JSON for tool {}: {}",
-                    tool_name, e
+                    "Failed to parse test JSON for tool {} category {}: {}",
+                    tool_name, category_name, e
                 ))
             })?;
 
-        // Validate tests are for the correct tool
+        // Validate tests are for the correct tool and category
         for test in &generated_suite.tests {
             if let TestKind::ToolCall { tool_name: test_tool, .. } = &test.kind {
-                if test_tool != tool_name {
+                if test_tool != &tool_name {
                     tracing::warn!(
                         "Test '{}' targets wrong tool '{}' (expected '{}')",
                         test.name, test_tool, tool_name
                     );
                 }
             }
+
+            if test.category != category {
+                tracing::warn!(
+                    "Test '{}' has wrong category '{:?}' (expected '{:?}')",
+                    test.name, test.category, category
+                );
+            }
         }
 
-        Ok(generated_suite)
+        tracing::info!("Generated {} tests for tool {} category {}",
+            generated_suite.tests.len(), tool_name, category_name);
+        Ok(generated_suite.tests)
     }
 
     /// Build the test generation prompt
@@ -640,65 +722,6 @@ Start with {{ and end with }}. ONLY JSON.
         working_text
     }
 
-    /// Attempt to repair truncated JSON by completing incomplete structures
-    fn repair_truncated_json(&self, json: &str) -> String {
-        let trimmed = json.trim();
-
-        // Check if JSON looks complete
-        if trimmed.starts_with('{') && trimmed.ends_with('}') {
-            // Appears complete, no repair needed
-            return json.to_string();
-        }
-
-        // Check for EOF while parsing (truncated arrays or objects)
-        let mut repaired = json.to_string();
-
-        // Count brackets and braces to detect truncation
-        let mut brace_depth = 0;
-        let mut bracket_depth = 0;
-        let mut in_string = false;
-        let mut escape_next = false;
-
-        for ch in json.chars() {
-            if escape_next {
-                escape_next = false;
-                continue;
-            }
-
-            match ch {
-                '\\' if in_string => escape_next = true,
-                '"' => in_string = !in_string,
-                '{' if !in_string => brace_depth += 1,
-                '}' if !in_string => brace_depth -= 1,
-                '[' if !in_string => bracket_depth += 1,
-                ']' if !in_string => bracket_depth -= 1,
-                _ => {}
-            }
-        }
-
-        // If we're in a string, close it
-        if in_string {
-            repaired.push('"');
-            tracing::debug!("Closed unclosed string");
-        }
-
-        // Close any unclosed arrays
-        while bracket_depth > 0 {
-            repaired.push(']');
-            bracket_depth -= 1;
-            tracing::debug!("Closed unclosed array");
-        }
-
-        // Close any unclosed objects
-        while brace_depth > 0 {
-            repaired.push('}');
-            brace_depth -= 1;
-            tracing::debug!("Closed unclosed object");
-        }
-
-        repaired
-    }
-
     /// Validate generated tests for basic correctness
     fn validate_generated_tests(&self, suite: &GeneratedTestSuite) -> McpResult<()> {
         if suite.tests.is_empty() {
@@ -846,7 +869,11 @@ GUIDELINES:
 /// Focused prompt for generating tests for a SINGLE tool at a time
 const TOOL_TEST_GENERATION_SYSTEM_PROMPT: &str = r#"You are a QA engineer generating tests for a SINGLE MCP tool.
 
-CRITICAL: Output MUST be valid, complete JSON. No markdown, no truncation.
+CRITICAL REQUIREMENTS:
+1. Generate EXACTLY 5-8 tests (NOT MORE!)
+2. Output MUST be valid, complete JSON
+3. No markdown, no truncation
+4. Stop after 8 tests maximum
 
 EXACT JSON SCHEMA (follow this structure exactly):
 {
