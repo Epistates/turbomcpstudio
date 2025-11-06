@@ -245,6 +245,17 @@
 		}
 	}
 
+	async function deleteRun(runId: string) {
+		if (!confirm('Are you sure you want to delete this test run?')) return;
+
+		try {
+			await invoke('delete_test_run', { runId });
+			await loadRuns();
+		} catch (e) {
+			error = `Failed to delete test run: ${e}`;
+		}
+	}
+
 	async function deleteAllTests() {
 		if (!selectedSuiteId) return;
 		if (!confirm(`Are you sure you want to delete all ${tests.length} tests in this suite?`)) return;
@@ -604,11 +615,23 @@
 												</p>
 											</div>
 										</div>
-										{#if run.duration_ms}
-											<span class="text-sm text-zinc-600 dark:text-zinc-400">
-												{formatDuration(run.duration_ms)}
-											</span>
-										{/if}
+										<div class="flex items-center gap-3">
+											{#if run.duration_ms}
+												<span class="text-sm text-zinc-600 dark:text-zinc-400">
+													{formatDuration(run.duration_ms)}
+												</span>
+											{/if}
+											<button
+												onclick={(e) => {
+													e.stopPropagation();
+													deleteRun(run.id);
+												}}
+												class="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+												title="Delete run"
+											>
+												<Trash2 size={16} />
+											</button>
+										</div>
 									</div>
 									<div class="flex gap-2">
 										<div class="flex-1 h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
