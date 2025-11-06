@@ -94,6 +94,10 @@
 	const currentProvider = $derived(providers.find((p) => p.provider_id === selectedProvider));
 	const availableModels = $derived(currentProvider?.available_models ?? []);
 
+	// Check if we should show provider selector (only when multiple providers configured)
+	const enabledProviders = $derived(providers.filter(p => p.enabled));
+	const showProviderSelector = $derived(enabledProviders.length > 1);
+
 	// Auto-select first model when provider changes
 	$effect(() => {
 		if (selectedProvider && availableModels.length > 0 && !availableModels.includes(selectedModel)) {
@@ -117,13 +121,23 @@
 
 	async function loadProviders() {
 		try {
-			const result = await invoke<LLMProviderStatus[]>('list_llm_providers');
-			providers = result;
+			const [providerStatuses, llmConfig] = await Promise.all([
+				invoke<LLMProviderStatus[]>('list_llm_providers'),
+				invoke<any>('get_llm_config')
+			]);
 
-			// Auto-select first enabled provider
-			const firstEnabled = result.find((p) => p.enabled);
-			if (firstEnabled && !selectedProvider) {
-				selectedProvider = firstEnabled.provider_id;
+			providers = providerStatuses;
+
+			// Auto-select active provider from global config
+			const activeProviderId = llmConfig?.active_provider;
+			if (activeProviderId && !selectedProvider) {
+				selectedProvider = activeProviderId;
+			} else if (!selectedProvider) {
+				// Fall back to first enabled provider
+				const firstEnabled = providerStatuses.find((p) => p.enabled);
+				if (firstEnabled) {
+					selectedProvider = firstEnabled.provider_id;
+				}
 			}
 		} catch (e) {
 			error = `Failed to load LLM providers: ${e}`;
@@ -329,27 +343,29 @@
 			<div class="mb-4">
 				<h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Test Suites</h2>
 
-				<!-- LLM Provider Selector -->
-				<div class="mb-2">
-					<label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-						Provider
-					</label>
-					<select
-						bind:value={selectedProvider}
-						class="w-full px-3 py-1.5 text-sm bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-					>
-						{#if providers.length === 0}
-							<option value="">No providers configured</option>
-						{:else}
-							{#each providers.filter(p => p.enabled) as provider}
-								<option value={provider.provider_id}>
-									{provider.display_name}
-									{provider.provider_type === 'local' ? '(Local)' : ''}
-								</option>
-							{/each}
-						{/if}
-					</select>
-				</div>
+				<!-- LLM Provider Selector (only show when multiple providers available) -->
+				{#if showProviderSelector}
+					<div class="mb-2">
+						<label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+							Provider
+						</label>
+						<select
+							bind:value={selectedProvider}
+							class="w-full px-3 py-1.5 text-sm bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+						>
+							{#if providers.length === 0}
+								<option value="">No providers configured</option>
+							{:else}
+								{#each enabledProviders as provider}
+									<option value={provider.provider_id}>
+										{provider.display_name}
+										{provider.provider_type === 'local' ? '(Local)' : ''}
+									</option>
+								{/each}
+							{/if}
+						</select>
+					</div>
+				{/if}
 
 				<!-- Model Selector -->
 				<div class="mb-3">

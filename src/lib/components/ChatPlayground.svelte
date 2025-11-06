@@ -53,16 +53,31 @@
 
 	async function loadProviders() {
 		try {
-			const result = await invoke<LLMProviderStatus[]>('list_llm_providers');
-			providers = result;
+			const [providerStatuses, llmConfig] = await Promise.all([
+				invoke<LLMProviderStatus[]>('list_llm_providers'),
+				invoke<any>('get_llm_config')
+			]);
 
-			// Auto-select first enabled provider
-			const firstEnabled = result.find((p) => p.enabled);
-			if (firstEnabled && !selectedProvider) {
-				selectedProvider = firstEnabled.provider_id;
-				// Auto-select first available model for this provider
-				if (firstEnabled.available_models.length > 0) {
-					selectedModel = firstEnabled.available_models[0];
+			providers = providerStatuses;
+
+			// Auto-select active provider from global config
+			const activeProviderId = llmConfig?.active_provider;
+			if (activeProviderId && !selectedProvider) {
+				selectedProvider = activeProviderId;
+				const activeProviderInfo = providerStatuses.find(p => p.provider_id === activeProviderId);
+				// Auto-select first available model for active provider
+				if (activeProviderInfo && activeProviderInfo.available_models.length > 0) {
+					selectedModel = activeProviderInfo.available_models[0];
+				}
+			} else if (!selectedProvider) {
+				// Fall back to first enabled provider
+				const firstEnabled = providerStatuses.find((p) => p.enabled);
+				if (firstEnabled) {
+					selectedProvider = firstEnabled.provider_id;
+					// Auto-select first available model for this provider
+					if (firstEnabled.available_models.length > 0) {
+						selectedModel = firstEnabled.available_models[0];
+					}
 				}
 			}
 		} catch (e) {
