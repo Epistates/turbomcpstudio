@@ -15,6 +15,8 @@ A native desktop application for developing, testing, and debugging Model Contex
 
 ---
 
+<img src="static/screenshot.png" alt="TurboMCP Studio" style="width: 100%; max-width: 100%; margin: 20px 0;"/>
+
 ## Why TurboMCP Studio?
 
 - **Native Performance** - Built with Rust and Tauri for blazing-fast native desktop experience
@@ -44,8 +46,6 @@ A native desktop application for developing, testing, and debugging Model Contex
 - ✅ **Sampling & Elicitation Flow** - Complete sampling and prompt elicitation workflow for model testing
 - ✅ **Protocol Inspector** - Real-time protocol message viewing
 - ✅ **Settings** - Configure application preferences and themes
-
-<img src="static/screenshot.png" alt="TurboMCP Studio" style="width: 100%; max-width: 100%; margin: 20px 0;"/>
 
 ## Installation
 
