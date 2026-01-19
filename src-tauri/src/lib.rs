@@ -6,6 +6,7 @@ pub mod interceptor;
 mod llm_config;
 mod llm_providers;
 mod mcp_client;
+mod oauth;
 pub mod proxy;
 pub mod registry;
 pub mod testing;
@@ -35,6 +36,8 @@ pub struct AppState {
     pub monitoring_handle: Arc<tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>>,
     /// Proxy manager for creating and managing MCP proxies
     pub proxy_manager: Arc<ProxyManager>,
+    /// OAuth flow manager for OAuth 2.1 visual debugger
+    pub oauth_flow_manager: Arc<oauth::OAuthFlowManager>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -159,6 +162,9 @@ pub fn run() {
             // Initialize proxy manager for universal MCP proxying
             let proxy_manager = Arc::new(ProxyManager::new(database.clone()));
 
+            // Initialize OAuth flow manager for OAuth 2.1 visual debugger
+            let oauth_flow_manager = Arc::new(oauth::OAuthFlowManager::new());
+
             // Store lightweight state immediately to unblock UI
             app.manage(AppState {
                 mcp_manager: mcp_manager.clone(),
@@ -168,6 +174,12 @@ pub fn run() {
                 workflow_engine: workflow_engine.clone(),
                 monitoring_handle: monitoring_handle.clone(),
                 proxy_manager: proxy_manager.clone(),
+                oauth_flow_manager: oauth_flow_manager.clone(),
+            });
+
+            // Also manage OAuth state for OAuth commands
+            app.manage(commands::oauth::OAuthState {
+                flow_manager: oauth_flow_manager.clone(),
             });
 
             // Issue #5 fix: Proper handshake pattern to prevent race condition
@@ -464,6 +476,7 @@ pub fn run() {
             commands::update_test,
             commands::delete_test,
             commands::delete_test_suite,
+            commands::delete_test_run,
             commands::get_test_runs,
             // Test Execution commands
             commands::run_test_suite,
@@ -543,6 +556,27 @@ pub fn run() {
             commands::list_proxies,
             commands::get_proxy_metrics,
             commands::introspect_backend,
+            // OAuth 2.1 Visual Debugger commands
+            commands::discover_oauth_metadata,
+            commands::start_oauth_authorization_flow,
+            commands::get_oauth_flow_status,
+            commands::cancel_oauth_flow,
+            commands::decode_jwt_token,
+            commands::refresh_oauth_token,
+            commands::revoke_oauth_token,
+            commands::export_oauth_config,
+            commands::import_oauth_config,
+            commands::has_valid_oauth_token,
+            commands::get_oauth_token,
+            commands::get_oauth_provider_templates,
+            commands::get_oauth_provider_template,
+            commands::validate_oauth_manual_config,
+            // OAuth config persistence commands
+            commands::save_oauth_config,
+            commands::load_oauth_config,
+            commands::update_oauth_config,
+            commands::delete_oauth_config,
+            commands::list_oauth_configs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

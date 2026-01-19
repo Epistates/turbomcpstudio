@@ -26,7 +26,8 @@
     Network,
     Sparkles,
     Beaker,
-    Radar
+    Radar,
+    Shield
   } from 'lucide-svelte';
 
   // Props using Svelte 5 runes
@@ -60,7 +61,8 @@
     { id: 'protocol', label: 'Protocol', icon: Network },
     { id: 'chat', label: 'LLM Playground', icon: Sparkles },
     { id: 'testing', label: 'Testing', icon: Beaker },
-    // { id: 'collections', label: 'Collections', icon: Layers3 }, // TODO: Enable for v2 with multi-server UI
+    { id: 'collections', label: 'Collections', icon: Layers3 },
+    { id: 'oauth', label: 'OAuth Debugger', icon: Shield },
   ];
 
   function navigateTo(view: View) {
@@ -80,6 +82,7 @@
     'chat': null,             // LLM Playground doesn't require MCP servers
     'testing': null,          // Unified Testing supports all servers
     'collections': null,      // Collections supports all servers
+    'oauth': null,            // OAuth Debugger is standalone (doesn't require MCP capability)
     'settings': null          // Settings doesn't require MCP capability
   };
 

@@ -84,6 +84,13 @@ impl MessageConverter {
             }
             ContentBlock::ResourceLink(_) => "[Resource link]".to_string(),
             ContentBlock::Resource(_) => "[Embedded resource]".to_string(),
+            // v3 new variants for tool calling in sampling
+            ContentBlock::ToolUse(tool_use) => {
+                format!("[Tool call: {}]", tool_use.name)
+            }
+            ContentBlock::ToolResult(tool_result) => {
+                format!("[Tool result: {}]", tool_result.tool_use_id)
+            }
         }
     }
 

@@ -33,15 +33,18 @@ pub enum BackendConfig {
     /// Standard I/O subprocess
     Stdio {
         command: String,
-        args: Vec<String>,
+        #[serde(default)]
+        args: Option<Vec<String>>,
+        #[serde(default)]
+        env: Option<std::collections::HashMap<String, String>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         working_dir: Option<String>,
     },
     /// HTTP/SSE backend
     Http {
         url: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        auth_token: Option<String>,
+        #[serde(default)]
+        headers: Option<std::collections::HashMap<String, String>>,
     },
     /// TCP socket backend
     Tcp { host: String, port: u16 },
@@ -49,7 +52,11 @@ pub enum BackendConfig {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     Unix { path: String },
     /// WebSocket backend
-    WebSocket { url: String },
+    WebSocket {
+        url: String,
+        #[serde(default)]
+        headers: Option<std::collections::HashMap<String, String>>,
+    },
 }
 
 /// Frontend exposure type
@@ -188,9 +195,11 @@ pub struct ToolSpec {
 /// Resource specification
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceSpec {
+    pub name: String,
     pub uri: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mime_type: Option<String>,
 }
 
@@ -200,6 +209,18 @@ pub struct PromptSpec {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default)]
+    pub arguments: Vec<PromptArgumentSpec>,
+}
+
+/// Prompt argument specification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptArgumentSpec {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub required: bool,
 }
 
 /// Proxy list item (for UI)

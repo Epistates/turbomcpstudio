@@ -3,7 +3,7 @@
 //! Tauri commands for AI-powered test generation, execution, and management.
 
 use crate::testing::{TestDatabase, TestExecutor, TestGenerator};
-use crate::types::{NewTestSuite, Test, TestResult, TestRun, TestSuite};
+use crate::types::{Test, TestResult, TestRun, TestSuite};
 use crate::AppState;
 use tauri::State;
 

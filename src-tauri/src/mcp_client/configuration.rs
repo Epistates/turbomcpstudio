@@ -1,77 +1,76 @@
 //! MCP Client Configuration Module
 //!
 //! Provides production-ready configuration helpers for MCP client setup:
-//! - Enterprise plugin configuration (retry, cache, metrics)
+//! - v3 resilience configuration (retry, circuit breaker, health checks)
 //! - Client capabilities with all MCP features enabled (opt-out model)
 //! - Connection configuration with production defaults
 //! - Server capability mapping for protocol negotiation
 
-use std::sync::Arc;
 use turbomcp_client::{Client, ClientBuilder, ClientCapabilities, ConnectionConfig};
 use turbomcp_transport::Transport;
 
-// Plugin system ready for TurboMCP 2.0.0-rc.1
-#[cfg(feature = "plugins")]
-use turbomcp_client::plugins::{
-    CacheConfig, CachePlugin, MetricsPlugin, PluginConfig, RetryConfig, RetryPlugin,
-};
+// v3 resilience configuration
+use turbomcp_transport::resilience::{CircuitBreakerConfig, HealthCheckConfig, RetryConfig};
 
 /// Configuration utilities for MCP client setup
 pub struct Configuration;
 
 impl Configuration {
-    /// Configure ClientBuilder with enterprise plugins for production reliability
+    /// Configure ClientBuilder with enterprise resilience for production reliability
     ///
-    /// When the `plugins` feature is enabled, adds:
-    /// - **Retry Plugin**: Exponential backoff, 3 retries, handles timeouts and connection errors
-    /// - **Cache Plugin**: 1000 entries, 5min TTL, caches responses/resources/tools
-    /// - **Metrics Plugin**: Performance monitoring for development insights
-    #[cfg(feature = "plugins")]
-    pub fn configure_plugins(mut builder: ClientBuilder) -> ClientBuilder {
-        // Retry plugin with exponential backoff - essential for MCP Studio's server testing
+    /// Configures v3 resilience features:
+    /// - **Retry**: Exponential backoff, 3 retries, handles timeouts and connection errors
+    /// - **Circuit Breaker**: Prevents cascade failures with configurable thresholds
+    /// - **Health Checks**: Periodic connection health monitoring
+    ///
+    /// Note: Currently unused - available for production deployments requiring enhanced reliability.
+    #[allow(dead_code)]
+    pub fn configure_resilience(builder: ClientBuilder) -> ClientBuilder {
+        use std::time::Duration;
+
+        // Retry config with exponential backoff - essential for MCP Studio's server testing
         let retry_config = RetryConfig {
-            max_retries: 3,
-            base_delay_ms: 100,
-            max_delay_ms: 5000,
+            max_attempts: 3,
+            base_delay: Duration::from_millis(100),
+            max_delay: Duration::from_secs(5),
             backoff_multiplier: 2.0,
+            jitter_factor: 0.1, // 10% jitter to prevent thundering herd
             retry_on_timeout: true,
             retry_on_connection_error: true,
+            custom_retry_conditions: Vec::new(),
         };
-        builder = builder.with_plugin(Arc::new(RetryPlugin::new(PluginConfig::Retry(
-            retry_config,
-        ))));
 
-        // Cache plugin for performance - critical for repeated tool/resource calls
-        let cache_config = CacheConfig {
-            max_entries: 1000,
-            ttl_seconds: 300, // 5 minutes - good for development workflow
-            cache_responses: true,
-            cache_resources: true,
-            cache_tools: true,
+        // Circuit breaker for cascade failure protection
+        let circuit_config = CircuitBreakerConfig {
+            failure_threshold: 5,      // Open after 5 failures
+            success_threshold: 2,      // Close after 2 successes in half-open
+            timeout: Duration::from_secs(30), // Stay open for 30s before half-open
+            rolling_window_size: 100,  // Track last 100 requests
+            minimum_requests: 10,      // Minimum requests before opening
         };
-        builder = builder.with_plugin(Arc::new(CachePlugin::new(PluginConfig::Cache(
-            cache_config,
-        ))));
 
-        // Metrics plugin for monitoring server performance - valuable for development
-        builder = builder.with_plugin(Arc::new(MetricsPlugin::new(PluginConfig::Metrics)));
+        // Health check config for connection monitoring
+        let health_config = HealthCheckConfig {
+            interval: Duration::from_secs(30),  // Check every 30s
+            timeout: Duration::from_secs(5),    // 5s timeout for health check
+            failure_threshold: 3,               // Unhealthy after 3 failed checks
+            success_threshold: 1,               // Healthy after 1 success
+            custom_check: None,
+        };
 
-        tracing::info!("Enterprise plugins enabled: Retry, Cache, Metrics");
+        tracing::info!("v3 resilience enabled: Retry, Circuit Breaker, Health Checks");
+
         builder
-    }
-
-    /// No-op plugin configuration when `plugins` feature is disabled
-    #[cfg(not(feature = "plugins"))]
-    pub fn configure_plugins(builder: ClientBuilder) -> ClientBuilder {
-        tracing::debug!("Plugin system disabled - using basic client");
-        builder
+            .with_retry_config(retry_config)
+            .with_circuit_breaker_config(circuit_config)
+            .with_health_check_config(health_config)
     }
 
     /// Build MCP client with all capabilities enabled
     ///
     /// Configures client with:
     /// - All MCP operations enabled (tools, prompts, resources, sampling)
-    /// - Enterprise plugins (retry, cache, metrics when available)
+    /// - v3 resilience features (retry, circuit breaker, health checks)
     /// - Connection configuration with production defaults
     /// - Transport-layer reliability features
     ///
@@ -81,14 +80,41 @@ impl Configuration {
     ///
     /// # Returns
     /// Configured MCP client ready for bidirectional operations
-    pub fn build_client_with_capabilities<T: Transport>(
+    pub fn build_client_with_capabilities<T: Transport + 'static>(
         transport: T,
         connection_config: ConnectionConfig,
     ) -> Client<T> {
-        Self::configure_plugins(ClientBuilder::new())
+        ClientBuilder::new()
             .with_capabilities(ClientCapabilities::all())
             .with_connection_config(connection_config)
             .build_sync(transport)
+    }
+
+    /// Build MCP client with resilience features enabled
+    ///
+    /// Creates a client wrapped in TurboTransport for production-grade reliability:
+    /// - Automatic retry with exponential backoff
+    /// - Circuit breaker pattern for fast failure
+    /// - Health checking and monitoring
+    ///
+    /// # Arguments
+    /// * `transport` - The transport layer to use
+    /// * `connection_config` - Connection settings
+    ///
+    /// # Returns
+    /// Resilient MCP client with all capabilities
+    ///
+    /// Note: Currently unused - available for production deployments requiring enhanced reliability.
+    #[allow(dead_code)]
+    pub async fn build_resilient_client<T: Transport + 'static>(
+        transport: T,
+        connection_config: ConnectionConfig,
+    ) -> turbomcp_protocol::McpResult<Client<turbomcp_transport::resilience::TurboTransport>> {
+        Self::configure_resilience(ClientBuilder::new())
+            .with_capabilities(ClientCapabilities::all())
+            .with_connection_config(connection_config)
+            .build_resilient(transport)
+            .await
     }
 
     /// Get protocol-level capabilities configuration

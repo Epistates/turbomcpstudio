@@ -28,7 +28,7 @@ pub enum McpStudioError {
     TurboMcpError(String),
 
     #[error("MCP protocol error: {0}")]
-    McpError(#[from] turbomcp::McpError),
+    McpError(#[from] turbomcp_protocol::McpError),
 
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),

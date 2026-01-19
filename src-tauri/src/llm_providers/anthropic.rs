@@ -167,19 +167,28 @@ impl LLMServerClient for AnthropicLLMClient {
     async fn get_server_info(
         &self,
     ) -> Result<ServerInfo, Box<dyn std::error::Error + Send + Sync>> {
+        // Model list updated January 2026 - Claude Opus 4.5 is latest flagship
         Ok(ServerInfo {
             name: "Anthropic".to_string(),
             models: vec![
-                "claude-4-sonnet".to_string(),
-                "claude-4-opus".to_string(),
-                "claude-4.1-opus".to_string(),
-                "claude-3-5-sonnet-20241022".to_string(),
+                // Claude 4.5 family (November 2025 - latest)
+                "claude-opus-4-5-20251101".to_string(),   // Latest flagship
+                "claude-sonnet-4-5-20251101".to_string(), // Best balance of intelligence/speed/cost
+                // Claude 4.x family (GA)
+                "claude-sonnet-4-20250514".to_string(),
+                "claude-opus-4-1-20250414".to_string(),
+                // Aliases for latest versions
+                "claude-opus-4-5".to_string(),
+                "claude-sonnet-4-5".to_string(),
             ],
             capabilities: vec![
                 "function_calling".to_string(),
                 "vision".to_string(),
                 "computer_use".to_string(),
                 "thinking_tokens".to_string(),
+                "1m_context".to_string(),        // Sonnet 4/4.5 expanded context
+                "agent_skills".to_string(),      // Skills-2025-10-02 beta
+                "code_execution".to_string(),    // Code-execution-2025-05-22 beta
             ],
         })
     }

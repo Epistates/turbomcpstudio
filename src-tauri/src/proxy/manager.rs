@@ -1,4 +1,6 @@
 //! ProxyManager - Main orchestrator for proxy lifecycle
+//!
+//! Integrates with turbomcp-proxy for introspection and runtime capabilities.
 
 use super::types::*;
 use crate::database::Database;
@@ -6,6 +8,10 @@ use crate::error::{AppError, AppResult};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+
+// Import turbomcp-proxy introspection types
+use turbomcp_proxy::introspection::{McpBackend, McpIntrospector, StdioBackend};
+use turbomcp_proxy::introspection::spec::ServerSpec as TurboServerSpec;
 
 /// Main proxy manager for creating, starting, stopping, and monitoring proxies
 pub struct ProxyManager {
@@ -262,21 +268,147 @@ impl ProxyManager {
             .ok_or_else(|| AppError::proxy(format!("Proxy {} not running", proxy_id)))
     }
 
-    /// Introspect a backend to discover capabilities (to be implemented with turbomcp-proxy)
+    /// Introspect a backend to discover capabilities
+    ///
+    /// Uses turbomcp-proxy McpIntrospector for actual server introspection.
+    /// Currently supports STDIO backends; HTTP/WebSocket introspection planned.
     pub async fn introspect_backend(
         &self,
-        _backend_config: &BackendConfig,
-        _timeout_seconds: Option<u64>,
+        backend_config: &BackendConfig,
+        timeout_seconds: Option<u64>,
     ) -> AppResult<ServerSpec> {
-        // TODO: Integrate with turbomcp-proxy McpIntrospector
-        // For now, return placeholder
-        Ok(ServerSpec {
-            name: "Unknown Server".to_string(),
-            version: None,
-            tools: vec![],
-            resources: vec![],
-            prompts: vec![],
-        })
+        let timeout = std::time::Duration::from_secs(timeout_seconds.unwrap_or(30));
+
+        match backend_config {
+            BackendConfig::Stdio { command, args, env: _, working_dir } => {
+                tracing::info!("Introspecting STDIO backend: {}", command);
+
+                // Create STDIO backend with turbomcp-proxy
+                let mut backend = if let Some(work_dir) = working_dir {
+                    StdioBackend::with_working_dir(
+                        command.clone(),
+                        args.clone().unwrap_or_default(),
+                        work_dir.clone(),
+                    )
+                    .await
+                    .map_err(|e| AppError::proxy(format!("Failed to start backend: {}", e)))?
+                } else {
+                    StdioBackend::new(
+                        command.clone(),
+                        args.clone().unwrap_or_default(),
+                    )
+                    .await
+                    .map_err(|e| AppError::proxy(format!("Failed to start backend: {}", e)))?
+                };
+
+                // Create introspector
+                let introspector = McpIntrospector::with_client_info(
+                    "TurboMCP Studio",
+                    env!("CARGO_PKG_VERSION"),
+                );
+
+                // Perform introspection with timeout
+                let result = tokio::time::timeout(
+                    timeout,
+                    introspector.introspect(&mut backend),
+                )
+                .await
+                .map_err(|_| AppError::proxy("Introspection timed out"))?
+                .map_err(|e| AppError::proxy(format!("Introspection failed: {}", e)))?;
+
+                // Shutdown backend gracefully
+                let _ = backend.shutdown().await;
+
+                // Convert turbomcp-proxy ServerSpec to our local types
+                Ok(Self::convert_server_spec(&result))
+            }
+            BackendConfig::Http { url, headers: _ } => {
+                // HTTP introspection not yet implemented in turbomcp-proxy
+                tracing::warn!("HTTP introspection not yet available, returning placeholder");
+                Ok(ServerSpec {
+                    name: format!("HTTP Server at {}", url),
+                    version: None,
+                    tools: vec![],
+                    resources: vec![],
+                    prompts: vec![],
+                })
+            }
+            BackendConfig::WebSocket { url, headers: _ } => {
+                tracing::warn!("WebSocket introspection not yet available, returning placeholder");
+                Ok(ServerSpec {
+                    name: format!("WebSocket Server at {}", url),
+                    version: None,
+                    tools: vec![],
+                    resources: vec![],
+                    prompts: vec![],
+                })
+            }
+            BackendConfig::Tcp { host, port } => {
+                tracing::warn!("TCP introspection not yet available, returning placeholder");
+                Ok(ServerSpec {
+                    name: format!("TCP Server at {}:{}", host, port),
+                    version: None,
+                    tools: vec![],
+                    resources: vec![],
+                    prompts: vec![],
+                })
+            }
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
+            BackendConfig::Unix { path } => {
+                tracing::warn!("Unix socket introspection not yet available, returning placeholder");
+                Ok(ServerSpec {
+                    name: format!("Unix Socket at {}", path),
+                    version: None,
+                    tools: vec![],
+                    resources: vec![],
+                    prompts: vec![],
+                })
+            }
+        }
+    }
+
+    /// Convert turbomcp-proxy ServerSpec to our local types
+    fn convert_server_spec(spec: &TurboServerSpec) -> ServerSpec {
+        ServerSpec {
+            name: spec.server_info.name.clone(),
+            version: Some(spec.server_info.version.clone()),
+            tools: spec
+                .tools
+                .iter()
+                .map(|t| ToolSpec {
+                    name: t.name.clone(),
+                    description: t.description.clone(),
+                    input_schema: serde_json::to_value(&t.input_schema).ok(),
+                })
+                .collect(),
+            resources: spec
+                .resources
+                .iter()
+                .map(|r| ResourceSpec {
+                    name: r.name.clone(),
+                    uri: r.uri.clone(),
+                    description: r.description.clone(),
+                    mime_type: r.mime_type.clone(),
+                })
+                .collect(),
+            prompts: spec
+                .prompts
+                .iter()
+                .map(|p| PromptSpec {
+                    name: p.name.clone(),
+                    description: p.description.clone(),
+                    arguments: p
+                        .arguments
+                        .iter()
+                        .map(|a| PromptArgumentSpec {
+                            name: a.name.clone(),
+                            description: a.description.clone(),
+                            required: a.required.unwrap_or(false),
+                        })
+                        .collect(),
+                })
+                .collect(),
+        }
     }
 }
 

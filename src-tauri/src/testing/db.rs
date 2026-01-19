@@ -2,13 +2,13 @@
 //!
 //! Provides CRUD operations for test suites, tests, test runs, and results.
 
-use crate::error::{McpResult, McpStudioError};
+use crate::error::McpResult;
 use crate::types::{
     NewTest, NewTestRun, NewTestResult, NewTestSuite, RunComparison, Test, TestResult, TestRun,
     TestRunSummary, TestSuite,
 };
 use sqlx::{Pool, Row, Sqlite};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 /// Database operations for test management
@@ -50,9 +50,9 @@ impl TestDatabase {
         .bind(&suite.name)
         .bind(&suite.description)
         .bind(1) // version starts at 1
-        .bind(format!("{:?}", now))
-        .bind(format!("{:?}", now))
-        .bind(suite.generated_at.map(|t| format!("{:?}", t)))
+        .bind(Self::system_time_to_unix(now).to_string())
+        .bind(Self::system_time_to_unix(now).to_string())
+        .bind(suite.generated_at.map(|t| Self::system_time_to_unix(t).to_string()))
         .bind(&suite.schema_hash)
         .execute(&self.pool)
         .await?;
@@ -140,7 +140,7 @@ impl TestDatabase {
         )
         .bind(&suite.name)
         .bind(&suite.description)
-        .bind(format!("{:?}", now))
+        .bind(Self::system_time_to_unix(now).to_string())
         .bind(&suite.schema_hash)
         .bind(&suite.id)
         .execute(&self.pool)
@@ -196,7 +196,7 @@ impl TestDatabase {
             .bind(test.category.as_str())
             .bind(test.complexity.as_str())
             .bind(test.auto_generated)
-            .bind(format!("{:?}", now))
+            .bind(Self::system_time_to_unix(now).to_string())
             .execute(&self.pool)
             .await?;
 
@@ -266,7 +266,7 @@ impl TestDatabase {
         .bind(serde_json::to_string(&test.assertions)?)
         .bind(test.category.as_str())
         .bind(test.complexity.as_str())
-        .bind(format!("{:?}", now))
+        .bind(Self::system_time_to_unix(now).to_string())
         .bind(&test.id)
         .execute(&self.pool)
         .await?;
@@ -303,7 +303,7 @@ impl TestDatabase {
         )
         .bind(&id)
         .bind(&run.suite_id)
-        .bind(format!("{:?}", now))
+        .bind(Self::system_time_to_unix(now).to_string())
         .bind(run.total_tests)
         .bind("running")
         .bind(&run.triggered_by)
@@ -325,12 +325,13 @@ impl TestDatabase {
             WHERE id = ?
             "#,
         )
-        .bind(format!("{:?}", now))
+        .bind(Self::system_time_to_unix(now).to_string())
         .bind(summary.duration_ms)
         .bind(summary.passed)
         .bind(summary.failed)
         .bind(summary.errors)
         .bind(summary.status.as_str())
+        .bind(run_id)
         .execute(&self.pool)
         .await?;
 
@@ -419,7 +420,7 @@ impl TestDatabase {
         .bind(&result.error_message)
         .bind(result.actual_result.as_ref().map(|v| v.to_string()))
         .bind(result.duration_ms)
-        .bind(format!("{:?}", now))
+        .bind(Self::system_time_to_unix(now).to_string())
         .execute(&self.pool)
         .await?;
 
@@ -496,10 +497,36 @@ impl TestDatabase {
     // Helper Functions
     // =========================================================================
 
-    fn parse_system_time(_s: &str) -> McpResult<SystemTime> {
-        // TODO: Parse SystemTime from Debug format
-        // This is a simplified parser - production would use proper serialization
-        Ok(SystemTime::now()) // Placeholder
+    /// Convert SystemTime to UNIX timestamp (seconds since epoch) for storage
+    fn system_time_to_unix(time: SystemTime) -> i64 {
+        time.duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0)
+    }
+
+    /// Parse UNIX timestamp (seconds since epoch) back to SystemTime
+    fn parse_system_time(s: &str) -> McpResult<SystemTime> {
+        // First try to parse as i64 (UNIX timestamp - new format)
+        if let Ok(secs) = s.parse::<i64>() {
+            return Ok(UNIX_EPOCH + Duration::from_secs(secs as u64));
+        }
+
+        // Fallback: try to parse legacy Debug format "SystemTime { tv_sec: X, tv_nsec: Y }"
+        if s.starts_with("SystemTime") {
+            // Extract tv_sec value from Debug format
+            if let Some(start) = s.find("tv_sec: ") {
+                let remainder = &s[start + 8..];
+                if let Some(end) = remainder.find(|c: char| !c.is_ascii_digit()) {
+                    if let Ok(secs) = remainder[..end].parse::<u64>() {
+                        return Ok(UNIX_EPOCH + Duration::from_secs(secs));
+                    }
+                }
+            }
+        }
+
+        // Fallback to current time if parsing fails
+        tracing::warn!("Failed to parse timestamp '{}', using current time", s);
+        Ok(SystemTime::now())
     }
 
     fn row_to_test(row: sqlx::sqlite::SqliteRow) -> McpResult<Test> {

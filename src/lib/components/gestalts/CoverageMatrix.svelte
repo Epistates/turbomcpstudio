@@ -21,7 +21,10 @@
     onSelectTest: (testId: string) => void;
   }
 
-  const { coverage, selectedTestId, onSelectTest } = $props();
+  const { coverage, selectedTestId, onSelectTest }: Props = $props();
+
+  // Get typed tool coverage array
+  const toolCoverages = $derived(Array.from(coverage.byTool.values()) as ToolCoverage[]);
 
   const categories = [
     { key: 'happyPath', label: 'Happy Path', color: 'blue' },
@@ -93,7 +96,7 @@
       </div>
 
       <!-- Data rows: one per tool -->
-      {#each Array.from(coverage.byTool.values()) as tool: ToolCoverage (tool.toolName)}
+      {#each toolCoverages as tool (tool.toolName)}
         {@const totalTests = (
           tool.happyPath.testIds.length +
           tool.edgeCase.testIds.length +

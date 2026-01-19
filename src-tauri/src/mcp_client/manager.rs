@@ -2,8 +2,8 @@
 //!
 //! This module provides the primary interface for managing MCP server connections,
 //! handling multiple transports (STDIO, HTTP, WebSocket, TCP, Unix), and coordinating
-//! all MCP protocol operations. It integrates with TurboMCP 2.0 for enterprise-grade
-//! reliability, performance, and compliance with the MCP 2025-06-18 specification.
+//! all MCP protocol operations. It integrates with TurboMCP v3.0 for enterprise-grade
+//! reliability, performance, and compliance with the MCP 2025-11-25 specification.
 //!
 //! # Key Features
 //!
@@ -39,7 +39,7 @@ use sysinfo::{Pid, System};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-// TurboMCP 2.0+ imports - World-class Clone pattern (no more SharedClient!)
+// TurboMCP v3 imports - World-class Clone pattern (no more SharedClient!)
 use turbomcp_client::sampling::SamplingHandler;
 
 use turbomcp_client::handlers::ElicitationResponse;

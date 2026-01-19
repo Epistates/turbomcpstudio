@@ -24,6 +24,7 @@ pub mod sampling;
 pub mod llm_playground;
 pub mod test_generation;
 pub mod proxy;
+pub mod oauth;
 
 // Data Management
 pub mod collections;
@@ -52,6 +53,7 @@ pub use llm_playground::*;
 pub use mcp_prompts::*;
 pub use mcp_resources::*;
 pub use mcp_tools::*;
+pub use oauth::*;
 pub use profiles::*;
 pub use protocol_inspector::*;
 pub use proxy::*;

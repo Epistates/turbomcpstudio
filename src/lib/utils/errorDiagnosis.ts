@@ -153,7 +153,7 @@ export function diagnoseError(error: any, context: ErrorContext = {}): Diagnosed
         'Check that the model name is spelled correctly',
         'Verify you have access to this model',
         'Some models require special API access',
-        'Try using a different model (e.g., gpt-4o, claude-3-sonnet)'
+        'Try using a different model (e.g., gpt-5.2, claude-sonnet-4-5)'
       ]
     };
   }

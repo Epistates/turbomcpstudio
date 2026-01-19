@@ -132,6 +132,13 @@ impl GeminiLLMClient {
                     turbomcp_protocol::types::ContentBlock::Resource(_) => {
                         "[Embedded resource]".to_string()
                     }
+                    // v3 new variants for tool calling in sampling
+                    turbomcp_protocol::types::ContentBlock::ToolUse(tool_use) => {
+                        format!("[Tool call: {}]", tool_use.name)
+                    }
+                    turbomcp_protocol::types::ContentBlock::ToolResult(tool_result) => {
+                        format!("[Tool result: {}]", tool_result.tool_use_id)
+                    }
                 };
 
                 GeminiContent {
@@ -275,14 +282,30 @@ impl LLMServerClient for GeminiLLMClient {
     async fn get_server_info(
         &self,
     ) -> Result<ServerInfo, Box<dyn std::error::Error + Send + Sync>> {
+        // Model list updated January 2026 - Gemini 2.5 and 3.0 families
         Ok(ServerInfo {
             name: "Google Gemini".to_string(),
             models: vec![
+                // Gemini 3 family (GA in AI Studio)
+                "gemini-3-pro".to_string(),
+                "gemini-3-flash".to_string(),
+                // Gemini 2.5 family (Production recommended)
+                "gemini-2.5-pro".to_string(),       // High-capability, 1M context
+                "gemini-2.5-flash".to_string(),     // Fast, controllable thinking budgets
+                "gemini-2.5-flash-lite".to_string(), // Cost-optimized for scale
+                // Gemini Live API
+                "gemini-2.5-flash-live".to_string(), // Real-time bidirectional streaming
+                // Legacy aliases (may point to preview)
                 "gemini-pro".to_string(),
-                "gemini-pro-vision".to_string(),
-                "gemini-ultra".to_string(),
             ],
-            capabilities: vec!["vision".to_string(), "function_calling".to_string()],
+            capabilities: vec![
+                "vision".to_string(),
+                "function_calling".to_string(),
+                "1m_context".to_string(),           // Gemini 2.5 Pro
+                "adaptive_thinking".to_string(),    // Controllable thinking budgets
+                "live_streaming".to_string(),       // Gemini Live API
+                "multimodal".to_string(),
+            ],
         })
     }
 }

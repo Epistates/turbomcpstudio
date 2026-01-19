@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
+import { notificationStore } from './notificationStore';
 
-export type View = 'dashboard' | 'servers' | 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | 'protocol' | 'chat' | 'testing' | 'collections' | 'settings';
+export type View = 'dashboard' | 'servers' | 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | 'protocol' | 'chat' | 'testing' | 'collections' | 'oauth' | 'settings';
 
 /**
  * ✅ NEW: Unified modal state structure
@@ -110,12 +111,13 @@ function createUiStore() {
       update(state => ({ ...state, error: undefined }));
     },
 
-    // Show notification
+    // Show notification (toast + persistent panel)
     showNotification(
       type: 'success' | 'error' | 'warning' | 'info',
       message: string,
       timeout = 5000
     ) {
+      // Show temporary toast notification
       update(state => ({
         ...state,
         notification: { type, message, timeout },
@@ -126,6 +128,15 @@ function createUiStore() {
           update(state => ({ ...state, notification: undefined }));
         }, timeout);
       }
+
+      // Also add to persistent notification panel
+      const titleMap = {
+        success: 'Success',
+        error: 'Error',
+        warning: 'Warning',
+        info: 'Info'
+      };
+      notificationStore.add(type, titleMap[type], message);
     },
 
     // Clear notification

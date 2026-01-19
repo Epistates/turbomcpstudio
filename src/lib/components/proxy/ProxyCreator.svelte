@@ -194,7 +194,7 @@
               <button type="button" on:click={addArg} class="btn-small">Add</button>
             </div>
 
-            {#if (form.backend_config.args as string[])?.length > 0}
+            {#if Array.isArray(form.backend_config.args) && form.backend_config.args.length > 0}
               <div class="args-list">
                 {#each form.backend_config.args as arg, i}
                   <div class="arg-item">

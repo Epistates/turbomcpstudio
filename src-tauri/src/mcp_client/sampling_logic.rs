@@ -51,7 +51,11 @@ impl SamplingLogic {
                 stop_sequences: None,
                 model_preferences: None,
                 include_context: None,
-                _meta: None, // TurboMCP 2.0: removed metadata, use _meta
+                // v3 new fields
+                tools: None,
+                tool_choice: None,
+                task: None,
+                _meta: None,
             };
 
             // Generate request ID for this outgoing request

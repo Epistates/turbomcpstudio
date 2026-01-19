@@ -4,11 +4,10 @@
 //! and determine appropriate test coverage.
 
 use crate::types::{
-    server_types::{ServerInfo, Tool},
+    server_types::ServerInfo,
     ComplexityScore, Pattern, SchemaAnalysis, TestArea,
 };
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
 
 /// Information about a single tool for focused test generation
 #[derive(Debug, Clone)]
@@ -106,67 +105,175 @@ impl SchemaAnalyzer {
     }
 
     /// Detect common patterns in server tools/resources
-    fn detect_patterns(_server: &ServerInfo) -> Vec<Pattern> {
-        // TODO: Implement pattern detection once we understand
-        // the exact structure of ServerCapabilities from turbomcp-protocol
-        // For now, return empty to get compilation working
-        Vec::new()
+    ///
+    /// NOTE: Full pattern detection requires actual tool names from MCP list_tools().
+    /// ServerInfo only contains capability metadata (whether tools/resources exist),
+    /// not the actual tool definitions. For full pattern detection, pass tool names
+    /// from McpClientManager::list_tools() to detect_patterns_from_tools().
+    fn detect_patterns(server: &ServerInfo) -> Vec<Pattern> {
+        let mut patterns = Vec::new();
+
+        // Basic pattern detection from capability presence
+        if let Some(caps) = &server.capabilities {
+            // If server has both tools and resources, likely does data transformation
+            if caps.tools.is_some() && caps.resources.is_some() {
+                patterns.push(Pattern::DataTransformation);
+            }
+        }
+
+        patterns
+    }
+
+    /// Detect patterns from actual tool names
+    ///
+    /// Call this with tool names from McpClientManager::list_tools() for full pattern detection.
+    pub fn detect_patterns_from_tools(tool_names: &[String]) -> Vec<Pattern> {
+        let mut patterns = Vec::new();
+
+        // CRUD pattern
+        if Self::has_crud_pattern(tool_names) {
+            patterns.push(Pattern::Crud);
+        }
+
+        // Search pattern
+        let has_search = tool_names.iter().any(|name| {
+            let lower = name.to_lowercase();
+            lower.contains("search") || lower.contains("find") || lower.contains("query")
+        });
+        if has_search {
+            patterns.push(Pattern::Search);
+        }
+
+        // Authentication pattern
+        let has_auth = tool_names.iter().any(|name| {
+            let lower = name.to_lowercase();
+            lower.contains("login")
+                || lower.contains("logout")
+                || lower.contains("auth")
+                || lower.contains("token")
+        });
+        if has_auth {
+            patterns.push(Pattern::Authentication);
+        }
+
+        // Pagination pattern
+        let has_pagination = tool_names.iter().any(|name| {
+            let lower = name.to_lowercase();
+            lower.contains("list") || lower.contains("page") || lower.contains("cursor")
+        });
+        if has_pagination {
+            patterns.push(Pattern::Pagination);
+        }
+
+        // File operation pattern
+        let has_file = tool_names.iter().any(|name| {
+            let lower = name.to_lowercase();
+            lower.contains("file")
+                || lower.contains("upload")
+                || lower.contains("download")
+                || lower.contains("read")
+                || lower.contains("write")
+        });
+        if has_file {
+            patterns.push(Pattern::FileOperation);
+        }
+
+        // Async operation pattern
+        let has_async = tool_names.iter().any(|name| {
+            let lower = name.to_lowercase();
+            lower.contains("async")
+                || lower.contains("queue")
+                || lower.contains("job")
+                || lower.contains("poll")
+        });
+        if has_async {
+            patterns.push(Pattern::AsyncOperation);
+        }
+
+        patterns
     }
 
     /// Detect CRUD pattern (Create, Read, Update, Delete)
     fn has_crud_pattern(tool_names: &[String]) -> bool {
-        let has_create = tool_names
-            .iter()
-            .any(|name| name.contains("create") || name.contains("add") || name.contains("new"));
+        let has_create = tool_names.iter().any(|name| {
+            let lower = name.to_lowercase();
+            lower.contains("create") || lower.contains("add") || lower.contains("new")
+        });
 
         let has_read = tool_names.iter().any(|name| {
-            name.contains("get")
-                || name.contains("read")
-                || name.contains("fetch")
-                || name.contains("retrieve")
+            let lower = name.to_lowercase();
+            lower.contains("get") || lower.contains("read") || lower.contains("fetch")
         });
 
         let has_update = tool_names.iter().any(|name| {
-            name.contains("update")
-                || name.contains("edit")
-                || name.contains("modify")
-                || name.contains("patch")
+            let lower = name.to_lowercase();
+            lower.contains("update") || lower.contains("edit") || lower.contains("modify")
         });
 
         let has_delete = tool_names.iter().any(|name| {
-            name.contains("delete") || name.contains("remove") || name.contains("destroy")
+            let lower = name.to_lowercase();
+            lower.contains("delete") || lower.contains("remove")
         });
 
         // Need at least 3 out of 4 CRUD operations
-        let crud_count = [has_create, has_read, has_update, has_delete]
+        [has_create, has_read, has_update, has_delete]
             .iter()
             .filter(|&&x| x)
-            .count();
-
-        crud_count >= 3
+            .count()
+            >= 3
     }
 
     /// Calculate complexity score based on server capabilities
-    fn calculate_complexity(_server: &ServerInfo) -> ComplexityScore {
-        // TODO: Implement complexity calculation once we understand
-        // the exact structure of ServerCapabilities from turbomcp-protocol
+    fn calculate_complexity(server: &ServerInfo) -> ComplexityScore {
+        let mut tool_count = 0;
+        let mut resource_count = 0;
+        let mut prompt_count = 0;
+
+        // Count capabilities if present
+        if let Some(caps) = &server.capabilities {
+            if caps.tools.is_some() {
+                tool_count = 1; // We know tools exist but don't know count without list_tools()
+            }
+            if caps.resources.is_some() {
+                resource_count = 1; // We know resources exist
+            }
+            if caps.prompts.is_some() {
+                prompt_count = 1; // We know prompts exist
+            }
+        }
+
+        // Calculate total score: tools weighted higher (3x), resources (2x), prompts (1x)
+        let total_score = (tool_count * 3) + (resource_count * 2) + prompt_count;
+
         ComplexityScore {
-            tool_count: 0,
-            resource_count: 0,
-            prompt_count: 0,
-            total_score: 0,
+            tool_count,
+            resource_count,
+            prompt_count,
+            total_score: total_score as i32,
         }
     }
 
-    /// Identify test coverage areas based on server capabilities
-    fn identify_test_areas(_server: &ServerInfo, _patterns: &[Pattern]) -> Vec<TestArea> {
-        // TODO: Implement test area identification
-        // For now, return default test areas
-        vec![
+    /// Identify test coverage areas based on server capabilities and detected patterns
+    fn identify_test_areas(server: &ServerInfo, patterns: &[Pattern]) -> Vec<TestArea> {
+        let mut areas = vec![
             TestArea::HappyPath,
             TestArea::EdgeCases,
             TestArea::ErrorHandling,
-        ]
+        ];
+
+        // Add security testing if auth patterns detected
+        if patterns.contains(&Pattern::Authentication) {
+            areas.push(TestArea::Security);
+        }
+
+        // Add performance testing for complex servers
+        if let Some(caps) = &server.capabilities {
+            if caps.tools.is_some() && caps.resources.is_some() {
+                areas.push(TestArea::Performance);
+            }
+        }
+
+        areas
     }
 
     /// Calculate a hash of the server schema for change detection

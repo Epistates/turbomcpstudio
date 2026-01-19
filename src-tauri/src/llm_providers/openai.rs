@@ -138,20 +138,32 @@ impl LLMServerClient for OpenAILLMClient {
     async fn get_server_info(
         &self,
     ) -> Result<ServerInfo, Box<dyn std::error::Error + Send + Sync>> {
+        // Model list updated January 2026 - GPT-5.2 is latest flagship
         Ok(ServerInfo {
             name: "OpenAI".to_string(),
             models: vec![
+                // GPT-5.2 family (December 2025 - latest)
+                "gpt-5.2".to_string(),           // Flagship: 90% ARC-AGI, 400K context, 128K output
+                "gpt-5.2-codex".to_string(),     // Agentic coding model
+                // GPT-5.1 family
+                "gpt-5.1".to_string(),
+                "gpt-5.1-codex-max".to_string(), // Frontier agentic coding
+                // GPT-5 base
                 "gpt-5".to_string(),
-                "gpt-5-mini".to_string(),
-                "gpt-5-nano".to_string(),
+                // GPT-4o family (still supported)
                 "gpt-4o".to_string(),
                 "gpt-4o-mini".to_string(),
+                // Open-weight reasoning models
+                "gpt-oss-120b".to_string(),
+                "gpt-oss-20b".to_string(),
             ],
             capabilities: vec![
                 "structured_outputs".to_string(),
                 "function_calling".to_string(),
                 "vision".to_string(),
                 "audio".to_string(),
+                "reasoning".to_string(),         // GPT-5.2 adaptive thinking
+                "400k_context".to_string(),      // GPT-5.2 context window
             ],
         })
     }

@@ -262,6 +262,10 @@ impl TransportConfig {
             max_connections: None,
             compression: false,
             compression_algorithm: None,
+            // v3 new fields
+            limits: Default::default(),
+            timeouts: Default::default(),
+            tls: Default::default(),
             custom: HashMap::new(),
         }
     }

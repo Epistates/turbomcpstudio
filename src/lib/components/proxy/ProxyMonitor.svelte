@@ -8,11 +8,16 @@
     selectedProxyId: string;
   }
 
-  let { selectedProxyId } = $props();
+  let { selectedProxyId }: Props = $props();
 
-  let proxy = $derived(
-    proxyStore.subscribe(($store) => $store.proxies.find((p) => p.id.value === selectedProxyId))
-  );
+  // Use $effect to reactively get the proxy from the store
+  let proxy = $state<any>(undefined);
+  $effect(() => {
+    const unsubscribe = proxyStore.subscribe((store) => {
+      proxy = store.proxies.find((p) => p.id.value === selectedProxyId);
+    });
+    return unsubscribe;
+  });
 
   let metrics = $state(null as any);
   let metricsError = $state<string | null>(null);
@@ -21,7 +26,7 @@
   let refreshInterval: ReturnType<typeof setInterval> | null = null;
 
   async function loadMetrics() {
-    if (!proxy) return;
+    if (!selectedProxyId) return;
 
     loadingMetrics = true;
     metricsError = null;
@@ -36,11 +41,11 @@
     }
   }
 
-  onMount(async () => {
-    await loadMetrics();
+  onMount(() => {
+    loadMetrics();
 
     refreshInterval = setInterval(() => {
-      if (autoRefresh && proxy) {
+      if (autoRefresh && selectedProxyId) {
         loadMetrics();
       }
     }, 5000); // Refresh every 5 seconds

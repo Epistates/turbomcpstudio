@@ -43,8 +43,13 @@
     DollarSign,
     Info,
     Folder,
-    FileText
+    FileText,
+    Sun,
+    Moon,
+    Palette
   } from 'lucide-svelte';
+
+  import { themeStore, type Theme } from '$lib/stores/themeStore';
 
   // ===============================================
   // TYPES & INTERFACES
@@ -120,12 +125,19 @@
   let dataDirectory = $state<string>('');
   let logDirectory = $state<string>('');
 
+  // Theme state
+  const theme = $derived($themeStore);
+
+  function setTheme(newTheme: Theme) {
+    themeStore.setTheme(newTheme);
+  }
+
   // ===============================================
   // PROVIDER DEFINITIONS (2025 Local + Cloud)
   // ===============================================
 
   const AVAILABLE_PROVIDERS: Omit<LLMProvider, 'status' | 'api_key' | 'base_url' | 'models'>[] = [
-    // Cloud Providers
+    // Cloud Providers (Q1 2026)
     {
       id: 'openai',
       name: 'OpenAI',
@@ -133,7 +145,7 @@
       icon: '🤖',
       default_base_url: 'https://api.openai.com/v1',
       requires_api_key: true,
-      description: 'GPT-5, gpt-5-turbo, GPT-4o, o4-mini, GPT-4.1'
+      description: 'GPT-5.2, GPT-5.2-Codex, GPT-5.1, GPT-4o (400K context)'
     },
     {
       id: 'anthropic',
@@ -142,7 +154,7 @@
       icon: '🧠',
       default_base_url: 'https://api.anthropic.com/v1',
       requires_api_key: true,
-      description: 'Claude Sonnet 4.5, Claude Haiku 4.5, Claude Opus 4.1, Claude 3.7 Sonnet'
+      description: 'Claude Opus 4.5, Claude Sonnet 4.5, Claude Sonnet 4 (1M context)'
     },
 
     // Local Providers (2025)
@@ -276,7 +288,9 @@
       test_result: 'none',
       test_message: '',
       available_models: [],
-      selected_model: ''
+      selected_model: '',
+      showAdvanced: false,
+      lastTestedUrl: ''
     };
   }
 
@@ -292,7 +306,9 @@
       test_result: 'none',
       test_message: '',
       available_models: [],
-      selected_model: ''
+      selected_model: '',
+      showAdvanced: false,
+      lastTestedUrl: ''
     };
   }
 
@@ -375,10 +391,11 @@
           }
         }
       } else {
-        // Cloud providers use predefined models
-        availableModels = quickSetup.provider.id === 'anthropic' ? ['claude-3-5-sonnet-20241022'] :
-                         ['gpt-4o', 'gpt-4o-mini'];
-        defaultModel = quickSetup.provider.id === 'anthropic' ? 'claude-3-5-sonnet-20241022' : 'gpt-4o';
+        // Cloud providers use predefined models (Q1 2026)
+        availableModels = quickSetup.provider.id === 'anthropic'
+          ? ['claude-sonnet-4-5', 'claude-opus-4-5', 'claude-sonnet-4']
+          : ['gpt-5.2', 'gpt-5.2-codex', 'gpt-5.1', 'gpt-4o', 'gpt-4o-mini'];
+        defaultModel = quickSetup.provider.id === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-5.2';
       }
 
       // Create complete LLMProviderConfig object based on provider type
@@ -411,7 +428,7 @@
         },
         capabilities: {
           supports_structured_outputs: quickSetup.provider.id === 'openai',
-          structured_output_models: quickSetup.provider.id === 'openai' ? ['gpt-4o'] : [],
+          structured_output_models: quickSetup.provider.id === 'openai' ? ['gpt-5.2', 'gpt-5.1', 'gpt-4o'] : [],
           max_structured_output_tokens: quickSetup.provider.id === 'openai' ? 200000 : null,
           supports_batch_processing: quickSetup.provider.type === 'cloud',
           batch_discount_percentage: quickSetup.provider.type === 'cloud' ? 50.0 : null,
@@ -806,6 +823,61 @@
 
     {:else if activeTab === 'global'}
       <div class="settings-section">
+        <!-- Appearance / Theme -->
+        <div class="theme-section">
+          <div class="flex items-center gap-2 mb-4">
+            <Palette size={20} class="text-mcp-primary-600" />
+            <h2 class="section-title">Appearance</h2>
+          </div>
+
+          <div class="theme-card">
+            <p class="text-sm text-secondary mb-4">
+              Choose your preferred color theme. Select "System" to automatically match your operating system preference.
+            </p>
+
+            <div class="theme-options">
+              <button
+                onclick={() => setTheme('light')}
+                class="theme-option {theme.theme === 'light' ? 'active' : ''}"
+              >
+                <Sun size={24} class="mb-2" />
+                <span class="theme-option-label">Light</span>
+                {#if theme.theme === 'light'}
+                  <CheckCircle size={16} class="theme-option-check" />
+                {/if}
+              </button>
+
+              <button
+                onclick={() => setTheme('dark')}
+                class="theme-option {theme.theme === 'dark' ? 'active' : ''}"
+              >
+                <Moon size={24} class="mb-2" />
+                <span class="theme-option-label">Dark</span>
+                {#if theme.theme === 'dark'}
+                  <CheckCircle size={16} class="theme-option-check" />
+                {/if}
+              </button>
+
+              <button
+                onclick={() => setTheme('system')}
+                class="theme-option {theme.theme === 'system' ? 'active' : ''}"
+              >
+                <Monitor size={24} class="mb-2" />
+                <span class="theme-option-label">System</span>
+                {#if theme.theme === 'system'}
+                  <CheckCircle size={16} class="theme-option-check" />
+                {/if}
+              </button>
+            </div>
+
+            {#if theme.theme === 'system'}
+              <p class="text-xs text-secondary mt-4 text-center">
+                Currently using <span class="font-medium">{theme.resolvedTheme}</span> theme based on your system preference
+              </p>
+            {/if}
+          </div>
+        </div>
+
         <!-- Application Info -->
         <div class="info-section">
           <div class="flex items-center gap-2 mb-4">
@@ -1485,5 +1557,57 @@
 
   .preset-button span {
     display: block;
+  }
+
+  /* Theme Section Styles */
+  .theme-section {
+    @apply mb-8;
+  }
+
+  .theme-card {
+    @apply p-6 border rounded-lg;
+    background: var(--mcp-card-background);
+    border-color: var(--mcp-border-primary);
+  }
+
+  .theme-options {
+    @apply grid grid-cols-3 gap-4;
+  }
+
+  .theme-option {
+    @apply relative flex flex-col items-center justify-center p-6 border-2 rounded-xl transition-all cursor-pointer;
+    background: var(--mcp-surface-secondary);
+    border-color: var(--mcp-border-primary);
+    color: var(--mcp-text-secondary);
+  }
+
+  .theme-option:hover {
+    background: var(--mcp-surface-tertiary);
+    border-color: var(--mcp-primary-300);
+    color: var(--mcp-text-primary);
+  }
+
+  .theme-option.active {
+    background: var(--mcp-primary-50);
+    border-color: var(--mcp-primary-500);
+    color: var(--mcp-primary-700);
+  }
+
+  [data-theme="dark"] .theme-option.active {
+    background: var(--mcp-primary-900);
+    border-color: var(--mcp-primary-400);
+    color: var(--mcp-primary-300);
+  }
+
+  .theme-option-label {
+    @apply text-sm font-medium;
+  }
+
+  .theme-option-check {
+    @apply absolute top-2 right-2 text-mcp-primary-600;
+  }
+
+  [data-theme="dark"] .theme-option-check {
+    @apply text-mcp-primary-400;
   }
 </style>

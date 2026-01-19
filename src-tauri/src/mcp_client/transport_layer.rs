@@ -332,7 +332,7 @@ impl TransportLayer {
         }
     }
 
-    /// Connect to WebSocket MCP server using TurboMCP 1.0.8
+    /// Connect to WebSocket MCP server using TurboMCP v3
     #[cfg(feature = "websocket")]
     async fn connect_websocket(
         connection: Arc<ManagedConnection>,
@@ -388,7 +388,7 @@ impl TransportLayer {
         ))
     }
 
-    /// Connect to TCP MCP server using TurboMCP 1.0.8
+    /// Connect to TCP MCP server using TurboMCP v3
     #[cfg(feature = "tcp")]
     async fn connect_tcp(
         connection: Arc<ManagedConnection>,
@@ -446,7 +446,7 @@ impl TransportLayer {
         ))
     }
 
-    /// Connect to Unix socket MCP server using TurboMCP 1.0.8
+    /// Connect to Unix socket MCP server using TurboMCP v3
     #[cfg(unix)]
     async fn connect_unix(
         connection: Arc<ManagedConnection>,
@@ -613,7 +613,7 @@ impl TransportLayer {
         Ok(McpTransportClient::InterceptedChildProcess(client))
     }
 
-    /// Initialize TurboMCP HTTP/SSE client transport (TurboMCP 2.0 DOGFOODING)
+    /// Initialize TurboMCP HTTP/SSE client transport (TurboMCP v3 DOGFOODING)
     #[cfg(feature = "http")]
     async fn initialize_http_client(
         connection: &Arc<ManagedConnection>,
@@ -795,7 +795,7 @@ impl TransportLayer {
         .await
     }
 
-    /// Initialize TurboMCP client for TCP transport using TurboMCP 1.0.8
+    /// Initialize TurboMCP client for TCP transport using TurboMCP v3
     #[cfg(feature = "tcp")]
     async fn initialize_tcp_client(
         connection: &Arc<ManagedConnection>,
@@ -842,7 +842,7 @@ impl TransportLayer {
         .await
     }
 
-    /// Initialize TurboMCP client for Unix socket transport using TurboMCP 1.0.8
+    /// Initialize TurboMCP client for Unix socket transport using TurboMCP v3
     #[cfg(unix)]
     async fn initialize_unix_client(
         connection: &Arc<ManagedConnection>,

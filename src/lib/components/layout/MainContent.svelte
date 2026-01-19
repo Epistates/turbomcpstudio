@@ -21,6 +21,7 @@
   import EditServerModal from '../EditServerModal.svelte';
   import ModeIndicator from '../ModeIndicator.svelte';
   import ServerContextBar from '../ServerContextBar.svelte';
+  import OAuthDebugger from '../oauth/OAuthDebugger.svelte';
 
   // Reactive view state using Svelte 5 runes
   // Access store properties directly with $derived to maintain reactivity
@@ -151,13 +152,13 @@
     {:else if currentView === 'protocol'}
       <ProtocolInspector />
     {:else if currentView === 'collections'}
-      <!-- NOTE: Collections view disabled in Sidebar for v1 but code preserved -->
-      <!-- TODO: Enable in v2 with proper multi-server UI design -->
       <CollectionsManager />
     {:else if currentView === 'chat'}
       <ChatPlayground />
     {:else if currentView === 'testing'}
       <UnifiedTesting serverId={contextState.selectedServer?.id} />
+    {:else if currentView === 'oauth'}
+      <OAuthDebugger />
     {:else if currentView === 'settings'}
       <Settings />
     {/if}

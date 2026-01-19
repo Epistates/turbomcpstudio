@@ -687,8 +687,103 @@ impl Database {
             .execute(&self.pool)
             .await?;
 
+        // =====================================================================
+        // OAuth 2.1 Visual Debugger Tables
+        // =====================================================================
+
+        // OAuth configurations table
+        tracing::info!("Creating oauth_configs table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS oauth_configs (
+                id TEXT PRIMARY KEY,
+                server_id TEXT NOT NULL,
+                protocol_version TEXT NOT NULL,
+                auth_server_url TEXT NOT NULL,
+                token_endpoint TEXT,
+                client_id TEXT,
+                client_secret TEXT,
+                redirect_uri TEXT NOT NULL,
+                scopes TEXT NOT NULL,
+                resource_uri TEXT NOT NULL,
+                use_pkce BOOLEAN NOT NULL DEFAULT 1,
+                use_dpop BOOLEAN NOT NULL DEFAULT 0,
+                metadata TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(server_id) REFERENCES server_configs(id) ON DELETE CASCADE
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("oauth_configs table created successfully");
+
+        // OAuth flow execution logs table (for debugging)
+        tracing::info!("Creating oauth_flow_logs table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS oauth_flow_logs (
+                id TEXT PRIMARY KEY,
+                config_id TEXT NOT NULL,
+                flow_type TEXT NOT NULL,
+                state_param TEXT,
+                pkce_verifier TEXT,
+                status TEXT NOT NULL,
+                error_code TEXT,
+                error_description TEXT,
+                steps TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                FOREIGN KEY(config_id) REFERENCES oauth_configs(id) ON DELETE CASCADE
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("oauth_flow_logs table created successfully");
+
+        // OAuth tokens table (keyring-backed metadata)
+        tracing::info!("Creating oauth_tokens table");
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS oauth_tokens (
+                id TEXT PRIMARY KEY,
+                server_id TEXT NOT NULL,
+                keyring_key TEXT NOT NULL,
+                token_type TEXT NOT NULL,
+                scope TEXT,
+                expires_at TEXT,
+                refresh_keyring_key TEXT,
+                dpop_jkt TEXT,
+                created_at TEXT NOT NULL,
+                last_refreshed_at TEXT,
+                FOREIGN KEY(server_id) REFERENCES server_configs(id) ON DELETE CASCADE
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+        tracing::info!("oauth_tokens table created successfully");
+
+        // Create indexes for OAuth tables
+        tracing::info!("Creating idx_oauth_configs_server_id index");
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_oauth_configs_server_id ON oauth_configs(server_id)")
+            .execute(&self.pool)
+            .await?;
+
+        tracing::info!("Creating idx_oauth_flow_logs_config_id index");
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_oauth_flow_logs_config_id ON oauth_flow_logs(config_id)")
+            .execute(&self.pool)
+            .await?;
+
+        tracing::info!("Creating idx_oauth_tokens_server_id index");
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_oauth_tokens_server_id ON oauth_tokens(server_id)")
+            .execute(&self.pool)
+            .await?;
+
         let migration_duration = migration_start.elapsed();
-        tracing::info!("Database migrations completed successfully in {:?} (12 tables + 4 indexes, typically 3-15ms)", migration_duration);
+        tracing::info!("Database migrations completed successfully in {:?} (15 tables + 7 indexes, typically 3-15ms)", migration_duration);
         Ok(())
     }
 
@@ -1530,5 +1625,173 @@ impl Database {
             .await?;
 
         Ok(())
+    }
+
+    // =========================================================================
+    // OAuth Configuration Methods
+    // =========================================================================
+
+    /// Save OAuth configuration for a server
+    pub async fn save_oauth_config(&self, config: &crate::oauth::OAuthConfig) -> McpResult<String> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            .to_string();
+        let scopes_json = serde_json::to_string(&config.scopes)?;
+        let metadata_json = config.metadata.as_ref().map(|m| serde_json::to_string(m)).transpose()?;
+
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO oauth_configs
+            (id, server_id, protocol_version, auth_server_url, token_endpoint, client_id,
+             client_secret, redirect_uri, scopes, resource_uri, use_pkce, use_dpop,
+             metadata, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(&id)
+        .bind(&config.server_id)
+        .bind(&config.protocol_version)
+        .bind(&config.auth_server_url)
+        .bind(&config.token_endpoint)
+        .bind(&config.client_id)
+        .bind(&config.client_secret)
+        .bind(&config.redirect_uri)
+        .bind(&scopes_json)
+        .bind(&config.resource_uri)
+        .bind(config.use_pkce as i32)
+        .bind(config.use_dpop as i32)
+        .bind(&metadata_json)
+        .bind(&now)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(id)
+    }
+
+    /// Get OAuth configuration by server ID
+    pub async fn get_oauth_config(&self, server_id: &str) -> McpResult<Option<crate::oauth::OAuthConfig>> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, server_id, protocol_version, auth_server_url, token_endpoint, client_id,
+                   client_secret, redirect_uri, scopes, resource_uri, use_pkce, use_dpop, metadata
+            FROM oauth_configs
+            WHERE server_id = ?
+            "#,
+        )
+        .bind(server_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match row {
+            Some(row) => {
+                let scopes_json: String = row.get("scopes");
+                let metadata_json: Option<String> = row.get("metadata");
+
+                Ok(Some(crate::oauth::OAuthConfig {
+                    server_id: row.get("server_id"),
+                    protocol_version: row.get("protocol_version"),
+                    auth_server_url: row.get("auth_server_url"),
+                    token_endpoint: row.get("token_endpoint"),
+                    client_id: row.get("client_id"),
+                    client_secret: row.get("client_secret"),
+                    redirect_uri: row.get("redirect_uri"),
+                    scopes: serde_json::from_str(&scopes_json).unwrap_or_default(),
+                    resource_uri: row.get("resource_uri"),
+                    use_pkce: row.get::<i32, _>("use_pkce") != 0,
+                    use_dpop: row.get::<i32, _>("use_dpop") != 0,
+                    metadata: metadata_json.and_then(|s| serde_json::from_str(&s).ok()),
+                }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Update OAuth configuration
+    pub async fn update_oauth_config(&self, server_id: &str, config: &crate::oauth::OAuthConfig) -> McpResult<()> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            .to_string();
+        let scopes_json = serde_json::to_string(&config.scopes)?;
+        let metadata_json = config.metadata.as_ref().map(|m| serde_json::to_string(m)).transpose()?;
+
+        sqlx::query(
+            r#"
+            UPDATE oauth_configs
+            SET protocol_version = ?, auth_server_url = ?, token_endpoint = ?, client_id = ?,
+                client_secret = ?, redirect_uri = ?, scopes = ?, resource_uri = ?,
+                use_pkce = ?, use_dpop = ?, metadata = ?, updated_at = ?
+            WHERE server_id = ?
+            "#,
+        )
+        .bind(&config.protocol_version)
+        .bind(&config.auth_server_url)
+        .bind(&config.token_endpoint)
+        .bind(&config.client_id)
+        .bind(&config.client_secret)
+        .bind(&config.redirect_uri)
+        .bind(&scopes_json)
+        .bind(&config.resource_uri)
+        .bind(config.use_pkce as i32)
+        .bind(config.use_dpop as i32)
+        .bind(&metadata_json)
+        .bind(&now)
+        .bind(server_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Delete OAuth configuration for a server
+    pub async fn delete_oauth_config(&self, server_id: &str) -> McpResult<()> {
+        sqlx::query("DELETE FROM oauth_configs WHERE server_id = ?")
+            .bind(server_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    /// List all OAuth configurations
+    pub async fn list_oauth_configs(&self) -> McpResult<Vec<crate::oauth::OAuthConfig>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT id, server_id, protocol_version, auth_server_url, token_endpoint, client_id,
+                   client_secret, redirect_uri, scopes, resource_uri, use_pkce, use_dpop, metadata
+            FROM oauth_configs
+            ORDER BY updated_at DESC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut configs = Vec::new();
+        for row in rows {
+            let scopes_json: String = row.get("scopes");
+            let metadata_json: Option<String> = row.get("metadata");
+
+            configs.push(crate::oauth::OAuthConfig {
+                server_id: row.get("server_id"),
+                protocol_version: row.get("protocol_version"),
+                auth_server_url: row.get("auth_server_url"),
+                token_endpoint: row.get("token_endpoint"),
+                client_id: row.get("client_id"),
+                client_secret: row.get("client_secret"),
+                redirect_uri: row.get("redirect_uri"),
+                scopes: serde_json::from_str(&scopes_json).unwrap_or_default(),
+                resource_uri: row.get("resource_uri"),
+                use_pkce: row.get::<i32, _>("use_pkce") != 0,
+                use_dpop: row.get::<i32, _>("use_dpop") != 0,
+                metadata: metadata_json.and_then(|s| serde_json::from_str(&s).ok()),
+            });
+        }
+
+        Ok(configs)
     }
 }

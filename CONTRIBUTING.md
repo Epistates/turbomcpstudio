@@ -53,10 +53,7 @@ We actively welcome pull requests!
 git clone https://github.com/YOUR_USERNAME/turbomcpstudio.git
 cd turbomcpstudio
 
-# Clone TurboMCP dependency
-git clone https://github.com/Epistates/turbomcp.git ../turbomcp
-
-# Install dependencies
+# Install dependencies (TurboMCP will be fetched from crates.io automatically)
 pnpm install
 
 # Start development server

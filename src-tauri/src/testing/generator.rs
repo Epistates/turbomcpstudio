@@ -376,6 +376,10 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
                 "```".to_string(),
                 "```json".to_string(),
             ]),
+            // v3 new fields - not needed for test generation
+            tools: None,
+            tool_choice: None,
+            task: None,
             _meta: None,
         };
 
@@ -452,210 +456,11 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
         Ok(generated_suite.tests)
     }
 
-    /// Build the test generation prompt
-    fn build_test_generation_prompt(
-        &self,
-        server: &ServerInfo,
-        analysis: &crate::types::SchemaAnalysis,
-    ) -> String {
-        let server_name = &server.config.name;
-        let server_desc = server.config.description.as_deref().unwrap_or("No description");
-
-        // Get capabilities summary
-        let (tools_summary, resources_summary, prompts_summary) = self.get_capabilities_summary(server);
-
-        // Get patterns detected
-        let patterns = analysis
-            .patterns
-            .iter()
-            .map(|p| format!("{:?}", p))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        format!(
-            r#"GENERATE TEST CASES. OUTPUT ONLY VALID JSON. NO OTHER TEXT.
-
-Expected JSON structure (MUST follow exactly):
-{}
-
-Server to test:
-Name: {}
-Description: {}
-Complexity Score: {}
-Detected Patterns: {}
-
-Capabilities:
-Tools ({}):
-{}
-
-Resources ({}):
-{}
-
-Prompts ({}):
-{}
-
-Generate 15-25 comprehensive tests:
-- Happy paths (40%): normal scenarios, valid inputs
-- Edge cases (30%): boundaries, special chars, optional params omitted
-- Error handling (20%): invalid params, missing fields, malformed input
-- Security (10%): injection, auth bypass, validation
-
-For each test, provide: name, description, category, complexity, kind, test_data, assertions.
-
-CRITICAL: Output ONLY the JSON object. No thinking. No explanations. No markdown.
-Start with {{ and end with }}. ONLY JSON.
-"#,
-            TEST_SCHEMA,
-            server_name,
-            server_desc,
-            analysis.complexity.total_score,
-            if patterns.is_empty() { "None detected".to_string() } else { patterns },
-            analysis.complexity.tool_count,
-            tools_summary,
-            analysis.complexity.resource_count,
-            resources_summary,
-            analysis.complexity.prompt_count,
-            prompts_summary,
-        )
-    }
-
-    /// Get a summary of server capabilities
-    fn get_capabilities_summary(&self, server: &ServerInfo) -> (String, String, String) {
-        // TODO: Extract actual capabilities once we understand the structure
-        // For now, return placeholder summaries
-
-        let tools_summary = if let Some(caps) = &server.capabilities {
-            // Try to extract tool information
-            format!("Server has tools capability: {}", caps.tools.is_some())
-        } else {
-            "No capabilities information available".to_string()
-        };
-
-        let resources_summary = if let Some(caps) = &server.capabilities {
-            format!("Server has resources capability: {}", caps.resources.is_some())
-        } else {
-            "No capabilities information available".to_string()
-        };
-
-        let prompts_summary = if let Some(caps) = &server.capabilities {
-            format!("Server has prompts capability: {}", caps.prompts.is_some())
-        } else {
-            "No capabilities information available".to_string()
-        };
-
-        (tools_summary, resources_summary, prompts_summary)
-    }
-
-    /// Call LLM to generate tests
-    async fn call_llm_for_tests(&self, prompt: &str, provider_id: Option<String>, model_id: Option<String>) -> McpResult<GeneratedTestSuite> {
-        tracing::info!("=== Starting LLM call for test generation ===");
-        tracing::info!("Provider ID: {:?}", provider_id);
-        tracing::info!("Model ID: {:?}", model_id);
-        tracing::info!("Prompt length: {} chars", prompt.len());
-
-        // Get max_tokens from provider config or use default
-        let max_tokens = if let Some(ref prov_id) = provider_id {
-            let config = self.llm.get_config().await;
-            config
-                .providers
-                .get(prov_id)
-                .map(|p| p.max_tokens)
-                .unwrap_or(8000)
-        } else {
-            // Fallback to default for active provider
-            let config = self.llm.get_config().await;
-            if let Some(active_id) = config.active_provider {
-                config
-                    .providers
-                    .get(&active_id)
-                    .map(|p| p.max_tokens)
-                    .unwrap_or(8000)
-            } else {
-                8000
-            }
-        };
-
-        tracing::info!("Using max_tokens: {} for provider: {:?}", max_tokens, provider_id);
-
-        // Build request
-        let request = CreateMessageRequest {
-            messages: vec![SamplingMessage {
-                role: Role::User,
-                content: Content::Text(TextContent {
-                    text: prompt.to_string(),
-                    annotations: None,
-                    meta: None,
-                }),
-                metadata: None,
-            }],
-            system_prompt: Some(TEST_GENERATION_SYSTEM_PROMPT.to_string()),
-            max_tokens,  // Use configured value instead of hardcoded 8000
-            temperature: Some(0.3),  // Lowered from 0.7 for more deterministic tests
-            model_preferences: model_id.clone().map(|m| {
-                tracing::info!("Creating model preferences with hint: {}", m);
-                ModelPreferences {
-                    hints: Some(vec![ModelHint::new(m)]),
-                    cost_priority: None,
-                    speed_priority: None,
-                    intelligence_priority: None,
-                }
-            }),
-            include_context: None,
-            stop_sequences: Some(vec![
-                "```".to_string(),
-                "```json".to_string(),
-            ]),  // Added stop sequences to prevent markdown after JSON
-            _meta: None,
-        };
-
-        tracing::info!("Request created, invoking LLM directly...");
-        tracing::info!("Messages count: {}, System prompt set: true", request.messages.len());
-
-        // Use specified provider or fallback to active provider
-        let response = self
-            .llm
-            .invoke_llm_directly(request, provider_id.clone())
-            .await
-            .map_err(|e| {
-                let error_msg = format!("LLM invocation failed: {}", e);
-                tracing::error!("{}", error_msg);
-                tracing::error!("Provider was: {:?}", provider_id);
-                McpStudioError::ConfigError(error_msg)
-            })?;
-
-        // Extract text content
-        let response_text = match response.content {
-            Content::Text(text_content) => text_content.text,
-            _ => {
-                return Err(McpStudioError::ConfigError(
-                    "Unexpected response format from LLM".to_string(),
-                ))
-            }
-        };
-
-        // Parse JSON response
-        // First try to extract JSON from markdown code blocks if present
-        let json_text = self.extract_json_from_response(&response_text);
-
-        tracing::info!("Extracted JSON length: {} chars", json_text.len());
-        tracing::debug!("Extracted JSON (first 500 chars): {}",
-            if json_text.len() > 500 { format!("{}...", &json_text[..500]) } else { json_text.clone() });
-        tracing::info!("Full extracted JSON for parsing:\n{}", json_text);
-
-        let generated_suite: GeneratedTestSuite = serde_json::from_str(&json_text)
-            .map_err(|e| {
-                tracing::error!("Failed to parse LLM response: {}", e);
-                tracing::error!("Full JSON we tried to parse:\n{}", json_text);
-                tracing::debug!("Original response text (first 1000 chars): {}",
-                    if response_text.len() > 1000 { format!("{}...", &response_text[..1000]) } else { response_text.clone() });
-                McpStudioError::ConfigError(format!("Failed to parse test suite JSON: {}", e))
-            })?;
-
-        // Validate generated tests
-        self.validate_generated_tests(&generated_suite)?;
-
-        Ok(generated_suite)
-    }
+    // Legacy monolithic test generation methods removed in v3 migration:
+    // - build_test_generation_prompt() - superseded by per-category prompts
+    // - get_capabilities_summary() - no longer needed
+    // - call_llm_for_tests() - superseded by call_llm_for_category_tests()
+    // The new per-tool parallel approach provides better LLM response quality.
 
     /// Extract JSON from LLM response
     /// Handles multiple reasoning/thinking formats:
@@ -663,7 +468,8 @@ Start with {{ and end with }}. ONLY JSON.
     /// - OpenAI oss models: reasoning field + content field
     /// - Standard models: direct JSON
     /// - Markdown: ```json...```
-    pub fn extract_json_from_response(&self, text: &str) -> String {
+    #[allow(dead_code)] // May be useful for future extensibility
+    fn extract_json_from_response(&self, text: &str) -> String {
         let mut working_text = text.to_string();
 
         // Step 1: Extract content after closing </think> tag (Qwen thinking models)
@@ -723,6 +529,7 @@ Start with {{ and end with }}. ONLY JSON.
     }
 
     /// Validate generated tests for basic correctness
+    #[allow(dead_code)] // May be useful for future validation
     fn validate_generated_tests(&self, suite: &GeneratedTestSuite) -> McpResult<()> {
         if suite.tests.is_empty() {
             return Err(McpStudioError::ConfigError(
@@ -790,146 +597,15 @@ Start with {{ and end with }}. ONLY JSON.
     }
 }
 
-/// Expected JSON schema for test generation
-const TEST_SCHEMA: &str = r#"{
-  "suite_name": "Name of test suite",
-  "description": "Brief description",
-  "tests": [
-    {
-      "name": "test_name_here",
-      "description": "What it validates",
-      "category": "happy_path",
-      "complexity": "simple",
-      "kind": {"tool_call": {"tool_name": "name", "arguments": {}}},
-      "test_data": {},
-      "assertions": [
-        {"type": "status_equals", "expected": "success"}
-      ]
-    }
-  ]
-}
-
-VALID CATEGORIES:
-- "happy_path" (normal scenarios, valid inputs)
-- "edge_case" (boundaries, special characters, optional params)
-- "error" (invalid params, missing fields, malformed input)
-- "security" (injection, auth bypass, validation)
-- "workflow" (multi-step operations)
-- "performance" (performance/load testing)
-
-VALID COMPLEXITIES:
-- "simple"
-- "medium"
-- "complex"
-
-VALID ASSERTION TYPES:
-- {"type": "status_equals", "expected": "success"|"error"}
-- {"type": "content_contains", "substring": "text"}
-- {"type": "response_time_under", "milliseconds": 1000}
-"#;
-
-/// System prompt for test generation
-/// Concise version that works with thinking and standard models
-const TEST_GENERATION_SYSTEM_PROMPT: &str = r#"You are a QA engineer. Generate comprehensive test cases.
-
-OUTPUT REQUIREMENT:
-- Your response MUST be ONLY a valid JSON object
-- Start with { and end with }
-- No markdown, no explanations, no thinking process in the content
-- If you are a reasoning model, use reasoning internally but output ONLY JSON
-
-TEST CATEGORIES (MUST use exact names):
-- "happy_path" (normal scenarios, valid inputs)
-- "edge_case" (boundaries, special characters, optional params)
-- "error" (invalid params, missing fields, malformed input)
-- "security" (injection, validation bypass attempts)
-- "workflow" (multi-step operations)
-- "performance" (performance/load testing)
-
-TEST COMPLEXITY (MUST use exact names):
-- "simple" (straightforward test)
-- "medium" (moderately complex)
-- "complex" (advanced scenario)
-
-ASSERTION FORMAT IN TESTS:
-Use "type" field for each assertion:
-- {"type": "status_equals", "expected": "success"|"error"}
-- {"type": "content_contains", "substring": "..."}
-- {"type": "response_time_under", "milliseconds": 1000}
-
-GUIDELINES:
-- Happy paths (40%): use category "happy_path"
-- Edge cases (30%): use category "edge_case"
-- Error handling (20%): use category "error"
-- Security (10%): use category "security"
-- Use actual server tool names and realistic parameters
-"#;
-
-/// System prompt for PER-TOOL test generation
-/// Focused prompt for generating tests for a SINGLE tool at a time
-const TOOL_TEST_GENERATION_SYSTEM_PROMPT: &str = r#"You are a QA engineer generating tests for a SINGLE MCP tool.
-
-CRITICAL REQUIREMENTS:
-1. Generate EXACTLY 5-8 tests (NOT MORE!)
-2. Output MUST be valid, complete JSON
-3. No markdown, no truncation
-4. Stop after 8 tests maximum
-
-EXACT JSON SCHEMA (follow this structure exactly):
-{
-  "suite_name": "tool_name_tests",
-  "description": "Brief description of test suite",
-  "tests": [
-    {
-      "name": "test_identifier",
-      "description": "What this test validates",
-      "category": "happy_path",
-      "complexity": "simple",
-      "kind": {
-        "tool_call": {
-          "tool_name": "actual_tool_name",
-          "arguments": {"param1": "value1"}
-        }
-      },
-      "test_data": {},
-      "assertions": [
-        {"type": "status_equals", "expected": "success"}
-      ]
-    }
-  ]
-}
-
-FIELD DEFINITIONS (use EXACTLY these values):
-
-"category" field - Test type (choose ONE):
-  - "happy_path" - Normal scenarios with valid inputs
-  - "edge_case" - Boundary conditions, optional params
-  - "error" - Invalid inputs, missing required fields
-  - "security" - Injection attempts, validation bypass
-  - "workflow" - Multi-step sequences
-  - "performance" - Speed/load testing
-
-"complexity" field - Test difficulty (choose ONE):
-  - "simple" - Basic straightforward test
-  - "medium" - Moderate complexity
-  - "complex" - Advanced multi-condition test
-
-ASSERTION "type" options:
-  - "status_equals" with "expected": "success" or "error"
-  - "content_contains" with "substring": "text"
-  - "response_time_under" with "milliseconds": number
-
-GUIDELINES:
-- Generate 5-8 tests maximum per tool
-- 40% happy_path, 30% edge_case, 20% error, 10% security
-- DO NOT truncate JSON - complete all tests properly
-- Every test MUST have valid category and complexity
-- Close all braces and brackets
-"#;
+// Legacy constants removed in v3 migration:
+// - TEST_SCHEMA - was used for monolithic test generation
+// - TEST_GENERATION_SYSTEM_PROMPT - superseded by inline prompts in call_llm_for_category_tests
+// - TOOL_TEST_GENERATION_SYSTEM_PROMPT - never used
 
 #[cfg(test)]
 mod parse_tests {
     use super::*;
+    use crate::types::Assertion;
 
     #[test]
     fn test_assertion_json_format() {

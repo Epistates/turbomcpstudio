@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { invoke } from '@tauri-apps/api/core';
-	import { Send, Bot, User, AlertCircle, Loader2, Sparkles, DollarSign } from 'lucide-svelte';
+	import { Send, Bot, User, AlertCircle, Loader2, Sparkles, DollarSign, GitBranch, ChevronDown, X, Plus, Trash2 } from 'lucide-svelte';
 
 	// Type definitions
 	interface LLMProviderStatus {
@@ -30,8 +30,35 @@
 		cost?: number;
 	}
 
+	// Conversation branch type
+	interface ConversationBranch {
+		id: string;
+		name: string;
+		messages: Message[];
+		createdAt: Date;
+		parentBranchId?: string;
+		forkMessageId?: string;
+		totalCost: number;
+	}
+
 	// Reactive state
-	let messages = $state<Message[]>([]);
+	let branches = $state<ConversationBranch[]>([
+		{
+			id: 'main',
+			name: 'Main',
+			messages: [],
+			createdAt: new Date(),
+			totalCost: 0
+		}
+	]);
+	let activeBranchId = $state<string>('main');
+	let showBranchPanel = $state(false);
+
+	// Get current branch
+	const currentBranch = $derived(branches.find(b => b.id === activeBranchId) || branches[0]);
+	const messages = $derived(currentBranch?.messages || []);
+	const totalCost = $derived(currentBranch?.totalCost || 0);
+
 	let input = $state('');
 	let providers = $state<LLMProviderStatus[]>([]);
 	let selectedProvider = $state<string>('');
@@ -39,7 +66,6 @@
 	let activeProvider = $state<string | null>(null);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
-	let totalCost = $state(0);
 
 	// Refs
 	let chatContainer: HTMLDivElement;
@@ -94,7 +120,7 @@
 	}
 
 	async function sendMessage() {
-		if (!input.trim() || loading) return;
+		if (!input.trim() || loading || !currentBranch) return;
 
 		const userMessage: Message = {
 			id: crypto.randomUUID(),
@@ -103,7 +129,8 @@
 			timestamp: new Date()
 		};
 
-		messages = [...messages, userMessage];
+		// Update current branch's messages
+		updateBranchMessages([...currentBranch.messages, userMessage]);
 		const userInput = input;
 		input = '';
 		loading = true;
@@ -115,9 +142,10 @@
 		}
 
 		try {
+			const currentMessages = [...currentBranch.messages, userMessage];
 			const result = await invoke<any>('send_llm_message', {
 				request: {
-					messages: messages.map((m) => ({
+					messages: currentMessages.map((m) => ({
 						role: m.role,
 						content: { type: 'text', text: m.content }
 					})),
@@ -147,11 +175,17 @@
 				cost: calculateCost(result.usage, selectedProvider)
 			};
 
-			if (assistantMessage.cost) {
-				totalCost += assistantMessage.cost;
-			}
-
-			messages = [...messages, assistantMessage];
+			// Update branch with new message and cost
+			branches = branches.map(b => {
+				if (b.id === activeBranchId) {
+					return {
+						...b,
+						messages: [...currentMessages, assistantMessage],
+						totalCost: b.totalCost + (assistantMessage.cost || 0)
+					};
+				}
+				return b;
+			});
 
 			// Scroll to bottom
 			setTimeout(() => {
@@ -162,7 +196,7 @@
 		} catch (e: any) {
 			error = e.toString();
 			// Remove user message if failed
-			messages = messages.filter((m) => m.id !== userMessage.id);
+			updateBranchMessages(currentBranch.messages.filter((m) => m.id !== userMessage.id));
 			// Restore input
 			input = userInput;
 		} finally {
@@ -170,22 +204,95 @@
 		}
 	}
 
+	// Helper to update current branch's messages
+	function updateBranchMessages(newMessages: Message[]) {
+		branches = branches.map(b => {
+			if (b.id === activeBranchId) {
+				return { ...b, messages: newMessages };
+			}
+			return b;
+		});
+	}
+
+	// Fork conversation from a specific message
+	function forkFromMessage(messageId: string) {
+		if (!currentBranch) return;
+
+		const messageIndex = currentBranch.messages.findIndex(m => m.id === messageId);
+		if (messageIndex === -1) return;
+
+		// Get messages up to and including the selected message
+		const forkedMessages = currentBranch.messages.slice(0, messageIndex + 1);
+
+		// Calculate cost for forked messages
+		const forkedCost = forkedMessages.reduce((sum, m) => sum + (m.cost || 0), 0);
+
+		const newBranch: ConversationBranch = {
+			id: crypto.randomUUID(),
+			name: `Fork ${branches.length}`,
+			messages: [...forkedMessages],
+			createdAt: new Date(),
+			parentBranchId: activeBranchId,
+			forkMessageId: messageId,
+			totalCost: forkedCost
+		};
+
+		branches = [...branches, newBranch];
+		activeBranchId = newBranch.id;
+		showBranchPanel = true;
+	}
+
+	// Switch to a branch
+	function switchBranch(branchId: string) {
+		activeBranchId = branchId;
+	}
+
+	// Delete a branch (can't delete main)
+	function deleteBranch(branchId: string) {
+		if (branchId === 'main') return;
+		if (!confirm('Delete this conversation branch?')) return;
+
+		branches = branches.filter(b => b.id !== branchId);
+		if (activeBranchId === branchId) {
+			activeBranchId = 'main';
+		}
+	}
+
+	// Rename a branch
+	function renameBranch(branchId: string, newName: string) {
+		branches = branches.map(b => {
+			if (b.id === branchId) {
+				return { ...b, name: newName };
+			}
+			return b;
+		});
+	}
+
 	function calculateCost(usage: any, providerId: string): number {
 		if (!usage) return 0;
 
-		// Simple cost calculation (approximate rates)
+		// Simple cost calculation (approximate rates - Q1 2026)
 		const rates: Record<
 			string,
 			{ input: number; output: number }
 		> = {
-			'claude-3-7-sonnet': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
-			'claude-3-5-sonnet': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
-			'claude-3-opus': { input: 15.0 / 1_000_000, output: 75.0 / 1_000_000 },
-			'claude-3-haiku': { input: 0.25 / 1_000_000, output: 1.25 / 1_000_000 },
+			// Anthropic Claude 4.5 (November 2025)
+			'claude-opus-4-5': { input: 15.0 / 1_000_000, output: 75.0 / 1_000_000 },
+			'claude-sonnet-4-5': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
+			'claude-sonnet-4': { input: 3.0 / 1_000_000, output: 15.0 / 1_000_000 },
+			// OpenAI GPT-5.2 (December 2025)
+			'gpt-5.2': { input: 5.0 / 1_000_000, output: 15.0 / 1_000_000 },
+			'gpt-5.2-codex': { input: 5.0 / 1_000_000, output: 15.0 / 1_000_000 },
+			'gpt-5.1': { input: 2.5 / 1_000_000, output: 10.0 / 1_000_000 },
+			'gpt-4o': { input: 2.5 / 1_000_000, output: 10.0 / 1_000_000 },
+			'gpt-4o-mini': { input: 0.15 / 1_000_000, output: 0.6 / 1_000_000 },
 			openai: { input: 2.5 / 1_000_000, output: 10.0 / 1_000_000 },
-			'gemini-2.0-flash-exp': { input: 0.0, output: 0.0 }, // Free
-			'gemini-1.5-flash': { input: 0.075 / 1_000_000, output: 0.3 / 1_000_000 },
-			'gemini-1.5-pro': { input: 1.25 / 1_000_000, output: 5.0 / 1_000_000 }
+			// Google Gemini 2.5/3.0 (Q1 2026)
+			'gemini-3-pro': { input: 1.25 / 1_000_000, output: 5.0 / 1_000_000 },
+			'gemini-3-flash': { input: 0.075 / 1_000_000, output: 0.3 / 1_000_000 },
+			'gemini-2.5-pro': { input: 1.25 / 1_000_000, output: 5.0 / 1_000_000 },
+			'gemini-2.5-flash': { input: 0.075 / 1_000_000, output: 0.3 / 1_000_000 },
+			'gemini-2.5-flash-lite': { input: 0.0375 / 1_000_000, output: 0.15 / 1_000_000 }
 		};
 
 		const rate = rates[providerId] || { input: 0, output: 0 };
@@ -200,9 +307,27 @@
 	}
 
 	function clearChat() {
-		if (confirm('Clear all messages?')) {
-			messages = [];
-			totalCost = 0;
+		if (confirm('Clear all messages in this branch?')) {
+			branches = branches.map(b => {
+				if (b.id === activeBranchId) {
+					return { ...b, messages: [], totalCost: 0 };
+				}
+				return b;
+			});
+			error = null;
+		}
+	}
+
+	function clearAllBranches() {
+		if (confirm('Clear all branches and start fresh?')) {
+			branches = [{
+				id: 'main',
+				name: 'Main',
+				messages: [],
+				createdAt: new Date(),
+				totalCost: 0
+			}];
+			activeBranchId = 'main';
 			error = null;
 		}
 	}
@@ -232,9 +357,65 @@
 	<div
 		class="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-950"
 	>
-		<div class="flex items-center gap-3">
-			<Sparkles class="h-6 w-6 text-purple-600 dark:text-purple-400" />
-			<h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">LLM Playground</h1>
+		<div class="flex items-center gap-4">
+			<div class="flex items-center gap-3">
+				<Sparkles class="h-6 w-6 text-purple-600 dark:text-purple-400" />
+				<h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">LLM Playground</h1>
+			</div>
+
+			<!-- Branch Selector -->
+			{#if branches.length > 1}
+				<div class="relative">
+					<button
+						onclick={() => showBranchPanel = !showBranchPanel}
+						class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 text-sm font-medium text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+					>
+						<GitBranch class="h-4 w-4" />
+						<span>{currentBranch?.name || 'Main'}</span>
+						<ChevronDown class="h-3 w-3" />
+					</button>
+
+					{#if showBranchPanel}
+						<div class="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 z-50 overflow-hidden">
+							<div class="p-2 border-b border-zinc-200 dark:border-zinc-700">
+								<div class="flex items-center justify-between">
+									<span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Branches</span>
+									<button
+										onclick={() => showBranchPanel = false}
+										class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-700"
+									>
+										<X class="h-3 w-3 text-zinc-400" />
+									</button>
+								</div>
+							</div>
+							<div class="max-h-64 overflow-y-auto">
+								{#each branches as branch (branch.id)}
+									<div
+										class="flex items-center justify-between px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 cursor-pointer {branch.id === activeBranchId ? 'bg-purple-50 dark:bg-purple-900/20' : ''}"
+										onclick={() => { switchBranch(branch.id); showBranchPanel = false; }}
+									>
+										<div class="flex items-center gap-2 flex-1 min-w-0">
+											<GitBranch class="h-4 w-4 flex-shrink-0 {branch.id === activeBranchId ? 'text-purple-600 dark:text-purple-400' : 'text-zinc-400'}" />
+											<span class="text-sm truncate {branch.id === activeBranchId ? 'font-medium text-purple-700 dark:text-purple-300' : 'text-zinc-700 dark:text-zinc-300'}">{branch.name}</span>
+										</div>
+										<div class="flex items-center gap-1">
+											<span class="text-xs text-zinc-500">{branch.messages.length} msgs</span>
+											{#if branch.id !== 'main'}
+												<button
+													onclick={(e) => { e.stopPropagation(); deleteBranch(branch.id); }}
+													class="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
+												>
+													<Trash2 class="h-3 w-3" />
+												</button>
+											{/if}
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+				</div>
+			{/if}
 		</div>
 
 		<div class="flex items-center gap-4">
@@ -374,6 +555,15 @@
 										{formatCost(message.cost)}
 									</span>
 								{/if}
+								<span>•</span>
+								<button
+									onclick={() => forkFromMessage(message.id)}
+									class="flex items-center gap-1 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors"
+									title="Fork conversation from here"
+								>
+									<GitBranch class="h-3 w-3" />
+									Fork
+								</button>
 							</div>
 						</div>
 

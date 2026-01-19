@@ -8,7 +8,7 @@ use crate::mcp_client::McpClientManager;
 use crate::testing::TestDatabase;
 use crate::types::{
     Assertion, NewTestResult, NewTestRun, Test, TestKind, TestResult, TestRunStatus,
-    TestRunSummary,
+    TestRunSummary, WorkflowAction,
 };
 use futures::future::join_all;
 use std::sync::Arc;
@@ -121,14 +121,20 @@ impl TestExecutor {
         let result = self.execute_single_test(&test, server_id).await;
         let duration = start.elapsed();
 
+        // Extract actual result and determine pass/fail
+        let (passed, error_message, actual_result) = match result {
+            Ok(actual) => (true, None, actual),
+            Err(e) => (false, Some(e.to_string()), None),
+        };
+
         // Save result
         let test_result = TestResult {
             id: Uuid::new_v4().to_string(),
             run_id: run_id.clone(),
             test_id: test_id.to_string(),
-            passed: result.is_ok(),
-            error_message: result.as_ref().err().map(|e| e.to_string()),
-            actual_result: None, // TODO: Capture actual response
+            passed,
+            error_message: error_message.clone(),
+            actual_result: actual_result.clone(),
             duration_ms: duration.as_millis() as i64,
             timestamp: std::time::SystemTime::now(),
         };
@@ -137,9 +143,9 @@ impl TestExecutor {
             .save_test_result(NewTestResult {
                 run_id: run_id.clone(),
                 test_id: test_id.to_string(),
-                passed: test_result.passed,
-                error_message: test_result.error_message.clone(),
-                actual_result: None,
+                passed,
+                error_message,
+                actual_result,
                 duration_ms: test_result.duration_ms,
             })
             .await?;
@@ -193,10 +199,10 @@ impl TestExecutor {
 
                     let duration = start.elapsed();
 
-                    let (passed, error_message) = match result {
-                        Ok(Ok(())) => (true, None),
-                        Ok(Err(e)) => (false, Some(e.to_string())),
-                        Err(_) => (false, Some(format!("Test timed out after {}s", timeout.as_secs()))),
+                    let (passed, error_message, actual_result) = match result {
+                        Ok(Ok(actual)) => (true, None, actual),
+                        Ok(Err(e)) => (false, Some(e.to_string()), None),
+                        Err(_) => (false, Some(format!("Test timed out after {}s", timeout.as_secs())), None),
                     };
 
                     // Create result
@@ -206,7 +212,7 @@ impl TestExecutor {
                         test_id: test.id.clone(),
                         passed,
                         error_message: error_message.clone(),
-                        actual_result: None,
+                        actual_result: actual_result.clone(),
                         duration_ms: duration.as_millis() as i64,
                         timestamp: std::time::SystemTime::now(),
                     };
@@ -218,7 +224,7 @@ impl TestExecutor {
                             test_id: test.id.clone(),
                             passed,
                             error_message,
-                            actual_result: None,
+                            actual_result,
                             duration_ms: duration.as_millis() as i64,
                         })
                         .await;
@@ -236,11 +242,12 @@ impl TestExecutor {
     }
 
     /// Execute a single test (static to allow spawning)
+    /// Returns (success, actual_result) tuple for debugging and assertion checking
     async fn execute_test_static(
         test: &Test,
         server_id: Uuid,
         mcp_client: &McpClientManager,
-    ) -> McpResult<()> {
+    ) -> McpResult<Option<serde_json::Value>> {
         tracing::debug!("Executing test: {}", test.name);
 
         // Execute based on test kind
@@ -270,24 +277,64 @@ impl TestExecutor {
                 serde_json::to_value(result).ok()
             }
             TestKind::Workflow { steps } => {
-                // TODO: Execute workflow steps in sequence
-                tracing::warn!("Workflow tests not yet implemented");
-                return Err(McpStudioError::ConfigError(
-                    "Workflow tests not yet implemented".to_string(),
-                ));
+                // Execute workflow steps in sequence, ordered by `order` field
+                let mut sorted_steps = steps.clone();
+                sorted_steps.sort_by_key(|s| s.order);
+
+                let mut last_result = None;
+                for step in sorted_steps {
+                    tracing::debug!("Executing workflow step {}: {:?}", step.order, step.action);
+
+                    let step_result = match &step.action {
+                        WorkflowAction::CallTool { tool_name, arguments } => {
+                            mcp_client
+                                .call_tool(server_id, tool_name, arguments.clone())
+                                .await?
+                        }
+                        WorkflowAction::ReadResource { uri } => {
+                            mcp_client
+                                .read_resource(server_id, uri.clone())
+                                .await?
+                        }
+                        WorkflowAction::GetPrompt { name, arguments } => {
+                            mcp_client
+                                .get_prompt(server_id, name.clone(), arguments.clone())
+                                .await?
+                        }
+                        WorkflowAction::Delay { milliseconds } => {
+                            tokio::time::sleep(Duration::from_millis(*milliseconds)).await;
+                            serde_json::json!({"status": "completed", "delay_ms": milliseconds})
+                        }
+                    };
+
+                    // Verify expected outcome if specified
+                    if let Some(expected) = &step.expected_outcome {
+                        let result_str = serde_json::to_string(&step_result).unwrap_or_default();
+                        if !result_str.contains(expected) {
+                            return Err(McpStudioError::ConfigError(format!(
+                                "Workflow step {} failed: expected '{}' not found in result",
+                                step.order, expected
+                            )));
+                        }
+                    }
+
+                    last_result = Some(step_result);
+                }
+
+                last_result
             }
         };
 
         // Check assertions
-        if let Some(result) = actual_result {
-            Self::check_assertions(&test.assertions, &result)?;
+        if let Some(ref result) = actual_result {
+            Self::check_assertions(&test.assertions, result)?;
         }
 
-        Ok(())
+        Ok(actual_result)
     }
 
     /// Execute a single test (instance method)
-    async fn execute_single_test(&self, test: &Test, server_id: Uuid) -> McpResult<()> {
+    async fn execute_single_test(&self, test: &Test, server_id: Uuid) -> McpResult<Option<serde_json::Value>> {
         Self::execute_test_static(test, server_id, &self.mcp_client).await
     }
 

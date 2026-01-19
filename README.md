@@ -123,19 +123,9 @@ pnpm install
 
 TurboMCP is published to [crates.io](https://crates.io/crates/turbomcp) and handled automatically during the build process.
 
-**Current Version**: TurboMCP v2.0.0-rc.2 (stable, production-ready)
+**Current Version**: TurboMCP v2.0.4 (stable, production-ready)
 
-For development with the latest changes:
-```bash
-# Option 1: Git dependency (latest development version)
-# Edit src-tauri/Cargo.toml:
-# turbomcp = { git = "https://github.com/Epistates/turbomcp.git", branch = "main" }
-
-# Option 2: Clone TurboMCP locally for parallel development
-git clone https://github.com/Epistates/turbomcp.git ../turbomcp
-# Then edit src-tauri/Cargo.toml:
-# turbomcp = { path = "../../turbomcp/crates/turbomcp" }
-```
+All TurboMCP dependencies are fetched from crates.io during build. No additional setup required.
 
 ### Development Build
 
@@ -449,7 +439,7 @@ Before submitting:
 ### Build Errors
 
 **Error**: "could not find `turbomcp` in the crate root"
-- **Solution**: TurboMCP is automatically fetched from crates.io. If using git dependency, ensure `../turbomcp` exists or update `src-tauri/Cargo.toml`
+- **Solution**: Run `cargo clean` and rebuild. TurboMCP v2.0.4 is automatically fetched from crates.io during build.
 
 **Error**: "webkit2gtk not found" (Linux)
 - **Solution**: Install required system dependencies:

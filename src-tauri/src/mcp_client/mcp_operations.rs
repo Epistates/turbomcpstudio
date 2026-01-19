@@ -542,7 +542,7 @@ impl McpOperations {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use turbomcp_protocol::error::{Error, ErrorKind};
+    use turbomcp_protocol::{McpError as Error, ErrorKind};
 
     #[test]
     fn test_operations_module_exists() {
@@ -552,11 +552,11 @@ mod tests {
     #[test]
     fn test_is_user_action_error_validation() {
         // Validation errors (-32602) are user actions
-        // Both HandlerError::InvalidInput and ErrorKind::Validation map to -32602
-        let error = Error::new(ErrorKind::Validation, "Invalid input");
+        // v3: ErrorKind::InvalidParams maps to -32602
+        let error = Error::new(ErrorKind::InvalidParams, "Invalid input");
         assert!(
             is_user_action_error(&error),
-            "Validation (-32602) should be recognized as user action"
+            "InvalidParams (-32602) should be recognized as user action"
         );
     }
 
@@ -571,12 +571,13 @@ mod tests {
     }
 
     #[test]
-    fn test_is_user_action_error_transport_error() {
-        // Transport errors (-32014) should be retried
-        let error = Error::new(ErrorKind::Transport, "Connection lost");
+    fn test_is_user_action_error_connection_error() {
+        // v3: Use Internal for transport-like errors
+        // Internal error (-32603) should be retried
+        let error = Error::new(ErrorKind::Internal, "Connection lost");
         assert!(
             !is_user_action_error(&error),
-            "Transport errors should NOT be user action (should retry)"
+            "Internal errors should NOT be user action (should retry)"
         );
     }
 
@@ -584,23 +585,24 @@ mod tests {
     fn test_error_code_detection() {
         // Verify error code checking logic
         // User action codes (should NOT retry):
-        // -1 = HandlerError::UserCancelled (MCP 2025-06-18 spec)
-        // -32801 = HandlerError::Timeout
-        // -32602 = HandlerError::InvalidInput / ErrorKind::Validation
+        // -1 = UserRejected (MCP 2025-06-18 spec)
+        // -32602 = InvalidParams (validation errors)
 
-        // Verify -32602 (Validation) is detected
-        let validation_error = Error::new(ErrorKind::Validation, "Invalid");
-        assert_eq!(validation_error.jsonrpc_error_code(), -32602);
+        // Verify -32602 (InvalidParams) is detected
+        // v3: ErrorKind::InvalidParams maps to -32602
+        let validation_error = Error::new(ErrorKind::InvalidParams, "Invalid");
+        assert_eq!(validation_error.jsonrpc_code(), -32602);
         assert!(is_user_action_error(&validation_error));
 
         // Verify other errors are NOT user actions
         let internal_error = Error::new(ErrorKind::Internal, "Internal");
-        assert_eq!(internal_error.jsonrpc_error_code(), -32603);
+        assert_eq!(internal_error.jsonrpc_code(), -32603);
         assert!(!is_user_action_error(&internal_error));
 
-        let transport_error = Error::new(ErrorKind::Transport, "Network");
-        assert_eq!(transport_error.jsonrpc_error_code(), -32014);
-        assert!(!is_user_action_error(&transport_error));
+        // v3: Use ParseError for a different error code test (-32700)
+        let parse_error = Error::new(ErrorKind::ParseError, "Parse failed");
+        assert_eq!(parse_error.jsonrpc_code(), -32700);
+        assert!(!is_user_action_error(&parse_error));
     }
 
     // NOTE: Unit tests verify error code checking logic

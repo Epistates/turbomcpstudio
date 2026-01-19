@@ -1,14 +1,16 @@
-.PHONY: help dev build check refactor refactor-turbomcp-local refactor-preview refactor-interactive
+.PHONY: help dev build check refactor refactor-preview refactor-interactive show-turbomcp-versions
 
 # ============================================================================
-# Configuration: Turbomcp Versions
+# Configuration: TurboMCP Versions
 # ============================================================================
-# Detect versions from local turbomcp repo (../turbomcp/), or override:
-# Usage: make refactor-turbomcp-local TURBOMCP_VERSION=1.2.3
-TURBOMCP_VERSION ?= $(shell grep '^version = ' ../turbomcp/crates/turbomcp/Cargo.toml 2>/dev/null | head -1 | sed 's/version = "//;s/"//;' || echo "2.0.4")
-TURBOMCP_CLIENT_VERSION ?= $(shell grep '^version = ' ../turbomcp/crates/turbomcp-client/Cargo.toml 2>/dev/null | head -1 | sed 's/version = "//;s/"//;' || echo "2.0.4")
-TURBOMCP_PROTOCOL_VERSION ?= $(shell grep '^version = ' ../turbomcp/crates/turbomcp-protocol/Cargo.toml 2>/dev/null | head -1 | sed 's/version = "//;s/"//;' || echo "2.0.4")
-TURBOMCP_TRANSPORT_VERSION ?= $(shell grep '^version = ' ../turbomcp/crates/turbomcp-transport/Cargo.toml 2>/dev/null | head -1 | sed 's/version = "//;s/"//;' || echo "2.0.4")
+# TurboMCP is fetched from crates.io automatically
+# These versions match src-tauri/Cargo.toml
+TURBOMCP_VERSION ?= 2.0.4
+TURBOMCP_CLIENT_VERSION ?= 2.0.4
+TURBOMCP_PROTOCOL_VERSION ?= 2.0.4
+TURBOMCP_TRANSPORT_VERSION ?= 2.0.4
+TURBOMCP_AUTH_VERSION ?= 2.2
+TURBOMCP_DPOP_VERSION ?= 2.2
 
 # Default target
 help:
@@ -21,7 +23,6 @@ help:
 	@echo ""
 	@echo "Refactoring:"
 	@echo "  make refactor-list    - Show available refactoring patterns"
-	@echo "  make refactor-turbomcp-local - Convert local turbomcp deps to crates.io"
 	@echo "  make refactor-preview - Preview all active refactoring patterns"
 	@echo "  make refactor-interactive - Interactive refactoring (review each change)"
 	@echo ""
@@ -102,63 +103,22 @@ refactor:
 	ast-grep scan -r ".ast-grep-rules/patterns/$(PATTERN).yml" -i
 
 # ============================================================================
-# Turbomcp Dependency Refactoring
+# TurboMCP Dependency Information
 # ============================================================================
 
-# Convert turbomcp dependencies from local path to crates.io version
-# Usage: make refactor-turbomcp-local
-refactor-turbomcp-local:
-	@echo "Converting turbomcp dependencies from local path to crates.io version"
+# Show current TurboMCP versions (informational only - already using crates.io)
+show-turbomcp-versions:
+	@echo "Current TurboMCP Versions (from crates.io):"
 	@echo ""
-	@echo "Detected versions from local repo:"
 	@echo "  • turbomcp = \"$(TURBOMCP_VERSION)\""
 	@echo "  • turbomcp-client = \"$(TURBOMCP_CLIENT_VERSION)\""
 	@echo "  • turbomcp-protocol = \"$(TURBOMCP_PROTOCOL_VERSION)\""
 	@echo "  • turbomcp-transport = \"$(TURBOMCP_TRANSPORT_VERSION)\""
+	@echo "  • turbomcp-auth = \"$(TURBOMCP_AUTH_VERSION)\""
+	@echo "  • turbomcp-dpop = \"$(TURBOMCP_DPOP_VERSION)\""
 	@echo ""
-	@echo "Files to be modified:"
-	@find . -name "Cargo.toml" -type f | grep -v ".git" | grep -v "target"
-	@echo ""
-	@echo "Running sed-based refactoring..."
-	@echo ""
-	@for file in $$(find . -name "Cargo.toml" -type f | grep -v ".git" | grep -v "target"); do \
-		if grep -q 'path = "' "$$file" && grep -q "turbomcp" "$$file"; then \
-			echo "  Updating: $$file"; \
-			sed -i.bak 's/turbomcp = { version = "[^"]*", path = "[^"]*" }/turbomcp = "$(TURBOMCP_VERSION)"/g' "$$file"; \
-			sed -i.bak 's/turbomcp-client = { version = "[^"]*", path = "[^"]*" }/turbomcp-client = "$(TURBOMCP_CLIENT_VERSION)"/g' "$$file"; \
-			sed -i.bak 's/turbomcp-protocol = { version = "[^"]*", path = "[^"]*" }/turbomcp-protocol = "$(TURBOMCP_PROTOCOL_VERSION)"/g' "$$file"; \
-			sed -i.bak 's/turbomcp-transport = { version = "[^"]*", path = "[^"]*" }/turbomcp-transport = "$(TURBOMCP_TRANSPORT_VERSION)"/g' "$$file"; \
-			rm -f "$$file.bak"; \
-		fi; \
-	done
-	@echo ""
-	@echo "✅ Refactoring complete!"
-	@echo ""
-	@echo "Review changes with: git diff"
-	@echo "Commit with: git add -A && git commit -m 'refactor: update turbomcp deps to crates.io v$(TURBOMCP_VERSION)'"
-	@echo "Undo with: git checkout ."
-
-# Preview changes before applying
-refactor-turbomcp-preview:
-	@echo "Preview: Local turbomcp → crates.io conversion"
-	@echo ""
-	@echo "Using versions from local repo:"
-	@echo "  • turbomcp v$(TURBOMCP_VERSION)"
-	@echo "  • turbomcp-client v$(TURBOMCP_CLIENT_VERSION)"
-	@echo "  • turbomcp-protocol v$(TURBOMCP_PROTOCOL_VERSION)"
-	@echo "  • turbomcp-transport v$(TURBOMCP_TRANSPORT_VERSION)"
-	@echo ""
-	@echo "Files to be modified:"
-	@find . -name "Cargo.toml" -type f | grep -v ".git" | grep -v "target" | while read f; do \
-		if grep -q 'path = "' "$$f" && grep -q "turbomcp" "$$f"; then \
-			echo "  - $$f"; \
-			echo "    Current lines with local path:"; \
-			grep "turbomcp.*path = " "$$f" | sed 's/^/      /'; \
-			echo "    Will be converted to crates.io versions"; \
-		fi; \
-	done
-	@echo ""
-	@echo "To apply changes: make refactor-turbomcp-local"
+	@echo "All dependencies are fetched from crates.io automatically."
+	@echo "No local turbomcp repository needed."
 
 # ============================================================================
 # Utility Targets
@@ -186,9 +146,7 @@ refactor-help:
 	@echo "  3. git diff                   (verify changes)"
 	@echo "  4. git add . && git commit -m \"refactor: ...\"  (commit)"
 	@echo ""
-	@echo "Or for turbomcp specifically:"
-	@echo "  1. make refactor-turbomcp-preview  (preview changes)"
-	@echo "  2. make refactor-turbomcp-local    (apply changes)"
-	@echo "  3. git diff src-tauri/Cargo.toml   (verify)"
+	@echo "TurboMCP versions:"
+	@echo "  make show-turbomcp-versions  (show current crates.io versions)"
 	@echo ""
 	@echo "Docs: See .ast-grep-rules/README.md for detailed pattern documentation"

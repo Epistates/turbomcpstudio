@@ -1,6 +1,6 @@
 //! Proxy management commands for Tauri
 
-use crate::proxy::{AuthConfig, BackendConfig, FrontendType, ProxyId, ProxyInfo, ProxyManager, ProxyMetrics, ProxyStatus, ServerSpec};
+use crate::proxy::{AuthConfig, BackendConfig, FrontendType, ProxyId, ProxyInfo, ProxyMetrics, ProxyStatus, ServerSpec};
 use tauri::State;
 
 /// Create a new proxy configuration
@@ -27,17 +27,19 @@ pub async fn create_proxy(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing stdio command")?
                 .to_string();
-            let args = backend_config
+            let args: Option<Vec<String>> = backend_config
                 .get("args")
                 .and_then(|v| v.as_array())
-                .unwrap_or(&vec![])
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect();
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                });
 
             BackendConfig::Stdio {
                 command,
                 args,
+                env: None,
                 working_dir: None,
             }
         }
@@ -50,7 +52,7 @@ pub async fn create_proxy(
 
             BackendConfig::Http {
                 url,
-                auth_token: None,
+                headers: None,
             }
         }
         "tcp" => {
@@ -73,7 +75,7 @@ pub async fn create_proxy(
                 .ok_or("Missing websocket url")?
                 .to_string();
 
-            BackendConfig::WebSocket { url }
+            BackendConfig::WebSocket { url, headers: None }
         }
         _ => return Err(format!("Invalid backend type: {}", backend_type)),
     };
@@ -184,17 +186,19 @@ pub async fn introspect_backend(
                 .and_then(|v| v.as_str())
                 .ok_or("Missing stdio command")?
                 .to_string();
-            let args = backend_config
+            let args: Option<Vec<String>> = backend_config
                 .get("args")
                 .and_then(|v| v.as_array())
-                .unwrap_or(&vec![])
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect();
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                });
 
             BackendConfig::Stdio {
                 command,
                 args,
+                env: None,
                 working_dir: None,
             }
         }
@@ -207,7 +211,7 @@ pub async fn introspect_backend(
 
             BackendConfig::Http {
                 url,
-                auth_token: None,
+                headers: None,
             }
         }
         _ => return Err(format!("Unsupported backend type: {}", backend_type)),

@@ -182,6 +182,13 @@ impl OpenAICompatibleClient {
                     turbomcp_protocol::types::ContentBlock::Resource(_) => {
                         "[Embedded resource]".to_string()
                     }
+                    // v3 new variants for tool calling in sampling
+                    turbomcp_protocol::types::ContentBlock::ToolUse(tool_use) => {
+                        format!("[Tool call: {}]", tool_use.name)
+                    }
+                    turbomcp_protocol::types::ContentBlock::ToolResult(tool_result) => {
+                        format!("[Tool result: {}]", tool_result.tool_use_id)
+                    }
                 };
 
                 ChatMessage {

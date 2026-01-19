@@ -8,6 +8,7 @@
   import { uiStore } from '$lib/stores/uiStore';
   import { serverStore, getServerStatus } from '$lib/stores/serverStore';
   import Button from '../ui/Button.svelte';
+  import NotificationPanel from '../NotificationPanel.svelte';
   import {
     Menu,
     PanelLeftClose,
@@ -17,7 +18,6 @@
     Settings,
     HelpCircle,
     Search,
-    Bell,
     User,
     Zap,
     Database,
@@ -66,8 +66,8 @@
   }
 
   function openHelp() {
-    // Open help/documentation
-    window.open('https://github.com/anthropics/mcp-studio', '_blank');
+    // Open help/documentation - TurboMCP Studio docs
+    window.open('https://github.com/Epistates/turbomcpstudio', '_blank');
   }
 
   // Search functionality with global store
@@ -349,14 +349,8 @@
         {/if}
       </Button>
 
-      <!-- Notifications (placeholder) -->
-      <button
-        class="mcp-header__icon-button"
-        title="Notifications"
-        aria-label="Notifications"
-      >
-        <Bell size={18} />
-      </button>
+      <!-- Notifications -->
+      <NotificationPanel />
 
       <!-- Settings -->
       <Button

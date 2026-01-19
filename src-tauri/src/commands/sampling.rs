@@ -259,6 +259,10 @@ pub async fn test_sampling_request(
         max_tokens: 1000, // MCP 2025-06-18: Required field
         temperature: Some(0.7),
         stop_sequences: None,
+        // v3 new fields
+        tools: None,
+        tool_choice: None,
+        task: None,
         _meta: None,
     };
 

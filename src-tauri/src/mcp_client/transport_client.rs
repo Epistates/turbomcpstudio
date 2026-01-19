@@ -8,7 +8,7 @@ use std::sync::Arc;
 use turbomcp_client::handlers::{ElicitationHandler, LogHandler, ResourceUpdateHandler};
 use turbomcp_client::Client;
 use turbomcp_protocol::types::{Prompt, PromptInput, Tool, ToolInputSchema};
-use turbomcp_protocol::{Error, ErrorKind}; // v2.0: Re-exported at root (was turbomcp_core)
+use turbomcp_protocol::{McpError, ErrorKind}; // v3.0: Unified error type
 use turbomcp_transport::child_process::ChildProcessTransport;
 use turbomcp_transport::stdio::StdioTransport;
 
@@ -30,9 +30,13 @@ use turbomcp_transport::unix::UnixTransport;
 ///
 /// Following TurboMCP's world-class Clone pattern (reqwest/AWS SDK style),
 /// all clients are now cloneable directly - no SharedClient wrapper needed!
+///
+/// Note: Non-intercepted variants (Stdio, ChildProcess, Http, etc.) exist for
+/// when protocol interception is disabled. Currently we always use Intercepted
+/// variants for Protocol Inspector integration.
 #[derive(Clone)]
+#[allow(dead_code)] // Non-intercepted variants reserved for future use
 pub enum McpTransportClient {
-    #[allow(dead_code)]
     Stdio(Client<StdioTransport>),
     ChildProcess(Client<ChildProcessTransport>),
 
@@ -69,11 +73,11 @@ pub enum McpTransportClient {
 }
 
 impl McpTransportClient {
-    /// Helper to convert HTTP string errors to TurboMCP Error
+    /// Helper to convert HTTP string errors to TurboMCP McpError
     #[cfg(feature = "http")]
-    fn http_error(kind: ErrorKind, message: String) -> Box<Error> {
-        // Error::new already returns Box<Error>
-        Error::new(kind, message)
+    fn http_error(kind: ErrorKind, message: String) -> McpError {
+        // v3.0: McpError::new returns McpError directly
+        McpError::new(kind, message)
     }
 
     /// Create a basic tool schema for tools where we don't have full schema information
@@ -92,72 +96,86 @@ impl McpTransportClient {
     /// Get tools with their schemas from the MCP server
     /// This method is now an alias for list_tools() since TurboMCP 2.0.0-rc.1
     /// returns full Tool objects with schemas by default
-    pub async fn list_tools_with_schemas(&self) -> Result<Vec<Tool>, Box<Error>> {
+    pub async fn list_tools_with_schemas(&self) -> Result<Vec<Tool>, McpError> {
         tracing::info!("Getting tool schemas using TurboMCP 2.0.0-rc.1 API");
         self.list_tools().await
     }
 
     /// Call a tool on the MCP server (transport-agnostic)
+    ///
+    /// v3 Note: Returns CallToolResult serialized as serde_json::Value for backward compatibility.
+    /// The result contains `content`, `is_error`, and optional `structured_content`.
     pub async fn call_tool(
         &self,
         tool_name: &str,
         parameters: Option<HashMap<String, serde_json::Value>>,
-    ) -> Result<serde_json::Value, Box<Error>> {
+    ) -> Result<serde_json::Value, McpError> {
+        // v3: call_tool returns CallToolResult, convert to JSON for backward compatibility
+        let convert_result = |result: turbomcp_protocol::CallToolResult| -> Result<serde_json::Value, McpError> {
+            serde_json::to_value(result).map_err(|e| {
+                McpError::new(ErrorKind::Internal, format!("Failed to serialize CallToolResult: {}", e))
+            })
+        };
+
         match self {
-            McpTransportClient::Stdio(client) => client.call_tool(tool_name, parameters).await,
+            McpTransportClient::Stdio(client) => {
+                client.call_tool(tool_name, parameters).await.and_then(convert_result)
+            }
             McpTransportClient::ChildProcess(client) => {
-                client.call_tool(tool_name, parameters).await
+                client.call_tool(tool_name, parameters).await.and_then(convert_result)
             }
-
             McpTransportClient::InterceptedChildProcess(client) => {
-                client.call_tool(tool_name, parameters).await
+                client.call_tool(tool_name, parameters).await.and_then(convert_result)
             }
-
-
-            
 
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => {
-                client.call_tool(tool_name, parameters).await.map_err(|e| {
-                    Self::http_error(
-                        ErrorKind::Transport,
-                        format!("HTTP call_tool failed: {}", e),
-                    )
-                })
+                client.call_tool(tool_name, parameters).await
+                    .map_err(|e| Self::http_error(ErrorKind::Transport, format!("HTTP call_tool failed: {}", e)))
+                    .and_then(convert_result)
             }
 
             #[cfg(feature = "http")]
             McpTransportClient::InterceptedHttp(client) => {
-                client.call_tool(tool_name, parameters).await.map_err(|e| {
-                    Self::http_error(
-                        ErrorKind::Transport,
-                        format!("HTTP call_tool failed: {}", e),
-                    )
-                })
+                client.call_tool(tool_name, parameters).await
+                    .map_err(|e| Self::http_error(ErrorKind::Transport, format!("HTTP call_tool failed: {}", e)))
+                    .and_then(convert_result)
             }
 
             #[cfg(feature = "websocket")]
-            McpTransportClient::WebSocket(client) => client.call_tool(tool_name, parameters).await,
+            McpTransportClient::WebSocket(client) => {
+                client.call_tool(tool_name, parameters).await.and_then(convert_result)
+            }
 
             #[cfg(feature = "websocket")]
-            McpTransportClient::InterceptedWebSocket(client) => client.call_tool(tool_name, parameters).await,
+            McpTransportClient::InterceptedWebSocket(client) => {
+                client.call_tool(tool_name, parameters).await.and_then(convert_result)
+            }
 
             #[cfg(feature = "tcp")]
-            McpTransportClient::Tcp(client) => client.call_tool(tool_name, parameters).await,
+            McpTransportClient::Tcp(client) => {
+                client.call_tool(tool_name, parameters).await.and_then(convert_result)
+            }
 
             #[cfg(feature = "tcp")]
-            McpTransportClient::InterceptedTcp(client) => client.call_tool(tool_name, parameters).await,
+            McpTransportClient::InterceptedTcp(client) => {
+                client.call_tool(tool_name, parameters).await.and_then(convert_result)
+            }
 
             #[cfg(unix)]
-            McpTransportClient::Unix(client) => client.call_tool(tool_name, parameters).await,
+            McpTransportClient::Unix(client) => {
+                client.call_tool(tool_name, parameters).await.and_then(convert_result)
+            }
 
             #[cfg(unix)]
-            McpTransportClient::InterceptedUnix(client) => client.call_tool(tool_name, parameters).await,
+            McpTransportClient::InterceptedUnix(client) => {
+                client.call_tool(tool_name, parameters).await.and_then(convert_result)
+            }
         }
     }
 
     /// List tools available on the MCP server (transport-agnostic)
-    pub async fn list_tools(&self) -> Result<Vec<Tool>, Box<Error>> {
+    pub async fn list_tools(&self) -> Result<Vec<Tool>, McpError> {
         match self {
             McpTransportClient::Stdio(client) => client.list_tools().await,
             McpTransportClient::ChildProcess(client) => client.list_tools().await,
@@ -204,7 +222,7 @@ impl McpTransportClient {
     }
 
     /// List prompts available on the MCP server (transport-agnostic)
-    pub async fn list_prompts(&self) -> Result<Vec<Prompt>, Box<Error>> {
+    pub async fn list_prompts(&self) -> Result<Vec<Prompt>, McpError> {
         match self {
             McpTransportClient::Stdio(client) => client.list_prompts().await,
             McpTransportClient::ChildProcess(client) => client.list_prompts().await,
@@ -262,7 +280,7 @@ impl McpTransportClient {
         &self,
         name: &str,
         arguments: Option<PromptInput>,
-    ) -> Result<serde_json::Value, Box<Error>> {
+    ) -> Result<serde_json::Value, McpError> {
         match self {
             McpTransportClient::Stdio(client) => {
                 let result = client.get_prompt(name, arguments).await?;
@@ -343,7 +361,7 @@ impl McpTransportClient {
 
     /// List resources available on the MCP server (transport-agnostic)
     /// Returns full Resource objects per MCP spec (as of TurboMCP 2.0.1)
-    pub async fn list_resources(&self) -> Result<Vec<turbomcp_client::Resource>, Box<Error>> {
+    pub async fn list_resources(&self) -> Result<Vec<turbomcp_client::Resource>, McpError> {
         match self {
             McpTransportClient::Stdio(client) => client.list_resources().await,
             McpTransportClient::ChildProcess(client) => client.list_resources().await,
@@ -390,7 +408,7 @@ impl McpTransportClient {
     }
 
     /// Read a specific resource from the MCP server (transport-agnostic)
-    pub async fn read_resource(&self, uri: &str) -> Result<serde_json::Value, Box<Error>> {
+    pub async fn read_resource(&self, uri: &str) -> Result<serde_json::Value, McpError> {
         match self {
             McpTransportClient::Stdio(client) => {
                 let result = client.read_resource(uri).await?;
@@ -496,7 +514,7 @@ impl McpTransportClient {
         &self,
         completion_name: &str,
         partial_input: &str,
-    ) -> Result<Vec<String>, Box<Error>> {
+    ) -> Result<Vec<String>, McpError> {
         match self {
             McpTransportClient::Stdio(client) => client
                 .complete(completion_name, partial_input)
@@ -796,7 +814,7 @@ impl McpTransportClient {
     ///
     /// Without calling shutdown(), WebSocket reconnection tasks will continue
     /// running even after the client is dropped!
-    pub async fn shutdown(&self) -> Result<(), Box<Error>> {
+    pub async fn shutdown(&self) -> Result<(), McpError> {
         match self {
             McpTransportClient::Stdio(client) => client.shutdown().await,
             McpTransportClient::ChildProcess(client) => client.shutdown().await,
