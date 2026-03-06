@@ -14,7 +14,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use turbomcp_protocol::{Error as McpError, Result as McpResult};
+use turbomcp_protocol::{Error as McpError, ErrorKind, Result as McpResult};
 
 /// Token information from OAuth server
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,9 +159,12 @@ impl TokenStore {
     /// Access token and token type, or error if not found
     pub async fn get_token(&self, server_id: i64) -> McpResult<(String, String)> {
         let cache = self.token_cache.read();
-        let metadata = cache
-            .get(&server_id)
-            .ok_or_else(|| McpError::not_found(format!("No token found for server {}", server_id)))?;
+        let metadata = cache.get(&server_id).ok_or_else(|| {
+            McpError::new(
+                ErrorKind::Internal,
+                format!("No token found for server {}", server_id),
+            )
+        })?;
 
         // Check if token is expired
         if let Some(expires_at) = metadata.expires_at {
@@ -216,13 +219,15 @@ impl TokenStore {
     pub async fn get_refresh_token(&self, server_id: i64) -> McpResult<String> {
         let cache = self.token_cache.read();
         let metadata = cache.get(&server_id).ok_or_else(|| {
-            McpError::not_found(format!("No token found for server {}", server_id))
+            McpError::new(
+                ErrorKind::Internal,
+                format!("No token found for server {}", server_id),
+            )
         })?;
 
-        let refresh_key = metadata
-            .refresh_token_key
-            .as_ref()
-            .ok_or_else(|| McpError::not_found("No refresh token available"))?;
+        let refresh_key = metadata.refresh_token_key.as_ref().ok_or_else(|| {
+            McpError::new(ErrorKind::Internal, "No refresh token available")
+        })?;
 
         self.retrieve_from_keyring(refresh_key)
     }
@@ -230,11 +235,11 @@ impl TokenStore {
     /// Store value in OS keyring
     fn store_in_keyring(&self, key: &str, value: &str) -> McpResult<()> {
         let entry = Entry::new(&self.service_name, key)
-            .map_err(|e| McpError::internal(format!("Failed to create keyring entry: {}", e)))?;
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to create keyring entry: {}", e)))?;
 
         entry
             .set_password(value)
-            .map_err(|e| McpError::internal(format!("Failed to store in keyring: {}", e)))?;
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to store in keyring: {}", e)))?;
 
         Ok(())
     }
@@ -242,21 +247,24 @@ impl TokenStore {
     /// Retrieve value from OS keyring
     fn retrieve_from_keyring(&self, key: &str) -> McpResult<String> {
         let entry = Entry::new(&self.service_name, key)
-            .map_err(|e| McpError::internal(format!("Failed to create keyring entry: {}", e)))?;
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to create keyring entry: {}", e)))?;
 
-        entry
-            .get_password()
-            .map_err(|e| McpError::not_found(format!("Failed to retrieve from keyring: {}", e)))
+        entry.get_password().map_err(|e| {
+            McpError::new(
+                ErrorKind::Internal,
+                format!("Failed to retrieve from keyring: {}", e),
+            )
+        })
     }
 
     /// Delete value from OS keyring
     fn delete_from_keyring(&self, key: &str) -> McpResult<()> {
         let entry = Entry::new(&self.service_name, key)
-            .map_err(|e| McpError::internal(format!("Failed to create keyring entry: {}", e)))?;
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to create keyring entry: {}", e)))?;
 
         entry
-            .delete_password()
-            .map_err(|e| McpError::internal(format!("Failed to delete from keyring: {}", e)))?;
+            .delete_credential()
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to delete from keyring: {}", e)))?;
 
         Ok(())
     }

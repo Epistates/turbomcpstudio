@@ -14,7 +14,7 @@
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use turbomcp_protocol::{Error as McpError, Result as McpResult};
+use turbomcp_protocol::{Error as McpError, ErrorKind, Result as McpResult};
 use url::Url;
 
 /// OAuth Authorization Server Metadata (RFC 8414)
@@ -179,7 +179,8 @@ impl MetadataDiscovery {
             });
         }
 
-        Err(McpError::not_found(
+        Err(McpError::new(
+            ErrorKind::Internal,
             "OAuth metadata discovery failed: no .well-known endpoints found",
         ))
     }
@@ -193,7 +194,7 @@ impl MetadataDiscovery {
     ) -> McpResult<ProtectedResourceMetadata> {
         let discovery_url = base_url
             .join("/.well-known/oauth-protected-resource")
-            .map_err(|e| McpError::internal(format!("Invalid discovery URL: {}", e)))?;
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Invalid discovery URL: {}", e)))?;
 
         tracing::debug!("Discovering protected resource metadata: {}", discovery_url);
 
@@ -203,13 +204,16 @@ impl MetadataDiscovery {
             .header("Accept", "application/json")
             .send()
             .await
-            .map_err(|e| McpError::internal(format!("Discovery request failed: {}", e)))?;
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Discovery request failed: {}", e)))?;
 
         if !response.status().is_success() {
-            return Err(McpError::not_found(format!(
-                "Protected resource metadata not found: HTTP {}",
-                response.status()
-            )));
+            return Err(McpError::new(
+                ErrorKind::Internal,
+                format!(
+                    "Protected resource metadata not found: HTTP {}",
+                    response.status()
+                ),
+            ));
         }
 
         response
@@ -224,7 +228,7 @@ impl MetadataDiscovery {
     async fn discover_auth_server(&self, base_url: &Url) -> McpResult<AuthServerMetadata> {
         let discovery_url = base_url
             .join("/.well-known/oauth-authorization-server")
-            .map_err(|e| McpError::internal(format!("Invalid discovery URL: {}", e)))?;
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Invalid discovery URL: {}", e)))?;
 
         tracing::debug!("Discovering authorization server metadata: {}", discovery_url);
 
@@ -234,13 +238,16 @@ impl MetadataDiscovery {
             .header("Accept", "application/json")
             .send()
             .await
-            .map_err(|e| McpError::internal(format!("Discovery request failed: {}", e)))?;
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Discovery request failed: {}", e)))?;
 
         if !response.status().is_success() {
-            return Err(McpError::not_found(format!(
-                "Authorization server metadata not found: HTTP {}",
-                response.status()
-            )));
+            return Err(McpError::new(
+                ErrorKind::Internal,
+                format!(
+                    "Authorization server metadata not found: HTTP {}",
+                    response.status()
+                ),
+            ));
         }
 
         response
@@ -255,7 +262,7 @@ impl MetadataDiscovery {
     async fn discover_openid_connect(&self, base_url: &Url) -> McpResult<AuthServerMetadata> {
         let discovery_url = base_url
             .join("/.well-known/openid-configuration")
-            .map_err(|e| McpError::internal(format!("Invalid discovery URL: {}", e)))?;
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Invalid discovery URL: {}", e)))?;
 
         tracing::debug!("Discovering OpenID Connect configuration: {}", discovery_url);
 
@@ -265,13 +272,16 @@ impl MetadataDiscovery {
             .header("Accept", "application/json")
             .send()
             .await
-            .map_err(|e| McpError::internal(format!("Discovery request failed: {}", e)))?;
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Discovery request failed: {}", e)))?;
 
         if !response.status().is_success() {
-            return Err(McpError::not_found(format!(
-                "OpenID Connect configuration not found: HTTP {}",
-                response.status()
-            )));
+            return Err(McpError::new(
+                ErrorKind::Internal,
+                format!(
+                    "OpenID Connect configuration not found: HTTP {}",
+                    response.status()
+                ),
+            ));
         }
 
         // OpenID Connect configuration is compatible with RFC 8414

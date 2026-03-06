@@ -2,77 +2,12 @@
 //!
 //! This module provides a zero-copy, transport-agnostic interception layer
 //! that captures all MCP messages for display in the Protocol Inspector UI.
-//!
-//! # Architecture
-//!
-//! ```text
-//! ┌─────────────────────────────────────────┐
-//! │     TurboMCP Studio Backend              │
-//! └──────────────┬──────────────────────────┘
-//!                │ Uses InterceptedTransport
-//!                ↓
-//! ┌─────────────────────────────────────────┐
-//! │  InterceptedTransport<T>                │
-//! │  - Wraps any turbomcp Transport         │
-//! │  - Captures messages via Arc (zero-copy)│
-//! │  - Broadcasts to Tauri frontend         │
-//! └──────────────┬──────────────────────────┘
-//!                │ Delegates to
-//!                ↓
-//! ┌─────────────────────────────────────────┐
-//! │  TurboMCP Transport (from library)      │
-//! │  - StdioTransport, WebSocketTransport   │
-//! │  - HttpTransport, etc.                  │
-//! └─────────────────────────────────────────┘
-//! ```
-//!
-//! # Zero-Copy Design
-//!
-//! - Uses `Arc<InterceptedMessage>` to avoid cloning message payloads
-//! - Original `TransportMessage` from turbomcp already uses `Bytes` (zero-copy)
-//! - Wrapping in Arc adds only 16 bytes overhead per message
-//! - Frontend receives JSON serialization, interceptor holds Arc references
-//!
-//! # Performance
-//!
-//! - **Overhead**: < 1% latency impact (verified by benchmarks)
-//! - **Memory**: Zero payload copies, only Arc pointer overhead
-//! - **Throughput**: No significant impact on message throughput
-//!
-//! # Usage
-//!
-//! ```rust,no_run
-//! use turbomcp_transport::{StdioTransport, Transport};
-//! use turbomcpstudio_lib::interceptor::{InterceptedTransport, InterceptedMessage, Direction};
-//! use std::sync::Arc;
-//!
-//! #[tokio::main]
-//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     // Create any transport from turbomcp
-//!     let stdio = StdioTransport::new();
-//!
-//!     // Wrap with interceptor
-//!     let (intercepted, mut rx) = InterceptedTransport::new(stdio);
-//!
-//!     // Spawn listener task to broadcast to frontend
-//!     tokio::spawn(async move {
-//!         while let Some(msg) = rx.recv().await {
-//!             println!("{:?} message: {} bytes", msg.direction, msg.message.payload.len());
-//!             // In real code: emit Tauri event to frontend
-//!         }
-//!     });
-//!
-//!     // Use transport normally - all messages are auto-intercepted
-//!     intercepted.connect().await?;
-//!
-//!     Ok(())
-//! }
-//! ```
 
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
 
-use async_trait::async_trait;
 use serde::Serialize;
 use tokio::sync::mpsc;
 use turbomcp_transport::{
@@ -91,9 +26,6 @@ pub enum Direction {
 }
 
 /// An intercepted message with metadata for the frontend
-///
-/// This struct is serialized to JSON and sent to the Tauri frontend.
-/// Uses Arc internally for zero-copy sharing between interceptor and serializer.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InterceptedMessage {
@@ -119,7 +51,6 @@ fn serialize_instant<S>(instant: &Instant, serializer: S) -> Result<S::Ok, S::Er
 where
     S: serde::Serializer,
 {
-    // Convert Instant to milliseconds (approximate, good enough for UI)
     let millis = instant.elapsed().as_millis() as u64;
     serializer.serialize_u64(millis)
 }
@@ -133,52 +64,14 @@ pub struct InternalInterceptedMessage {
 }
 
 /// A transport wrapper that intercepts all send/receive operations
-///
-/// This wrapper implements the `Transport` trait from turbomcp and delegates
-/// all operations to the inner transport, while broadcasting intercepted messages.
-///
-/// # Type Parameters
-/// - `T`: Any type implementing the turbomcp `Transport` trait
-///
-/// # Zero-Copy Guarantee
-/// - Messages are wrapped in `Arc<TransportMessage>`
-/// - No payload copies occur during interception
-/// - Only when serializing to JSON for frontend do we copy the payload
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InterceptedTransport<T: Transport> {
-    /// The inner turbomcp transport being wrapped
-    inner: T,
-
-    /// Unbounded sender for broadcasting intercepted messages
-    ///
-    /// Unbounded is used because:
-    /// - Listeners should never block message flow
-    /// - If UI is slow, it's the UI's problem (can use backpressure via Tauri)
-    /// - Transport performance must not degrade due to interception
+    inner: Arc<T>,
     tx: mpsc::UnboundedSender<Arc<InternalInterceptedMessage>>,
 }
 
 impl<T: Transport> InterceptedTransport<T> {
     /// Create a new intercepted transport wrapping the given turbomcp transport
-    ///
-    /// Returns:
-    /// - The intercepted transport
-    /// - A receiver for intercepted messages (to be consumed by Tauri event emitter)
-    ///
-    /// # Example
-    /// ```rust,no_run
-    /// # use turbomcp_transport::StdioTransport;
-    /// # use turbomcpstudio_lib::interceptor::InterceptedTransport;
-    /// let stdio = StdioTransport::new();
-    /// let (intercepted, mut rx) = InterceptedTransport::new(stdio);
-    ///
-    /// // Spawn task to send messages to frontend
-    /// tokio::spawn(async move {
-    ///     while let Some(msg) = rx.recv().await {
-    ///         // Emit Tauri event with msg
-    ///     }
-    /// });
-    /// ```
     pub fn new(
         inner: T,
     ) -> (
@@ -186,9 +79,10 @@ impl<T: Transport> InterceptedTransport<T> {
         mpsc::UnboundedReceiver<Arc<InternalInterceptedMessage>>,
     ) {
         let (tx, rx) = mpsc::unbounded_channel();
-
-        let intercepted = Self { inner, tx };
-
+        let intercepted = Self {
+            inner: Arc::new(inner),
+            tx,
+        };
         (intercepted, rx)
     }
 
@@ -197,35 +91,18 @@ impl<T: Transport> InterceptedTransport<T> {
         &self.inner
     }
 
-    /// Get a mutable reference to the inner transport
-    pub fn inner_mut(&mut self) -> &mut T {
-        &mut self.inner
-    }
-
-    /// Consume this intercepted transport and return the inner transport
-    ///
-    /// This stops interception and returns the original transport
-    pub fn into_inner(self) -> T {
-        self.inner
-    }
-
     /// Broadcast an intercepted message to listeners
-    ///
-    /// If the channel is closed (no listeners), this is a no-op.
     fn broadcast(&self, direction: Direction, message: Arc<TransportMessage>) {
         let intercepted = Arc::new(InternalInterceptedMessage {
             direction,
             timestamp: Instant::now(),
             message,
         });
-
-        // Unbounded send - if it fails, all receivers have been dropped
         let _ = self.tx.send(intercepted);
     }
 }
 
-#[async_trait]
-impl<T: Transport> Transport for InterceptedTransport<T> {
+impl<T: Transport + 'static> Transport for InterceptedTransport<T> {
     fn transport_type(&self) -> TransportType {
         self.inner.transport_type()
     }
@@ -234,70 +111,81 @@ impl<T: Transport> Transport for InterceptedTransport<T> {
         self.inner.capabilities()
     }
 
-    async fn state(&self) -> TransportState {
-        self.inner.state().await
+    fn state(&self) -> Pin<Box<dyn Future<Output = TransportState> + Send + '_>> {
+        let inner = self.inner.clone();
+        Box::pin(async move { inner.state().await })
     }
 
-    async fn connect(&self) -> TransportResult<()> {
-        self.inner.connect().await
+    fn connect(&self) -> Pin<Box<dyn Future<Output = TransportResult<()>> + Send + '_>> {
+        let inner = self.inner.clone();
+        Box::pin(async move { inner.connect().await })
     }
 
-    async fn disconnect(&self) -> TransportResult<()> {
-        self.inner.disconnect().await
+    fn disconnect(&self) -> Pin<Box<dyn Future<Output = TransportResult<()>> + Send + '_>> {
+        let inner = self.inner.clone();
+        Box::pin(async move { inner.disconnect().await })
     }
 
-    /// Send a message, intercepting it for the UI
-    async fn send(&self, message: TransportMessage) -> TransportResult<()> {
-        // Wrap in Arc for zero-copy broadcast
+    fn send(
+        &self,
+        message: TransportMessage,
+    ) -> Pin<Box<dyn Future<Output = TransportResult<()>> + Send + '_>> {
         let message_arc = Arc::new(message);
-
-        // Broadcast to UI BEFORE sending (so UI sees it even if send fails)
         self.broadcast(Direction::Outgoing, Arc::clone(&message_arc));
-
-        // Unwrap Arc to get TransportMessage for inner transport
-        // This clones the TransportMessage struct, but NOT the payload (Bytes is zero-copy)
-        let message_clone = (*message_arc).clone();
-
-        // Delegate to inner turbomcp transport
-        self.inner.send(message_clone).await
-    }
-
-    /// Receive a message, intercepting it for the UI
-    async fn receive(&self) -> TransportResult<Option<TransportMessage>> {
-        // Delegate to inner turbomcp transport
-        let message_opt = self.inner.receive().await?;
-
-        if let Some(message) = message_opt {
-            // Wrap in Arc for zero-copy broadcast
-            let message_arc = Arc::new(message);
-
-            // Broadcast to UI
-            self.broadcast(Direction::Incoming, Arc::clone(&message_arc));
-
-            // Unwrap Arc to return TransportMessage
-            // This clones the struct, but NOT the payload (Bytes is zero-copy)
+        
+        let inner = self.inner.clone();
+        Box::pin(async move {
             let message_clone = (*message_arc).clone();
-
-            Ok(Some(message_clone))
-        } else {
-            Ok(None)
-        }
+            inner.send(message_clone).await
+        })
     }
 
-    async fn metrics(&self) -> TransportMetrics {
-        self.inner.metrics().await
+    fn receive(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = TransportResult<Option<TransportMessage>>> + Send + '_>> {
+        let inner = self.inner.clone();
+        let tx = self.tx.clone();
+        
+        Box::pin(async move {
+            let message_opt = inner.receive().await?;
+            if let Some(message) = message_opt {
+                let message_arc = Arc::new(message);
+                
+                let intercepted = Arc::new(InternalInterceptedMessage {
+                    direction: Direction::Incoming,
+                    timestamp: Instant::now(),
+                    message: Arc::clone(&message_arc),
+                });
+                let _ = tx.send(intercepted);
+
+                let message_clone = (*message_arc).clone();
+                Ok(Some(message_clone))
+            } else {
+                Ok(None)
+            }
+        })
     }
 
-    async fn is_connected(&self) -> bool {
-        self.inner.is_connected().await
+    fn metrics(&self) -> Pin<Box<dyn Future<Output = TransportMetrics> + Send + '_>> {
+        let inner = self.inner.clone();
+        Box::pin(async move { inner.metrics().await })
+    }
+
+    fn is_connected(&self) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
+        let inner = self.inner.clone();
+        Box::pin(async move { inner.is_connected().await })
     }
 
     fn endpoint(&self) -> Option<String> {
         self.inner.endpoint()
     }
 
-    async fn configure(&self, config: TransportConfig) -> TransportResult<()> {
-        self.inner.configure(config).await
+    fn configure(
+        &self,
+        config: TransportConfig,
+    ) -> Pin<Box<dyn Future<Output = TransportResult<()>> + Send + '_>> {
+        let inner = self.inner.clone();
+        Box::pin(async move { inner.configure(config).await })
     }
 }
 
@@ -346,7 +234,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl Transport for MockTransport {
         fn transport_type(&self) -> TransportType {
             TransportType::Stdio
@@ -356,35 +243,52 @@ mod tests {
             &self.capabilities
         }
 
-        async fn state(&self) -> TransportState {
-            self.state.lock().unwrap().clone()
+        fn state(&self) -> Pin<Box<dyn Future<Output = TransportState> + Send + '_>> {
+            // In MockTransport we don't have Arc around it yet, but Transport trait expects &self
+            // and returns a future. For mock it's fine to just return immediate future.
+            let state = self.state.clone();
+            Box::pin(async move { state.lock().unwrap().clone() })
         }
 
-        async fn connect(&self) -> TransportResult<()> {
-            *self.state.lock().unwrap() = TransportState::Connected;
-            Ok(())
+        fn connect(&self) -> Pin<Box<dyn Future<Output = TransportResult<()>> + Send + '_>> {
+            let state = self.state.clone();
+            Box::pin(async move {
+                *state.lock().unwrap() = TransportState::Connected;
+                Ok(())
+            })
         }
 
-        async fn disconnect(&self) -> TransportResult<()> {
-            *self.state.lock().unwrap() = TransportState::Disconnected;
-            Ok(())
+        fn disconnect(&self) -> Pin<Box<dyn Future<Output = TransportResult<()>> + Send + '_>> {
+            let state = self.state.clone();
+            Box::pin(async move {
+                *state.lock().unwrap() = TransportState::Disconnected;
+                Ok(())
+            })
         }
 
-        async fn send(&self, _message: TransportMessage) -> TransportResult<()> {
-            if !matches!(*self.state.lock().unwrap(), TransportState::Connected) {
-                return Err(TransportError::ConnectionFailed(
-                    "Not connected".to_string(),
-                ));
-            }
-            Ok(())
+        fn send(
+            &self,
+            _message: TransportMessage,
+        ) -> Pin<Box<dyn Future<Output = TransportResult<()>> + Send + '_>> {
+            let state = self.state.clone();
+            Box::pin(async move {
+                if !matches!(*state.lock().unwrap(), TransportState::Connected) {
+                    return Err(TransportError::ConnectionFailed(
+                        "Not connected".to_string(),
+                    ));
+                }
+                Ok(())
+            })
         }
 
-        async fn receive(&self) -> TransportResult<Option<TransportMessage>> {
-            Ok(None)
+        fn receive(
+            &self,
+        ) -> Pin<Box<dyn Future<Output = TransportResult<Option<TransportMessage>>> + Send + '_>> {
+            Box::pin(async move { Ok(None) })
         }
 
-        async fn metrics(&self) -> TransportMetrics {
-            TransportMetrics::default()
+        fn metrics(&self) -> Pin<Box<dyn Future<Output = TransportMetrics> + Send + '_>> {
+            Box::pin(async move { TransportMetrics::default() })
         }
     }
 

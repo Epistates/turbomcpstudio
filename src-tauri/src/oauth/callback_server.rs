@@ -14,7 +14,7 @@ use axum::{extract::Query, response::Html, routing::get, Router};
 use parking_lot::Mutex;
 use std::sync::Arc;
 use tokio::sync::oneshot;
-use turbomcp_protocol::{Error as McpError, Result as McpResult};
+use turbomcp_protocol::{Error as McpError, ErrorKind, Result as McpResult};
 
 /// Query parameters from OAuth callback
 #[derive(serde::Deserialize, Debug)]
@@ -74,7 +74,7 @@ impl CallbackServer {
 
         // Wait for callback
         rx.await
-            .map_err(|e| McpError::internal(format!("Callback receive failed: {}", e)))?
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Callback receive failed: {}", e)))?
             .map_err(|(error, description)| {
                 McpError::authentication(format!("OAuth error: {} - {}", error, description))
             })
@@ -254,7 +254,7 @@ impl CallbackServer {
 
         let addr = format!("127.0.0.1:{}", self.port);
         let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|e| {
-            McpError::internal(format!("Failed to bind OAuth callback server to {}: {}", addr, e))
+            McpError::new(ErrorKind::Internal, format!("Failed to bind OAuth callback server to {}: {}", addr, e))
         })?;
 
         tracing::info!("OAuth callback server listening on {}", addr);

@@ -30,10 +30,11 @@ use crate::database::Database;
 use crate::llm_config::LLMConfigManager;
 use crate::mcp_client::{ServerContext, CURRENT_SERVER_CONTEXT};
 use crate::types::{MessageDirection, MessageHistory};
-use async_trait::async_trait;
 use chrono::Utc;
 use dashmap::DashMap;
 use serde::Serialize;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::Emitter;
@@ -67,22 +68,30 @@ impl ContextAwareSamplingHandler {
     }
 }
 
-#[async_trait]
 impl SamplingHandler for ContextAwareSamplingHandler {
-    async fn handle_create_message(
+    fn handle_create_message(
         &self,
         request_id: String,
         request: CreateMessageRequest,
-    ) -> Result<CreateMessageResult, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Pin<
+        Box<
+            dyn Future<
+                    Output = Result<CreateMessageResult, Box<dyn std::error::Error + Send + Sync>>,
+                > + Send
+                + '_,
+        >,
+    > {
         // Set the server context in task-local storage before delegating
         let context = self.context.clone();
         let inner = self.inner.clone();
 
-        CURRENT_SERVER_CONTEXT
-            .scope(context, async move {
-                inner.handle_create_message(request_id, request).await
-            })
-            .await
+        Box::pin(async move {
+            CURRENT_SERVER_CONTEXT
+                .scope(context, async move {
+                    inner.handle_create_message_internal(request_id, request).await
+                })
+                .await
+        })
     }
 }
 
@@ -315,11 +324,9 @@ impl StudioSamplingHandler {
         tracing::info!("Rejection sent for request: {} - {}", request_id, reason);
         Ok(())
     }
-}
 
-#[async_trait]
-impl SamplingHandler for StudioSamplingHandler {
-    async fn handle_create_message(
+    /// Internal implementation of sampling handling
+    pub async fn handle_create_message_internal(
         &self,
         request_id: String,
         request: CreateMessageRequest,
@@ -517,5 +524,23 @@ impl SamplingHandler for StudioSamplingHandler {
                 Err(error)
             }
         }
+    }
+}
+
+impl SamplingHandler for StudioSamplingHandler {
+    fn handle_create_message(
+        &self,
+        request_id: String,
+        request: CreateMessageRequest,
+    ) -> Pin<
+        Box<
+            dyn Future<
+                    Output = Result<CreateMessageResult, Box<dyn std::error::Error + Send + Sync>>,
+                > + Send
+                + '_,
+        >,
+    > {
+        let this = self.clone();
+        Box::pin(async move { this.handle_create_message_internal(request_id, request).await })
     }
 }

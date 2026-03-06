@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
-use turbomcp_protocol::{Error as McpError, Result as McpResult};
+use turbomcp_protocol::{Error as McpError, ErrorKind, Result as McpResult};
 use uuid::Uuid;
 
 use crate::oauth::callback_server::CallbackServer;
@@ -240,7 +240,7 @@ impl OAuthFlowManager {
 
         // Open browser
         open::that(&auth_url)
-            .map_err(|e| McpError::internal(format!("Failed to open browser: {}", e)))?;
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to open browser: {}", e)))?;
 
         // Start callback listener
         self.start_callback_listener(flow_id.clone()).await?;
@@ -403,14 +403,14 @@ impl OAuthFlowManager {
             .form(&params)
             .send()
             .await
-            .map_err(|e| McpError::internal(format!("Token request failed: {}", e)))?;
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Token request failed: {}", e)))?;
 
         if !response.status().is_success() {
             let error_text = response
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(McpError::internal(format!(
+            return Err(McpError::new(ErrorKind::Internal, format!(
                 "Token exchange failed: {}",
                 error_text
             )));
@@ -444,10 +444,9 @@ impl OAuthFlowManager {
     /// Get current flow status
     pub async fn get_flow_status(&self, flow_id: &str) -> McpResult<OAuthFlow> {
         let flows = self.flows.read();
-        flows
-            .get(flow_id)
-            .cloned()
-            .ok_or_else(|| McpError::not_found(format!("Flow {} not found", flow_id)))
+        flows.get(flow_id).cloned().ok_or_else(|| {
+            McpError::new(ErrorKind::Internal, format!("Flow {} not found", flow_id))
+        })
     }
 
     /// Cancel OAuth flow
@@ -515,7 +514,7 @@ impl OAuthFlowManager {
             .form(&params)
             .send()
             .await
-            .map_err(|e| McpError::internal(format!("Token refresh request failed: {}", e)))?;
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Token refresh request failed: {}", e)))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -534,7 +533,7 @@ impl OAuthFlowManager {
                 }
             }
 
-            return Err(McpError::internal(format!(
+            return Err(McpError::new(ErrorKind::Internal, format!(
                 "Token refresh failed ({}): {}",
                 status, error_text
             )));

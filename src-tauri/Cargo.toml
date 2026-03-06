@@ -9,117 +9,76 @@ edition = "2021"
 name = "turbomcpstudio_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[dependencies]
+tauri = { version = "2.0", features = ["devtools"] }
+tauri-plugin-shell = "2.0"
+tauri-plugin-opener = "2.0"
+tauri-plugin-clipboard-manager = "2.0"
+tauri-plugin-dialog = "2.0"
+tauri-plugin-fs = "2.0"
+tauri-plugin-http = "2.0"
+tauri-plugin-log = "2.0"
+tauri-plugin-os = "2.0"
+tauri-plugin-process = "2.0"
+tauri-plugin-sql = { version = "2.0", features = ["sqlite"] }
+tauri-plugin-window-state = "2.0"
+tauri-plugin-single-instance = "2.0"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+thiserror = "2.0"
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+tokio = { version = "1.0", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+futures = "0.3"
+dashmap = "6.0"
+parking_lot = "0.12"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid", "macros"] }
+reqwest = { version = "0.13", features = ["json"] }
+async-openai = "0.30"
+async-trait = "0.1"
+keyring = "3.0"
+url = { version = "2.5", features = ["serde"] }
+base64 = "0.22"
+jsonwebtoken = "9.3"
+axum = "0.8"
+sysinfo = "0.33"
+regex = "1.10"
+rand = "0.8"
+sha2 = "0.10"
+open = "5.0"
+dirs = "5.0"
+log = "0.4"
+
+# TurboMCP integration - v3.0.0 (Official Release)
+turbomcp-client = "3.0"
+turbomcp-protocol = "3.0"
+turbomcp-types = "3.0"
+turbomcp-auth = { version = "3.0", features = ["oauth2", "jwt", "token-refresh"] }
+turbomcp-dpop = { version = "3.0", optional = true }
+turbomcp-proxy = { version = "3.0", default-features = false, features = ["introspection", "runtime"] }
+turbomcp-transport = { version = "3.0", default-features = false, features = ["stdio", "http", "websocket", "tcp", "unix"] }
+turbomcp-stdio = "3.0"
+turbomcp-http = "3.0"
+turbomcp-websocket = "3.0"
+turbomcp-tcp = "3.0"
+turbomcp-unix = "3.0"
+turbomcp-transport-traits = "3.0"
+
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }
 
-[dependencies]
-# Tauri core
-tauri = { version = "2.0", features = [] }
-tauri-plugin-opener = "2.0"
-tauri-plugin-shell = "2.0"
-tauri-plugin-sql = { version = "2.0", default-features = false, features = ["sqlite"] }
-tauri-plugin-fs = "2.0"
-tauri-plugin-process = "2.0"
-tauri-plugin-dialog = "2.0"
-tauri-plugin-http = "2.0"
-tauri-plugin-clipboard-manager = "2.3"
-
-# Plugin system
-tauri-plugin-single-instance = "2.0"
-tauri-plugin-window-state = "2.0"
-tauri-plugin-os = "2.0"
-
-# HTTP client for LLM API requests (aligned with turbomcp 3.0.0-beta.1)
-reqwest = { version = "0.13", features = ["json"] }
-
-# LLM Provider SDKs
-async-openai = "0.30"  # Official OpenAI SDK for Rust
-
-# TurboMCP integration - v3.0.0-beta.1 (local development - dogfooding)
-# Only include crates that are directly imported - others are pulled transitively
-turbomcp-client = { path = "../../turbomcp/crates/turbomcp-client" }  # Client, handlers, sampling
-turbomcp-protocol = { path = "../../turbomcp/crates/turbomcp-protocol" }  # Types, McpError
-
-# OAuth 2.1 support - v3 auth crate
-turbomcp-auth = { path = "../../turbomcp/crates/turbomcp-auth", features = ["oauth2", "jwt", "token-refresh"] }
-turbomcp-dpop = { path = "../../turbomcp/crates/turbomcp-dpop", optional = true }
-
-# Proxy support - v3 proxy crate for MCP server proxying
-turbomcp-proxy = { path = "../../turbomcp/crates/turbomcp-proxy", default-features = false, features = ["introspection", "runtime"] }
-
-# Async runtime
-tokio = { version = "1.0", features = ["full"] }
-futures = "0.3"
-async-trait = "0.1"
-
-# Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-serde_yaml = "0.9"  # For Docker MCP registry YAML parsing
-
-# Data structures
-uuid = { version = "1", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde"] }
-regex = "1.0"
-url = "2.5"  # URL parsing for HTTP transport
-sha2 = "0.10"  # For schema hashing in test generation
-
-# JWT handling
-jsonwebtoken = "9.3"
-base64 = "0.22"
-
-# Local OAuth redirect server (aligned with turbomcp 3.0.0-beta.1)
-axum = { version = "0.8", features = ["macros"] }
-tower = "0.5"
-tower-http = { version = "0.6", features = ["cors"] }
-
-# Secure random for state/nonce
-rand = "0.8"
-
-# Browser integration for OAuth
-open = "5.0"
-
-# Error handling (aligned with turbomcp 3.0.0-beta.1)
-thiserror = "2.0"
-anyhow = "1.0"
-
-# Database
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
-
-# Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-# Process management
-sysinfo = "0.32"
-
-# File & path utilities
-dirs = "5.0"
-
-# Concurrency
-parking_lot = "0.12"
-dashmap = "6.1"
-
-# Secure storage
-keyring = "2.3"
-tauri-plugin-log = "2.7.0"
-log = "0.4.28"
-
-[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
-# Unix socket support on Linux and macOS - v3 modular transports
-turbomcp-transport = { path = "../../turbomcp/crates/turbomcp-transport", default-features = false, features = ["stdio", "http", "websocket", "tcp", "unix"] }
-
-[target.'cfg(target_os = "windows")'.dependencies]
-# Exclude unix feature on Windows - v3 modular transports
-turbomcp-transport = { path = "../../turbomcp/crates/turbomcp-transport", default-features = false, features = ["stdio", "http", "websocket", "tcp"] }
-
 [features]
-default = ["stdio", "http", "websocket", "tcp", "dpop"]
+default = ["full"]
 stdio = []
 http = []
 websocket = []
 tcp = []
 unix = []
-dpop = ["dep:turbomcp-dpop"]  # Optional DPoP support (RFC 9449)
-full = ["stdio", "http", "websocket", "tcp", "dpop"]  # All features for production
-
+dpop = ["dep:turbomcp-dpop"]
+full = ["stdio", "http", "websocket", "tcp", "dpop"]

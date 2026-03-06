@@ -23,7 +23,7 @@ use std::collections::HashMap;
 #[cfg(feature = "dpop")]
 use std::sync::Arc;
 #[cfg(feature = "dpop")]
-use turbomcp_protocol::{Error as McpError, Result as McpResult};
+use turbomcp_protocol::{Error as McpError, ErrorKind, Result as McpResult};
 
 /// DPoP key pair for a server
 #[cfg(feature = "dpop")]
@@ -106,7 +106,10 @@ impl DPoPManager {
     ) -> McpResult<String> {
         let key_pairs = self.key_pairs.read();
         let _key_pair = key_pairs.get(&server_id).ok_or_else(|| {
-            McpError::not_found(format!("No DPoP key pair found for server {}", server_id))
+            McpError::new(
+                ErrorKind::Internal,
+                format!("No DPoP key pair found for server {}", server_id),
+            )
         })?;
 
         // In a real implementation, this would:
@@ -133,7 +136,10 @@ impl DPoPManager {
     pub async fn get_thumbprint(&self, server_id: i64) -> McpResult<String> {
         let key_pairs = self.key_pairs.read();
         let key_pair = key_pairs.get(&server_id).ok_or_else(|| {
-            McpError::not_found(format!("No DPoP key pair found for server {}", server_id))
+            McpError::new(
+                ErrorKind::Internal,
+                format!("No DPoP key pair found for server {}", server_id),
+            )
         })?;
 
         Ok(key_pair.thumbprint.clone())

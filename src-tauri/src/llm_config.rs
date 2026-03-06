@@ -1,6 +1,6 @@
 use crate::error::McpStudioError;
 use crate::llm_providers::{
-    AnthropicLLMClient, GeminiLLMClient, OpenAICompatibleClient, OpenAILLMClient,
+    AnthropicClient, GeminiClient, OpenAICompatibleClient, OpenAIClient,
 };
 use crate::types::{
     LLMConfiguration, LLMProviderStatus, ProviderUsageStats, SetAPIKeyRequest,
@@ -204,7 +204,7 @@ impl LLMConfigManager {
         let entry = Entry::new(&self.keyring_service, &key_id)
             .map_err(|e| McpStudioError::ConfigError(format!("Keyring error: {}", e)))?;
 
-        if let Err(e) = entry.delete_password() {
+        if let Err(e) = entry.delete_credential() {
             warn!("Failed to delete API key for {}: {}", provider_id, e);
         }
 
@@ -395,7 +395,7 @@ impl LLMConfigManager {
         );
 
         // Get base URL for local provider
-        let base_url = provider_config.base_url.as_ref().ok_or_else(|| {
+        let _base_url = provider_config.base_url.as_ref().ok_or_else(|| {
             McpStudioError::ConfigError(format!(
                 "Local provider {} requires base_url configuration",
                 provider_id
@@ -405,37 +405,17 @@ impl LLMConfigManager {
         // Create the appropriate OpenAI-compatible client
         let llm_client: Arc<dyn LLMServerClient> = match provider_id {
             "ollama" => {
-                debug!("Creating Ollama client at {}", base_url);
-                Arc::new(
-                    OpenAICompatibleClient::new_ollama(
-                        base_url.clone(),
-                        provider_config.default_model.clone(),
-                        provider_config.timeout_seconds,
-                    )
-                    .map_err(|e| {
-                        McpStudioError::ConfigError(format!(
-                            "Failed to create Ollama client: {}",
-                            e
-                        ))
-                    })?,
-                )
+                debug!("Creating Ollama client");
+                Arc::new(OpenAICompatibleClient::new_ollama(
+                    provider_config.default_model.clone(),
+                ))
             }
 
             "lmstudio" => {
-                debug!("Creating LMStudio client at {}", base_url);
-                Arc::new(
-                    OpenAICompatibleClient::new_lmstudio(
-                        base_url.clone(),
-                        provider_config.default_model.clone(),
-                        provider_config.timeout_seconds,
-                    )
-                    .map_err(|e| {
-                        McpStudioError::ConfigError(format!(
-                            "Failed to create LMStudio client: {}",
-                            e
-                        ))
-                    })?,
-                )
+                debug!("Creating LMStudio client");
+                Arc::new(OpenAICompatibleClient::new_lmstudio(
+                    provider_config.default_model.clone(),
+                ))
             }
 
             // Other local providers can be added here
@@ -479,47 +459,22 @@ impl LLMConfigManager {
             // OpenAI and OpenAI variants (nano, etc.)
             id if id.starts_with("openai") => {
                 debug!("Creating OpenAI client for provider: {}", id);
-                Arc::new(OpenAILLMClient::new(
+                Arc::new(OpenAIClient::new(
                     api_key.to_string(),
-                    provider_config.default_model.clone(),
-                    provider_config.base_url.clone(),
+                    Some(provider_config.default_model.clone()),
                 ))
             }
 
             // Anthropic Claude providers
             id if id.starts_with("claude-") => {
                 debug!("Creating Anthropic client for provider: {}", id);
-                Arc::new(
-                    AnthropicLLMClient::new(
-                        api_key.to_string(),
-                        provider_config.default_model.clone(),
-                        provider_config.timeout_seconds,
-                    )
-                    .map_err(|e| {
-                        McpStudioError::ConfigError(format!(
-                            "Failed to create Anthropic client: {}",
-                            e
-                        ))
-                    })?,
-                )
+                Arc::new(AnthropicClient::new(api_key.to_string()))
             }
 
             // Google Gemini
             "gemini" => {
                 debug!("Creating Gemini client for provider: {}", provider_id);
-                Arc::new(
-                    GeminiLLMClient::new(
-                        api_key.to_string(),
-                        provider_config.default_model.clone(),
-                        provider_config.timeout_seconds,
-                    )
-                    .map_err(|e| {
-                        McpStudioError::ConfigError(format!(
-                            "Failed to create Gemini client: {}",
-                            e
-                        ))
-                    })?,
-                )
+                Arc::new(GeminiClient::new(api_key.to_string()))
             }
 
             // Unknown provider
@@ -730,22 +685,18 @@ impl LLMConfigManager {
         provider_id: &str,
         provider_config: &crate::types::LLMProviderConfig,
     ) -> Result<Arc<dyn LLMServerClient>, Box<dyn std::error::Error + Send + Sync>> {
-        let base_url = provider_config
+        let _base_url = provider_config
             .base_url
             .as_ref()
             .ok_or_else(|| format!("Local provider {} requires base_url", provider_id))?;
 
         let client: Arc<dyn LLMServerClient> = match provider_id {
             "ollama" => Arc::new(OpenAICompatibleClient::new_ollama(
-                base_url.clone(),
                 provider_config.default_model.clone(),
-                provider_config.timeout_seconds,
-            )?),
+            )),
             "lmstudio" => Arc::new(OpenAICompatibleClient::new_lmstudio(
-                base_url.clone(),
                 provider_config.default_model.clone(),
-                provider_config.timeout_seconds,
-            )?),
+            )),
             _ => {
                 return Err(format!("Unknown local provider: {}", provider_id).into());
             }
@@ -762,21 +713,14 @@ impl LLMConfigManager {
         api_key: &str,
     ) -> Result<Arc<dyn LLMServerClient>, Box<dyn std::error::Error + Send + Sync>> {
         let client: Arc<dyn LLMServerClient> = match provider_id {
-            id if id.starts_with("openai") => Arc::new(OpenAILLMClient::new(
+            id if id.starts_with("openai") => Arc::new(OpenAIClient::new(
                 api_key.to_string(),
-                provider_config.default_model.clone(),
-                provider_config.base_url.clone(),
+                Some(provider_config.default_model.clone()),
             )),
-            id if id.starts_with("claude-") => Arc::new(AnthropicLLMClient::new(
-                api_key.to_string(),
-                provider_config.default_model.clone(),
-                provider_config.timeout_seconds,
-            )?),
-            "gemini" => Arc::new(GeminiLLMClient::new(
-                api_key.to_string(),
-                provider_config.default_model.clone(),
-                provider_config.timeout_seconds,
-            )?),
+            id if id.starts_with("claude-") => {
+                Arc::new(AnthropicClient::new(api_key.to_string()))
+            }
+            "gemini" => Arc::new(GeminiClient::new(api_key.to_string())),
             _ => {
                 return Err(format!("Unknown cloud provider: {}", provider_id).into());
             }

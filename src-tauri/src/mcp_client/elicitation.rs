@@ -5,6 +5,8 @@ use crate::mcp_client::{ServerContext, CURRENT_SERVER_CONTEXT};
 use crate::types::{MessageDirection, MessageHistory};
 use chrono::Utc;
 use dashmap::DashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::Emitter;
@@ -33,22 +35,23 @@ impl ContextAwareElicitationHandler {
     }
 }
 
-#[async_trait::async_trait]
 impl ElicitationHandler for ContextAwareElicitationHandler {
-    async fn handle_elicitation(
+    fn handle_elicitation(
         &self,
         request: ElicitationRequest,
-    ) -> HandlerResult<ElicitationResponse> {
+    ) -> Pin<Box<dyn Future<Output = HandlerResult<ElicitationResponse>> + Send + '_>> {
         // Set the server context in task-local storage before delegating
         let context = self.context.clone();
         let inner = self.inner.clone();
 
-        CURRENT_SERVER_CONTEXT
-            .scope(
-                context,
-                async move { inner.handle_elicitation(request).await },
-            )
-            .await
+        Box::pin(async move {
+            CURRENT_SERVER_CONTEXT
+                .scope(
+                    context,
+                    async move { inner.handle_elicitation_internal(request).await },
+                )
+                .await
+        })
     }
 }
 
@@ -106,11 +109,9 @@ impl StudioElicitationHandler {
             Err(format!("No pending channel for request: {}", request_id))
         }
     }
-}
 
-#[async_trait::async_trait]
-impl ElicitationHandler for StudioElicitationHandler {
-    async fn handle_elicitation(
+    /// Internal implementation of elicitation handling
+    async fn handle_elicitation_internal(
         &self,
         request: ElicitationRequest,
     ) -> HandlerResult<ElicitationResponse> {
@@ -261,5 +262,15 @@ impl ElicitationHandler for StudioElicitationHandler {
         }
 
         Ok(response)
+    }
+}
+
+impl ElicitationHandler for StudioElicitationHandler {
+    fn handle_elicitation(
+        &self,
+        request: ElicitationRequest,
+    ) -> Pin<Box<dyn Future<Output = HandlerResult<ElicitationResponse>> + Send + '_>> {
+        let this = self.clone();
+        Box::pin(async move { this.handle_elicitation_internal(request).await })
     }
 }

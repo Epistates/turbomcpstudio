@@ -1,170 +1,146 @@
-use async_openai::config::OpenAIConfig;
-use async_openai::types::CreateChatCompletionRequestArgs;
-use async_openai::Client as OpenAISDKClient;
-use async_trait::async_trait;
-use std::sync::Arc;
-use tracing::{debug, error, info, warn};
+use async_openai::{
+    config::OpenAIConfig,
+    types::{
+        ChatCompletionRequestAssistantMessageArgs, ChatCompletionRequestMessage,
+        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
+        CreateChatCompletionRequestArgs,
+    },
+    Client as OpenAIClientSDK,
+};
+use std::future::Future;
+use std::pin::Pin;
 use turbomcp_client::sampling::{LLMServerClient, ServerInfo};
-use turbomcp_protocol::types::{CreateMessageRequest, CreateMessageResult};
+use turbomcp_protocol::types::{
+    CreateMessageRequest, CreateMessageResult, Role, TextContent
+};
 
-use super::shared::{LLMProviderError, MessageConverter};
-use super::stop_reason_mapping::{map_stop_reason, LLMProvider};
+/// Boxed future type alias for sampling operations (inlined from turbomcp-client v3 private type)
+type BoxSamplingFuture<'a, T> =
+    Pin<Box<dyn Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send + 'a>>;
 
-/// OpenAI LLM client using official async-openai SDK
-#[derive(Debug, Clone)]
-pub struct OpenAILLMClient {
-    client: Arc<OpenAISDKClient<OpenAIConfig>>,
-    default_model: String,
+#[derive(Clone, Debug)]
+pub struct OpenAIClient {
+    sdk: OpenAIClientSDK<OpenAIConfig>,
+    model: String,
 }
 
-impl OpenAILLMClient {
-    /// Create new OpenAI client with API key
-    pub fn new(api_key: String, default_model: String, base_url: Option<String>) -> Self {
-        info!("Creating OpenAI client with model: {}", default_model);
-
-        let mut config = OpenAIConfig::new().with_api_key(api_key);
-
-        // Support custom base URLs (for Azure OpenAI, etc.)
-        if let Some(url) = base_url {
-            info!("Using custom OpenAI base URL: {}", url);
-            config = config.with_api_base(url);
-        }
-
-        Self {
-            client: Arc::new(OpenAISDKClient::with_config(config)),
-            default_model,
-        }
+impl OpenAIClient {
+    pub fn new(api_key: String, model: Option<String>) -> Self {
+        let config = OpenAIConfig::new().with_api_key(api_key);
+        let sdk = OpenAIClientSDK::with_config(config);
+        let model = model.unwrap_or_else(|| "gpt-4o".to_string());
+        Self { sdk, model }
     }
 }
 
-#[async_trait]
-impl LLMServerClient for OpenAILLMClient {
-    async fn create_message(
+impl LLMServerClient for OpenAIClient {
+    fn create_message(
         &self,
         request: CreateMessageRequest,
-    ) -> Result<CreateMessageResult, Box<dyn std::error::Error + Send + Sync>> {
-        debug!(
-            "OpenAI create_message called with {} messages",
-            request.messages.len()
-        );
+    ) -> BoxSamplingFuture<'_, CreateMessageResult> {
+        let sdk = self.sdk.clone();
+        let model = self.model.clone();
 
-        // Convert MCP messages to OpenAI format
-        let messages = MessageConverter::to_openai_messages(&request.messages);
+        Box::pin(async move {
+            let mut messages: Vec<ChatCompletionRequestMessage> = Vec::new();
 
-        // Extract model name from MCP 2025-06-18 model preferences structure
-        let model = request
-            .model_preferences
-            .as_ref()
-            .and_then(|prefs| prefs.hints.as_ref())
-            .and_then(|hints| hints.first())
-            .and_then(|hint| hint.name.as_ref())
-            .cloned()
-            .unwrap_or_else(|| self.default_model.clone());
-
-        debug!("Using OpenAI model: {}", model);
-
-        // Build request
-        let mut request_builder = CreateChatCompletionRequestArgs::default();
-        request_builder
-            .model(&model)
-            .messages(messages)
-            .max_tokens(request.max_tokens); // MCP 2025-06-18: Always required
-
-        if let Some(temperature) = request.temperature {
-            // OpenAI SDK expects f32, MCP uses f64
-            request_builder.temperature(temperature as f32);
-        }
-
-        if let Some(stop_sequences) = request.stop_sequences {
-            if !stop_sequences.is_empty() {
-                request_builder.stop(stop_sequences);
+            // Add system prompt if provided
+            if let Some(system_prompt) = request.system_prompt {
+                messages.push(
+                    ChatCompletionRequestSystemMessageArgs::default()
+                        .content(system_prompt)
+                        .build()?
+                        .into(),
+                );
             }
-        }
 
-        let chat_request = request_builder
-            .build()
-            .map_err(|e| LLMProviderError::ConfigError(e.to_string()))?;
+            // Convert MCP messages to OpenAI messages
+            for msg in request.messages {
+                // Using JSON fallback to avoid complex type mismatch issues with SamplingContentBlock
+                let msg_json = serde_json::to_value(&msg)?;
+                let content = &msg_json["content"];
+                
+                let text = if content.is_string() {
+                    content.as_str().unwrap_or("").to_string()
+                } else if content.is_object() && content["type"] == "text" {
+                    content["text"].as_str().unwrap_or("").to_string()
+                } else if content.is_array() {
+                    let mut full_text = String::new();
+                    if let Some(blocks) = content.as_array() {
+                        for block in blocks {
+                            if block["type"] == "text" {
+                                full_text.push_str(block["text"].as_str().unwrap_or(""));
+                            }
+                        }
+                    }
+                    full_text
+                } else {
+                    return Err("Unsupported content type".into());
+                };
 
-        // Call OpenAI API
-        debug!("Sending request to OpenAI API...");
-        let response = self.client.chat().create(chat_request).await.map_err(|e| {
-            error!("OpenAI API error: {}", e);
-            LLMProviderError::ApiError(e.to_string())
-        })?;
+                let openai_msg: ChatCompletionRequestMessage = match msg.role {
+                    Role::User => {
+                        ChatCompletionRequestUserMessageArgs::default()
+                            .content(text)
+                            .build()?
+                            .into()
+                    }
+                    Role::Assistant => {
+                        ChatCompletionRequestAssistantMessageArgs::default()
+                            .content(text)
+                            .build()?
+                            .into()
+                    }
+                };
+                messages.push(openai_msg);
+            }
 
-        debug!("Received response from OpenAI API");
+            let response = sdk
+                .chat()
+                .create(
+                    CreateChatCompletionRequestArgs::default()
+                        .model(model)
+                        .messages(messages)
+                        .max_tokens(request.max_tokens as u32)
+                        .temperature(request.temperature.unwrap_or(0.7) as f32)
+                        .build()?,
+                )
+                .await?;
 
-        // Extract first choice
-        let choice = response.choices.first().ok_or_else(|| {
-            error!("OpenAI response contained no choices");
-            LLMProviderError::InvalidResponse("No choices in response".to_string())
-        })?;
+            let choice = response
+                .choices
+                .first()
+                .ok_or_else(|| "No completion choices returned")?;
 
-        // Extract message content
-        let content = choice
-            .message
-            .content
-            .as_ref()
-            .ok_or_else(|| {
-                error!("OpenAI choice message has no content");
-                LLMProviderError::InvalidResponse("No content in message".to_string())
-            })?
-            .clone();
+            let content = choice
+                .message
+                .content
+                .clone()
+                .unwrap_or_else(|| "".to_string());
 
-        // Map OpenAI finish_reason to MCP StopReason enum
-        let stop_reason = if let Some(finish_reason) = &choice.finish_reason {
-            // Convert finish_reason to string for mapping
-            let reason_str = format!("{:?}", finish_reason);
-            debug!("OpenAI finish_reason: {}", reason_str);
-            map_stop_reason(LLMProvider::OpenAI, &reason_str.to_lowercase())
-        } else {
-            warn!("No finish_reason in OpenAI response, defaulting to EndTurn");
-            turbomcp_protocol::types::StopReason::EndTurn
-        };
+            // Convert to JSON and back to CreateMessageResult to bypass strict type construction
+            let result_json = serde_json::json!({
+                "role": "assistant",
+                "content": {
+                    "type": "text",
+                    "text": content
+                },
+                "model": response.model,
+                "stopReason": choice.finish_reason.as_ref().map(|r| format!("{:?}", r))
+            });
 
-        info!(
-            "OpenAI request completed - model: {}, stop_reason: {:?}",
-            response.model, stop_reason
-        );
-
-        // Create MCP result
-        Ok(MessageConverter::create_text_result(
-            content,
-            response.model,
-            stop_reason,
-        ))
+            let result: CreateMessageResult = serde_json::from_value(result_json)?;
+            Ok(result)
+        })
     }
 
-    async fn get_server_info(
-        &self,
-    ) -> Result<ServerInfo, Box<dyn std::error::Error + Send + Sync>> {
-        // Model list updated January 2026 - GPT-5.2 is latest flagship
-        Ok(ServerInfo {
-            name: "OpenAI".to_string(),
-            models: vec![
-                // GPT-5.2 family (December 2025 - latest)
-                "gpt-5.2".to_string(),           // Flagship: 90% ARC-AGI, 400K context, 128K output
-                "gpt-5.2-codex".to_string(),     // Agentic coding model
-                // GPT-5.1 family
-                "gpt-5.1".to_string(),
-                "gpt-5.1-codex-max".to_string(), // Frontier agentic coding
-                // GPT-5 base
-                "gpt-5".to_string(),
-                // GPT-4o family (still supported)
-                "gpt-4o".to_string(),
-                "gpt-4o-mini".to_string(),
-                // Open-weight reasoning models
-                "gpt-oss-120b".to_string(),
-                "gpt-oss-20b".to_string(),
-            ],
-            capabilities: vec![
-                "structured_outputs".to_string(),
-                "function_calling".to_string(),
-                "vision".to_string(),
-                "audio".to_string(),
-                "reasoning".to_string(),         // GPT-5.2 adaptive thinking
-                "400k_context".to_string(),      // GPT-5.2 context window
-            ],
+    fn get_server_info(&self) -> BoxSamplingFuture<'_, ServerInfo> {
+        Box::pin(async move {
+            Ok(ServerInfo {
+                name: "OpenAI".to_string(),
+                models: vec!["gpt-4o".to_string(), "gpt-4o-mini".to_string()],
+                capabilities: vec![],
+            })
         })
     }
 }
