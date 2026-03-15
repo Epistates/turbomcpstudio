@@ -14,6 +14,11 @@ use crate::error::{McpResult, McpStudioError};
 use crate::interceptor::{Direction, InterceptedTransport, InterceptedMessage};
 use crate::mcp_client::connection::ManagedConnection;
 use crate::mcp_client::elicitation::StudioElicitationHandler;
+use crate::mcp_client::notification_handlers::{
+    StudioLogHandler, StudioProgressHandler, StudioPromptListChangedHandler,
+    StudioResourceListChangedHandler, StudioResourceUpdateHandler,
+    StudioToolListChangedHandler,
+};
 use crate::mcp_client::sampling::StudioSamplingHandler;
 use crate::mcp_client::transport_client::McpTransportClient;
 use crate::types::{ConnectionStatus, TransportConfig};
@@ -158,6 +163,12 @@ impl TransportLayer {
         connection: Arc<ManagedConnection>,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
+        log_handler: Arc<StudioLogHandler>,
+        resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        progress_handler: Arc<StudioProgressHandler>,
+        tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<()> {
         tracing::info!(
             "Establishing MCP connection to: {} (transport: {:?})",
@@ -179,6 +190,12 @@ impl TransportLayer {
                     working_directory.as_deref(),
                     sampling_handler,
                     elicitation_handler,
+                    log_handler,
+                    resource_update_handler,
+                    progress_handler,
+                    tool_list_changed_handler,
+                    prompt_list_changed_handler,
+                    resource_list_changed_handler,
                 )
                 .await
             }
@@ -191,6 +208,12 @@ impl TransportLayer {
                     headers,
                     sampling_handler,
                     elicitation_handler,
+                    log_handler,
+                    resource_update_handler,
+                    progress_handler,
+                    tool_list_changed_handler,
+                    prompt_list_changed_handler,
+                    resource_list_changed_handler,
                 )
                 .await
             }
@@ -203,6 +226,12 @@ impl TransportLayer {
                     headers,
                     sampling_handler,
                     elicitation_handler,
+                    log_handler,
+                    resource_update_handler,
+                    progress_handler,
+                    tool_list_changed_handler,
+                    prompt_list_changed_handler,
+                    resource_list_changed_handler,
                 )
                 .await
             }
@@ -215,6 +244,12 @@ impl TransportLayer {
                     *port,
                     sampling_handler,
                     elicitation_handler,
+                    log_handler,
+                    resource_update_handler,
+                    progress_handler,
+                    tool_list_changed_handler,
+                    prompt_list_changed_handler,
+                    resource_list_changed_handler,
                 )
                 .await
             }
@@ -226,6 +261,12 @@ impl TransportLayer {
                     path,
                     sampling_handler,
                     elicitation_handler,
+                    log_handler,
+                    resource_update_handler,
+                    progress_handler,
+                    tool_list_changed_handler,
+                    prompt_list_changed_handler,
+                    resource_list_changed_handler,
                 )
                 .await
             }
@@ -258,6 +299,12 @@ impl TransportLayer {
         working_directory: Option<&str>,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
+        log_handler: Arc<StudioLogHandler>,
+        resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        progress_handler: Arc<StudioProgressHandler>,
+        tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<()> {
         tracing::info!("Connecting to STDIO MCP server using TurboMCP ChildProcessTransport:");
         tracing::info!("  Command: {} {:?}", command, args);
@@ -279,6 +326,12 @@ impl TransportLayer {
             working_directory,
             sampling_handler,
             elicitation_handler,
+            log_handler,
+            resource_update_handler,
+            progress_handler,
+            tool_list_changed_handler,
+            prompt_list_changed_handler,
+            resource_list_changed_handler,
         )
         .await
         {
@@ -305,9 +358,20 @@ impl TransportLayer {
         _headers: &std::collections::HashMap<String, String>,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
+        log_handler: Arc<StudioLogHandler>,
+        resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        progress_handler: Arc<StudioProgressHandler>,
+        tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<()> {
         // Initialize TurboMCP HTTP/SSE transport and client (DOGFOODING)
-        match Self::initialize_http_client(&connection, url, sampling_handler, elicitation_handler)
+        match Self::initialize_http_client(
+            &connection, url, sampling_handler, elicitation_handler,
+            log_handler, resource_update_handler,
+            progress_handler, tool_list_changed_handler,
+            prompt_list_changed_handler, resource_list_changed_handler,
+        )
             .await
         {
             Ok(client) => {
@@ -340,6 +404,12 @@ impl TransportLayer {
         headers: &std::collections::HashMap<String, String>,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
+        log_handler: Arc<StudioLogHandler>,
+        resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        progress_handler: Arc<StudioProgressHandler>,
+        tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<()> {
         tracing::info!("Establishing TurboMCP WebSocket connection to: {}", url);
 
@@ -350,6 +420,12 @@ impl TransportLayer {
             headers,
             sampling_handler,
             elicitation_handler,
+            log_handler,
+            resource_update_handler,
+            progress_handler,
+            tool_list_changed_handler,
+            prompt_list_changed_handler,
+            resource_list_changed_handler,
         )
         .await
         {
@@ -381,6 +457,12 @@ impl TransportLayer {
         _headers: &std::collections::HashMap<String, String>,
         _sampling_handler: Arc<StudioSamplingHandler>,
         _elicitation_handler: Arc<StudioElicitationHandler>,
+        _log_handler: Arc<StudioLogHandler>,
+        _resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        _progress_handler: Arc<StudioProgressHandler>,
+        _tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        _prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        _resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<()> {
         tracing::error!("WebSocket transport not compiled - enable 'websocket' feature");
         Err(McpStudioError::UnsupportedTransport(
@@ -396,6 +478,12 @@ impl TransportLayer {
         port: u16,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
+        log_handler: Arc<StudioLogHandler>,
+        resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        progress_handler: Arc<StudioProgressHandler>,
+        tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<()> {
         tracing::info!("Establishing TurboMCP TCP connection to: {}:{}", host, port);
 
@@ -406,6 +494,12 @@ impl TransportLayer {
             port,
             sampling_handler,
             elicitation_handler,
+            log_handler,
+            resource_update_handler,
+            progress_handler,
+            tool_list_changed_handler,
+            prompt_list_changed_handler,
+            resource_list_changed_handler,
         )
         .await
         {
@@ -439,6 +533,12 @@ impl TransportLayer {
         _port: u16,
         _sampling_handler: Arc<StudioSamplingHandler>,
         _elicitation_handler: Arc<StudioElicitationHandler>,
+        _log_handler: Arc<StudioLogHandler>,
+        _resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        _progress_handler: Arc<StudioProgressHandler>,
+        _tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        _prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        _resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<()> {
         tracing::error!("TCP transport not compiled - enable 'tcp' feature");
         Err(McpStudioError::UnsupportedTransport(
@@ -453,11 +553,22 @@ impl TransportLayer {
         path: &str,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
+        log_handler: Arc<StudioLogHandler>,
+        resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        progress_handler: Arc<StudioProgressHandler>,
+        tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<()> {
         tracing::info!("Establishing TurboMCP Unix socket connection to: {}", path);
 
         // Initialize Unix socket transport and client
-        match Self::initialize_unix_client(&connection, path, sampling_handler, elicitation_handler)
+        match Self::initialize_unix_client(
+            &connection, path, sampling_handler, elicitation_handler,
+            log_handler, resource_update_handler,
+            progress_handler, tool_list_changed_handler,
+            prompt_list_changed_handler, resource_list_changed_handler,
+        )
             .await
         {
             Ok(client) => {
@@ -490,6 +601,12 @@ impl TransportLayer {
         _path: &str,
         _sampling_handler: Arc<StudioSamplingHandler>,
         _elicitation_handler: Arc<StudioElicitationHandler>,
+        _log_handler: Arc<StudioLogHandler>,
+        _resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        _progress_handler: Arc<StudioProgressHandler>,
+        _tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        _prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        _resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<()> {
         tracing::error!("Unix socket transport not available on this platform");
         Err(McpStudioError::UnsupportedTransport(
@@ -505,6 +622,12 @@ impl TransportLayer {
         working_directory: Option<&str>,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
+        log_handler: Arc<StudioLogHandler>,
+        resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        progress_handler: Arc<StudioProgressHandler>,
+        tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<McpTransportClient> {
         tracing::info!("Creating world-class TurboMCP ChildProcessTransport client...");
 
@@ -608,6 +731,12 @@ impl TransportLayer {
             "ChildProcess",
             sampling_handler,
             elicitation_handler,
+            log_handler,
+            resource_update_handler,
+            progress_handler,
+            tool_list_changed_handler,
+            prompt_list_changed_handler,
+            resource_list_changed_handler,
         );
 
         Ok(McpTransportClient::InterceptedChildProcess(client))
@@ -620,6 +749,12 @@ impl TransportLayer {
         url: &str,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
+        log_handler: Arc<StudioLogHandler>,
+        resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        progress_handler: Arc<StudioProgressHandler>,
+        tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<Client<InterceptedTransport<StreamableHttpClientTransport>>> {
         tracing::info!(
             "🔗 Initializing TurboMCP Streamable HTTP client for URL: {}",
@@ -705,6 +840,12 @@ impl TransportLayer {
             "HTTP/SSE",
             sampling_handler,
             elicitation_handler,
+            log_handler,
+            resource_update_handler,
+            progress_handler,
+            tool_list_changed_handler,
+            prompt_list_changed_handler,
+            resource_list_changed_handler,
         )
         .await
     }
@@ -717,6 +858,12 @@ impl TransportLayer {
         _headers: &std::collections::HashMap<String, String>,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
+        log_handler: Arc<StudioLogHandler>,
+        resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        progress_handler: Arc<StudioProgressHandler>,
+        tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<Client<InterceptedTransport<WebSocketBidirectionalTransport>>> {
         tracing::info!(
             "🔗 Initializing TurboMCP WebSocket bidirectional transport for URL: {}",
@@ -791,6 +938,12 @@ impl TransportLayer {
             "WebSocket Bidirectional",
             sampling_handler,
             elicitation_handler,
+            log_handler,
+            resource_update_handler,
+            progress_handler,
+            tool_list_changed_handler,
+            prompt_list_changed_handler,
+            resource_list_changed_handler,
         )
         .await
     }
@@ -803,6 +956,12 @@ impl TransportLayer {
         port: u16,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
+        log_handler: Arc<StudioLogHandler>,
+        resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        progress_handler: Arc<StudioProgressHandler>,
+        tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<Client<InterceptedTransport<TcpTransport>>> {
         tracing::info!("Establishing TurboMCP TCP connection to: {}:{}", host, port);
 
@@ -838,6 +997,12 @@ impl TransportLayer {
             "TCP",
             sampling_handler,
             elicitation_handler,
+            log_handler,
+            resource_update_handler,
+            progress_handler,
+            tool_list_changed_handler,
+            prompt_list_changed_handler,
+            resource_list_changed_handler,
         )
         .await
     }
@@ -849,6 +1014,12 @@ impl TransportLayer {
         path: &str,
         sampling_handler: Arc<StudioSamplingHandler>,
         elicitation_handler: Arc<StudioElicitationHandler>,
+        log_handler: Arc<StudioLogHandler>,
+        resource_update_handler: Arc<StudioResourceUpdateHandler>,
+        progress_handler: Arc<StudioProgressHandler>,
+        tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+        prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+        resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
     ) -> McpResult<Client<InterceptedTransport<UnixTransport>>> {
         tracing::info!("Establishing TurboMCP Unix socket connection to: {}", path);
 
@@ -879,6 +1050,12 @@ impl TransportLayer {
             "Unix",
             sampling_handler,
             elicitation_handler,
+            log_handler,
+            resource_update_handler,
+            progress_handler,
+            tool_list_changed_handler,
+            prompt_list_changed_handler,
+            resource_list_changed_handler,
         )
         .await
     }

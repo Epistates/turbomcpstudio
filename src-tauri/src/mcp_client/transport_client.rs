@@ -4,7 +4,10 @@
 //! transport types (STDIO, HTTP, WebSocket, TCP, Unix sockets, etc.)
 
 use std::collections::HashMap;
-use turbomcp_client::handlers::{ElicitationHandler, LogHandler, ResourceUpdateHandler};
+use turbomcp_client::handlers::{
+    ElicitationHandler, LogHandler, ProgressHandler, PromptListChangedHandler,
+    ResourceListChangedHandler, ResourceUpdateHandler, ToolListChangedHandler,
+};
 use turbomcp_client::Client;
 use turbomcp_protocol::types::{Prompt, PromptInput, Tool, ToolInputSchema, CallToolResult, GetPromptResult, ReadResourceResult};
 use turbomcp_protocol::{McpError, ErrorKind}; // v3.0: Unified error type
@@ -719,6 +722,198 @@ impl McpTransportClient {
             McpTransportClient::Unix(client) => client.has_resource_update_handler(),
             #[cfg(unix)]
             McpTransportClient::InterceptedUnix(client) => client.has_resource_update_handler(),
+        }
+    }
+
+    /// Subscribe to resource updates (transport-agnostic)
+    pub async fn subscribe(&self, uri: &str) -> Result<(), McpError> {
+        match self {
+            McpTransportClient::Stdio(client) => { client.subscribe(uri).await?; Ok(()) }
+            McpTransportClient::ChildProcess(client) => { client.subscribe(uri).await?; Ok(()) }
+            McpTransportClient::InterceptedChildProcess(client) => { client.subscribe(uri).await?; Ok(()) }
+
+            #[cfg(feature = "http")]
+            McpTransportClient::Http(client) => { client.subscribe(uri).await.map_err(|e| Self::http_error(ErrorKind::Transport, format!("HTTP subscribe failed: {}", e)))?; Ok(()) }
+            #[cfg(feature = "http")]
+            McpTransportClient::InterceptedHttp(client) => { client.subscribe(uri).await.map_err(|e| Self::http_error(ErrorKind::Transport, format!("HTTP subscribe failed: {}", e)))?; Ok(()) }
+
+            #[cfg(feature = "websocket")]
+            McpTransportClient::WebSocket(client) => { client.subscribe(uri).await?; Ok(()) }
+            #[cfg(feature = "websocket")]
+            McpTransportClient::InterceptedWebSocket(client) => { client.subscribe(uri).await?; Ok(()) }
+
+            #[cfg(feature = "tcp")]
+            McpTransportClient::Tcp(client) => { client.subscribe(uri).await?; Ok(()) }
+            #[cfg(feature = "tcp")]
+            McpTransportClient::InterceptedTcp(client) => { client.subscribe(uri).await?; Ok(()) }
+
+            #[cfg(unix)]
+            McpTransportClient::Unix(client) => { client.subscribe(uri).await?; Ok(()) }
+            #[cfg(unix)]
+            McpTransportClient::InterceptedUnix(client) => { client.subscribe(uri).await?; Ok(()) }
+        }
+    }
+
+    /// Unsubscribe from resource updates (transport-agnostic)
+    pub async fn unsubscribe(&self, uri: &str) -> Result<(), McpError> {
+        match self {
+            McpTransportClient::Stdio(client) => { client.unsubscribe(uri).await?; Ok(()) }
+            McpTransportClient::ChildProcess(client) => { client.unsubscribe(uri).await?; Ok(()) }
+            McpTransportClient::InterceptedChildProcess(client) => { client.unsubscribe(uri).await?; Ok(()) }
+
+            #[cfg(feature = "http")]
+            McpTransportClient::Http(client) => { client.unsubscribe(uri).await.map_err(|e| Self::http_error(ErrorKind::Transport, format!("HTTP unsubscribe failed: {}", e)))?; Ok(()) }
+            #[cfg(feature = "http")]
+            McpTransportClient::InterceptedHttp(client) => { client.unsubscribe(uri).await.map_err(|e| Self::http_error(ErrorKind::Transport, format!("HTTP unsubscribe failed: {}", e)))?; Ok(()) }
+
+            #[cfg(feature = "websocket")]
+            McpTransportClient::WebSocket(client) => { client.unsubscribe(uri).await?; Ok(()) }
+            #[cfg(feature = "websocket")]
+            McpTransportClient::InterceptedWebSocket(client) => { client.unsubscribe(uri).await?; Ok(()) }
+
+            #[cfg(feature = "tcp")]
+            McpTransportClient::Tcp(client) => { client.unsubscribe(uri).await?; Ok(()) }
+            #[cfg(feature = "tcp")]
+            McpTransportClient::InterceptedTcp(client) => { client.unsubscribe(uri).await?; Ok(()) }
+
+            #[cfg(unix)]
+            McpTransportClient::Unix(client) => { client.unsubscribe(uri).await?; Ok(()) }
+            #[cfg(unix)]
+            McpTransportClient::InterceptedUnix(client) => { client.unsubscribe(uri).await?; Ok(()) }
+        }
+    }
+
+    /// Register a progress handler for progress notifications
+    #[allow(dead_code)]
+    pub fn register_progress_handler(&self, handler: std::sync::Arc<dyn ProgressHandler>) {
+        match self {
+            McpTransportClient::Stdio(client) => client.set_progress_handler(handler),
+            McpTransportClient::ChildProcess(client) => client.set_progress_handler(handler),
+            McpTransportClient::InterceptedChildProcess(client) => client.set_progress_handler(handler),
+
+            #[cfg(feature = "http")]
+            McpTransportClient::Http(client) => client.set_progress_handler(handler),
+            #[cfg(feature = "http")]
+            McpTransportClient::InterceptedHttp(client) => client.set_progress_handler(handler),
+            #[cfg(feature = "websocket")]
+            McpTransportClient::WebSocket(client) => client.set_progress_handler(handler),
+            #[cfg(feature = "websocket")]
+            McpTransportClient::InterceptedWebSocket(client) => client.set_progress_handler(handler),
+            #[cfg(feature = "tcp")]
+            McpTransportClient::Tcp(client) => client.set_progress_handler(handler),
+            #[cfg(feature = "tcp")]
+            McpTransportClient::InterceptedTcp(client) => client.set_progress_handler(handler),
+            #[cfg(unix)]
+            McpTransportClient::Unix(client) => client.set_progress_handler(handler),
+            #[cfg(unix)]
+            McpTransportClient::InterceptedUnix(client) => client.set_progress_handler(handler),
+        }
+    }
+
+    /// Check if a progress handler is registered
+    pub fn has_progress_handler(&self) -> bool {
+        match self {
+            McpTransportClient::Stdio(client) => client.has_progress_handler(),
+            McpTransportClient::ChildProcess(client) => client.has_progress_handler(),
+            McpTransportClient::InterceptedChildProcess(client) => client.has_progress_handler(),
+
+            #[cfg(feature = "http")]
+            McpTransportClient::Http(client) => client.has_progress_handler(),
+            #[cfg(feature = "http")]
+            McpTransportClient::InterceptedHttp(client) => client.has_progress_handler(),
+            #[cfg(feature = "websocket")]
+            McpTransportClient::WebSocket(client) => client.has_progress_handler(),
+            #[cfg(feature = "websocket")]
+            McpTransportClient::InterceptedWebSocket(client) => client.has_progress_handler(),
+            #[cfg(feature = "tcp")]
+            McpTransportClient::Tcp(client) => client.has_progress_handler(),
+            #[cfg(feature = "tcp")]
+            McpTransportClient::InterceptedTcp(client) => client.has_progress_handler(),
+            #[cfg(unix)]
+            McpTransportClient::Unix(client) => client.has_progress_handler(),
+            #[cfg(unix)]
+            McpTransportClient::InterceptedUnix(client) => client.has_progress_handler(),
+        }
+    }
+
+    /// Register a tool list changed handler
+    #[allow(dead_code)]
+    pub fn register_tool_list_changed_handler(&self, handler: std::sync::Arc<dyn ToolListChangedHandler>) {
+        match self {
+            McpTransportClient::Stdio(client) => client.set_tool_list_changed_handler(handler),
+            McpTransportClient::ChildProcess(client) => client.set_tool_list_changed_handler(handler),
+            McpTransportClient::InterceptedChildProcess(client) => client.set_tool_list_changed_handler(handler),
+
+            #[cfg(feature = "http")]
+            McpTransportClient::Http(client) => client.set_tool_list_changed_handler(handler),
+            #[cfg(feature = "http")]
+            McpTransportClient::InterceptedHttp(client) => client.set_tool_list_changed_handler(handler),
+            #[cfg(feature = "websocket")]
+            McpTransportClient::WebSocket(client) => client.set_tool_list_changed_handler(handler),
+            #[cfg(feature = "websocket")]
+            McpTransportClient::InterceptedWebSocket(client) => client.set_tool_list_changed_handler(handler),
+            #[cfg(feature = "tcp")]
+            McpTransportClient::Tcp(client) => client.set_tool_list_changed_handler(handler),
+            #[cfg(feature = "tcp")]
+            McpTransportClient::InterceptedTcp(client) => client.set_tool_list_changed_handler(handler),
+            #[cfg(unix)]
+            McpTransportClient::Unix(client) => client.set_tool_list_changed_handler(handler),
+            #[cfg(unix)]
+            McpTransportClient::InterceptedUnix(client) => client.set_tool_list_changed_handler(handler),
+        }
+    }
+
+    /// Register a prompt list changed handler
+    #[allow(dead_code)]
+    pub fn register_prompt_list_changed_handler(&self, handler: std::sync::Arc<dyn PromptListChangedHandler>) {
+        match self {
+            McpTransportClient::Stdio(client) => client.set_prompt_list_changed_handler(handler),
+            McpTransportClient::ChildProcess(client) => client.set_prompt_list_changed_handler(handler),
+            McpTransportClient::InterceptedChildProcess(client) => client.set_prompt_list_changed_handler(handler),
+
+            #[cfg(feature = "http")]
+            McpTransportClient::Http(client) => client.set_prompt_list_changed_handler(handler),
+            #[cfg(feature = "http")]
+            McpTransportClient::InterceptedHttp(client) => client.set_prompt_list_changed_handler(handler),
+            #[cfg(feature = "websocket")]
+            McpTransportClient::WebSocket(client) => client.set_prompt_list_changed_handler(handler),
+            #[cfg(feature = "websocket")]
+            McpTransportClient::InterceptedWebSocket(client) => client.set_prompt_list_changed_handler(handler),
+            #[cfg(feature = "tcp")]
+            McpTransportClient::Tcp(client) => client.set_prompt_list_changed_handler(handler),
+            #[cfg(feature = "tcp")]
+            McpTransportClient::InterceptedTcp(client) => client.set_prompt_list_changed_handler(handler),
+            #[cfg(unix)]
+            McpTransportClient::Unix(client) => client.set_prompt_list_changed_handler(handler),
+            #[cfg(unix)]
+            McpTransportClient::InterceptedUnix(client) => client.set_prompt_list_changed_handler(handler),
+        }
+    }
+
+    /// Register a resource list changed handler
+    #[allow(dead_code)]
+    pub fn register_resource_list_changed_handler(&self, handler: std::sync::Arc<dyn ResourceListChangedHandler>) {
+        match self {
+            McpTransportClient::Stdio(client) => client.set_resource_list_changed_handler(handler),
+            McpTransportClient::ChildProcess(client) => client.set_resource_list_changed_handler(handler),
+            McpTransportClient::InterceptedChildProcess(client) => client.set_resource_list_changed_handler(handler),
+
+            #[cfg(feature = "http")]
+            McpTransportClient::Http(client) => client.set_resource_list_changed_handler(handler),
+            #[cfg(feature = "http")]
+            McpTransportClient::InterceptedHttp(client) => client.set_resource_list_changed_handler(handler),
+            #[cfg(feature = "websocket")]
+            McpTransportClient::WebSocket(client) => client.set_resource_list_changed_handler(handler),
+            #[cfg(feature = "websocket")]
+            McpTransportClient::InterceptedWebSocket(client) => client.set_resource_list_changed_handler(handler),
+            #[cfg(feature = "tcp")]
+            McpTransportClient::Tcp(client) => client.set_resource_list_changed_handler(handler),
+            #[cfg(feature = "tcp")]
+            McpTransportClient::InterceptedTcp(client) => client.set_resource_list_changed_handler(handler),
+            #[cfg(unix)]
+            McpTransportClient::Unix(client) => client.set_resource_list_changed_handler(handler),
+            #[cfg(unix)]
+            McpTransportClient::InterceptedUnix(client) => client.set_resource_list_changed_handler(handler),
         }
     }
 
