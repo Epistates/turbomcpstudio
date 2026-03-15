@@ -36,6 +36,7 @@ impl RateLimiter {
     }
 
     /// Create a disabled rate limiter (passes all requests)
+    #[allow(dead_code)]
     pub fn disabled() -> Self {
         Self::new(0, 60)
     }

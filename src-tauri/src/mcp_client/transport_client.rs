@@ -811,6 +811,7 @@ impl McpTransportClient {
     }
 
     /// Check if a progress handler is registered
+    #[allow(dead_code)]
     pub fn has_progress_handler(&self) -> bool {
         match self {
             McpTransportClient::Stdio(client) => client.has_progress_handler(),
