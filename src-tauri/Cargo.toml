@@ -55,20 +55,20 @@ open = "5.0"
 dirs = "5.0"
 log = "0.4"
 
-# TurboMCP integration - v3.0.0 (Official Release)
-turbomcp-client = "3.0"
-turbomcp-protocol = "3.0"
-turbomcp-types = "3.0"
-turbomcp-auth = { version = "3.0", features = ["oauth2", "jwt", "token-refresh"] }
-turbomcp-dpop = { version = "3.0", optional = true }
-turbomcp-proxy = { version = "3.0", default-features = false, features = ["introspection", "runtime"] }
-turbomcp-transport = { version = "3.0", default-features = false, features = ["stdio", "http", "websocket", "tcp", "unix"] }
-turbomcp-stdio = "3.0"
-turbomcp-http = "3.0"
-turbomcp-websocket = "3.0"
-turbomcp-tcp = "3.0"
-turbomcp-unix = "3.0"
-turbomcp-transport-traits = "3.0"
+# TurboMCP integration - v3.0.4 (progress handler + pagination)
+turbomcp-client = { path = "../../turbomcp/crates/turbomcp-client" }
+turbomcp-protocol = { path = "../../turbomcp/crates/turbomcp-protocol" }
+turbomcp-types = { path = "../../turbomcp/crates/turbomcp-types" }
+turbomcp-auth = { path = "../../turbomcp/crates/turbomcp-auth", features = ["oauth2", "jwt", "token-refresh"] }
+turbomcp-dpop = { path = "../../turbomcp/crates/turbomcp-dpop", optional = true }
+turbomcp-proxy = { path = "../../turbomcp/crates/turbomcp-proxy", default-features = false, features = ["introspection", "runtime"] }
+turbomcp-transport = { path = "../../turbomcp/crates/turbomcp-transport", default-features = false, features = ["stdio", "http", "websocket", "tcp", "unix"] }
+turbomcp-stdio = { path = "../../turbomcp/crates/turbomcp-stdio" }
+turbomcp-http = { path = "../../turbomcp/crates/turbomcp-http" }
+turbomcp-websocket = { path = "../../turbomcp/crates/turbomcp-websocket" }
+turbomcp-tcp = { path = "../../turbomcp/crates/turbomcp-tcp" }
+turbomcp-unix = { path = "../../turbomcp/crates/turbomcp-unix" }
+turbomcp-transport-traits = { path = "../../turbomcp/crates/turbomcp-transport-traits" }
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }
