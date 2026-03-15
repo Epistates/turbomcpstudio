@@ -5928,7 +5928,6 @@ dependencies = [
  "sha2",
  "smallvec",
  "thiserror 2.0.18",
- "time",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -6014,7 +6013,6 @@ dependencies = [
  "sqlx-core",
  "stringprep",
  "thiserror 2.0.18",
- "time",
  "tracing",
  "uuid",
  "whoami",
@@ -6054,7 +6052,6 @@ dependencies = [
  "sqlx-core",
  "stringprep",
  "thiserror 2.0.18",
- "time",
  "tracing",
  "uuid",
  "whoami",
@@ -6081,7 +6078,6 @@ dependencies = [
  "serde_urlencoded",
  "sqlx-core",
  "thiserror 2.0.18",
- "time",
  "tracing",
  "url",
  "uuid",
@@ -6658,26 +6654,6 @@ dependencies = [
  "tracing",
  "windows-sys 0.60.2",
  "zbus",
-]
-
-[[package]]
-name = "tauri-plugin-sql"
-version = "2.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27454a5476feb6ea78d74d0f07085fc8a5e97565d7ae825373011fd27ec30303"
-dependencies = [
- "futures-core",
- "indexmap 2.13.0",
- "log",
- "serde",
- "serde_json",
- "sqlx",
- "tauri",
- "tauri-plugin",
- "thiserror 2.0.18",
- "time",
- "tokio",
- "uuid",
 ]
 
 [[package]]
@@ -7310,7 +7286,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-auth"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "base64 0.22.1",
  "blake3",
@@ -7358,7 +7334,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-core"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -7374,7 +7350,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-dpop"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "base64 0.22.1",
  "bon",
@@ -7402,7 +7378,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-http"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "bytes",
  "futures",
@@ -7418,7 +7394,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-protocol"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "ahash 0.8.12",
  "arc-swap",
@@ -7452,7 +7428,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-proxy"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "axum",
  "bytes",
@@ -7482,7 +7458,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-stdio"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "bytes",
  "futures",
@@ -7498,7 +7474,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-tcp"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "bytes",
  "futures",
@@ -7515,7 +7491,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-transport"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -7558,7 +7534,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-transport-traits"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "bytes",
  "futures",
@@ -7571,7 +7547,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-types"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "serde",
  "serde_json",
@@ -7579,7 +7555,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-unix"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "bytes",
  "futures",
@@ -7596,7 +7572,7 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-websocket"
-version = "3.0.3"
+version = "3.0.4"
 dependencies = [
  "bytes",
  "chrono",
@@ -7653,7 +7629,6 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-shell",
  "tauri-plugin-single-instance",
- "tauri-plugin-sql",
  "tauri-plugin-window-state",
  "thiserror 2.0.18",
  "tokio",
