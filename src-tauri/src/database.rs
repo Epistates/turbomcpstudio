@@ -1289,6 +1289,72 @@ impl Database {
         Ok(())
     }
 
+    /// Prune old messages to keep the message history bounded
+    ///
+    /// Keeps the most recent `max_messages` per server.
+    /// Returns the number of rows deleted.
+    pub async fn prune_messages(
+        &self,
+        server_id: Uuid,
+        max_messages: i64,
+    ) -> McpResult<u64> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM message_history
+            WHERE server_id = ? AND id NOT IN (
+                SELECT id FROM message_history
+                WHERE server_id = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+            )
+            "#,
+        )
+        .bind(server_id.to_string())
+        .bind(server_id.to_string())
+        .bind(max_messages)
+        .execute(&self.pool)
+        .await?;
+
+        let deleted = result.rows_affected();
+        if deleted > 0 {
+            tracing::debug!(
+                "Pruned {} old messages for server {} (keeping {})",
+                deleted,
+                server_id,
+                max_messages
+            );
+        }
+
+        Ok(deleted)
+    }
+
+    /// Prune all servers' message histories
+    ///
+    /// Keeps the most recent `max_messages_per_server` for each server.
+    pub async fn prune_all_messages(&self, max_messages_per_server: i64) -> McpResult<u64> {
+        // Get all distinct server IDs
+        let rows = sqlx::query("SELECT DISTINCT server_id FROM message_history")
+            .fetch_all(&self.pool)
+            .await?;
+
+        let mut total_deleted = 0u64;
+        for row in rows {
+            let server_id_str: String = row.get("server_id");
+            if let Ok(server_id) = Uuid::parse_str(&server_id_str) {
+                total_deleted += self.prune_messages(server_id, max_messages_per_server).await?;
+            }
+        }
+
+        if total_deleted > 0 {
+            tracing::info!(
+                "Pruned {} total old messages across all servers",
+                total_deleted
+            );
+        }
+
+        Ok(total_deleted)
+    }
+
     /// Get message history for a server
     pub async fn get_message_history(
         &self,

@@ -66,6 +66,12 @@ pub enum McpStudioError {
     #[error("Timeout error: {0}")]
     TimeoutError(String),
 
+    #[error("Rate limit exceeded: {0}")]
+    RateLimitExceeded(String),
+
+    #[error("Validation error: {0}")]
+    ValidationError(String),
+
     #[error("Proxy error: {0}")]
     ProxyError(String),
 
