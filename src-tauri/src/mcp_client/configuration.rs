@@ -167,17 +167,21 @@ impl Configuration {
             tools: caps
                 .tools
                 .as_ref()
-                .map(|_| crate::types::ToolsCapabilities { list_changed: None }),
+                .map(|t| crate::types::ToolsCapabilities {
+                    list_changed: t.list_changed,
+                }),
             prompts: caps
                 .prompts
                 .as_ref()
-                .map(|_| crate::types::PromptsCapabilities { list_changed: None }),
+                .map(|p| crate::types::PromptsCapabilities {
+                    list_changed: p.list_changed,
+                }),
             resources: caps
                 .resources
                 .as_ref()
-                .map(|_| crate::types::ResourcesCapabilities {
-                    subscribe: None,
-                    list_changed: None,
+                .map(|r| crate::types::ResourcesCapabilities {
+                    subscribe: r.subscribe,
+                    list_changed: r.list_changed,
                 }),
             completions: caps.completions.clone(),
             experimental: caps.experimental.clone(),

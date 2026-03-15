@@ -35,4 +35,22 @@ pub enum ConnectionEvent {
         server_id: Uuid,
         error: String,
     },
+    /// Server log message received (from LogHandler)
+    ServerLogMessage {
+        server_id: Uuid,
+        level: String,
+        data: Value,
+        logger: Option<String>,
+    },
+    /// Resource list changed on server (tools, prompts, or resources)
+    ListChanged {
+        server_id: Uuid,
+        /// Which list changed: "tools", "prompts", or "resources"
+        list_type: String,
+    },
+    /// A subscribed resource was updated
+    ResourceUpdated {
+        server_id: Uuid,
+        uri: String,
+    },
 }

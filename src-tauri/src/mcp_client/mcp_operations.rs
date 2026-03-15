@@ -111,7 +111,76 @@ fn is_user_action_error(error: &turbomcp_protocol::Error) -> bool {
     false
 }
 
+/// Maximum allowed size for tool call parameters (1MB)
+const MAX_PARAM_SIZE_BYTES: usize = 1_048_576;
+
+/// Maximum allowed tool name length
+const MAX_TOOL_NAME_LENGTH: usize = 256;
+
+/// Maximum JSON nesting depth
+const MAX_JSON_DEPTH: usize = 32;
+
+/// Check JSON value depth recursively
+fn json_depth(value: &Value, current: usize) -> usize {
+    if current >= MAX_JSON_DEPTH {
+        return current;
+    }
+    match value {
+        Value::Object(map) => {
+            map.values()
+                .map(|v| json_depth(v, current + 1))
+                .max()
+                .unwrap_or(current)
+        }
+        Value::Array(arr) => {
+            arr.iter()
+                .map(|v| json_depth(v, current + 1))
+                .max()
+                .unwrap_or(current)
+        }
+        _ => current,
+    }
+}
+
 impl McpOperations {
+    /// Validate tool call input parameters
+    ///
+    /// Checks:
+    /// - Tool name length limit
+    /// - Parameter size limit (1MB)
+    /// - JSON nesting depth limit (32 levels)
+    pub fn validate_tool_call_input(tool_name: &str, parameters: &Value) -> McpResult<()> {
+        // Validate tool name length
+        if tool_name.len() > MAX_TOOL_NAME_LENGTH {
+            return Err(McpStudioError::ValidationError(format!(
+                "Tool name exceeds maximum length of {} chars: {} chars",
+                MAX_TOOL_NAME_LENGTH,
+                tool_name.len()
+            )));
+        }
+
+        // Validate parameter size
+        let param_str = parameters.to_string();
+        if param_str.len() > MAX_PARAM_SIZE_BYTES {
+            return Err(McpStudioError::ValidationError(format!(
+                "Tool parameters exceed maximum size of {}KB: {}KB",
+                MAX_PARAM_SIZE_BYTES / 1024,
+                param_str.len() / 1024
+            )));
+        }
+
+        // Validate JSON depth
+        let depth = json_depth(parameters, 0);
+        if depth >= MAX_JSON_DEPTH {
+            return Err(McpStudioError::ValidationError(format!(
+                "Tool parameters exceed maximum nesting depth of {}: depth {}",
+                MAX_JSON_DEPTH, depth
+            )));
+        }
+
+        Ok(())
+    }
+
     /// Call a tool on an MCP server with retry logic
     ///
     /// Features:
@@ -489,6 +558,86 @@ impl McpOperations {
             server_id
         );
         Ok(resource_values)
+    }
+
+    /// Subscribe to updates for a specific resource on an MCP server
+    ///
+    /// The server will send `notifications/resources/updated` when the resource changes.
+    pub async fn subscribe_resource(
+        connections: &DashMap<Uuid, Arc<ManagedConnection>>,
+        server_id: Uuid,
+        uri: &str,
+    ) -> McpResult<()> {
+        let connection = connections
+            .get(&server_id)
+            .ok_or_else(|| McpStudioError::ServerNotFound(server_id.to_string()))?;
+
+        let status = *connection.status.read();
+        if !matches!(status, ConnectionStatus::Connected) {
+            return Err(McpStudioError::ConnectionFailed(format!(
+                "Server {} is not connected (status: {:?})",
+                server_id, status
+            )));
+        }
+
+        let client_opt = connection.client.read().clone();
+        let client = client_opt.ok_or_else(|| {
+            McpStudioError::ConnectionFailed("MCP client not initialized".to_string())
+        })?;
+
+        client.subscribe(uri).await.map_err(|e| {
+            *connection.error_count.lock() += 1;
+            McpStudioError::ToolCallFailed(format!("Failed to subscribe to '{}': {}", uri, e))
+        })?;
+
+        *connection.request_count.lock() += 1;
+        *connection.last_seen.write() = Some(Utc::now());
+
+        tracing::info!(
+            "Subscribed to resource '{}' on server {}",
+            uri,
+            server_id
+        );
+        Ok(())
+    }
+
+    /// Unsubscribe from updates for a specific resource on an MCP server
+    pub async fn unsubscribe_resource(
+        connections: &DashMap<Uuid, Arc<ManagedConnection>>,
+        server_id: Uuid,
+        uri: &str,
+    ) -> McpResult<()> {
+        let connection = connections
+            .get(&server_id)
+            .ok_or_else(|| McpStudioError::ServerNotFound(server_id.to_string()))?;
+
+        let status = *connection.status.read();
+        if !matches!(status, ConnectionStatus::Connected) {
+            return Err(McpStudioError::ConnectionFailed(format!(
+                "Server {} is not connected (status: {:?})",
+                server_id, status
+            )));
+        }
+
+        let client_opt = connection.client.read().clone();
+        let client = client_opt.ok_or_else(|| {
+            McpStudioError::ConnectionFailed("MCP client not initialized".to_string())
+        })?;
+
+        client.unsubscribe(uri).await.map_err(|e| {
+            *connection.error_count.lock() += 1;
+            McpStudioError::ToolCallFailed(format!("Failed to unsubscribe from '{}': {}", uri, e))
+        })?;
+
+        *connection.request_count.lock() += 1;
+        *connection.last_seen.write() = Some(Utc::now());
+
+        tracing::info!(
+            "Unsubscribed from resource '{}' on server {}",
+            uri,
+            server_id
+        );
+        Ok(())
     }
 
     /// Read a specific resource from an MCP server

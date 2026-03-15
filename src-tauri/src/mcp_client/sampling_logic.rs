@@ -10,7 +10,7 @@ use crate::error::{McpResult, McpStudioError};
 use crate::mcp_client::connection::ManagedConnection;
 use std::sync::Arc;
 use turbomcp_client::sampling::SamplingHandler; // Import trait for method availability
-use turbomcp_protocol::types::{Content, CreateMessageRequest, Role, SamplingMessage, TextContent};
+use turbomcp_protocol::types::{ContentBlock, CreateMessageRequest, Role, SamplingMessage, TextContent};
 use uuid::Uuid;
 
 /// Sampling Logic Operations
@@ -77,7 +77,7 @@ impl SamplingLogic {
                             Role::Assistant => "assistant",
                         },
                         "content": match result.content {
-                            Content::Text(text) => text.text,
+                            ContentBlock::Text(text) => text.text,
                             _ => "Unsupported content type".to_string(),
                         },
                         "model": result.model,
@@ -146,7 +146,7 @@ impl SamplingLogic {
 
                 Ok(SamplingMessage {
                     role,
-                    content: Content::Text(TextContent {
+                    content: ContentBlock::Text(TextContent {
                         text: content,
                         annotations: None,
                         meta: None,

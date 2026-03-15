@@ -10,6 +10,10 @@ use crate::error::{McpResult, McpStudioError};
 use std::sync::Arc;
 use uuid::Uuid;
 
+/// Maximum messages to keep per server in the Protocol Inspector history.
+/// Older messages are pruned after this threshold is exceeded.
+const MAX_MESSAGES_PER_SERVER: i64 = 10_000;
+
 /// Message History Operations
 ///
 /// Provides stateless operations for tracking and persisting MCP protocol messages.
@@ -131,6 +135,11 @@ impl MessageHistory {
         // Save to database
         database.save_message(&message).await?;
 
+        // Periodically prune old messages to keep history bounded
+        // Only prune every ~100 messages to avoid overhead
+        // (Using a simple modular check on the message count)
+        Self::maybe_prune(server_id, database).await;
+
         tracing::debug!(
             "Saved message to history: server={}, direction={:?}, size={}",
             server_id,
@@ -139,5 +148,42 @@ impl MessageHistory {
         );
 
         Ok(())
+    }
+
+    /// Conditionally prune old messages for a server
+    ///
+    /// Uses a lightweight check to avoid pruning on every insert.
+    /// Prunes when total exceeds threshold by 10% to batch deletions.
+    async fn maybe_prune(
+        server_id: Uuid,
+        database: &Arc<crate::database::Database>,
+    ) {
+        // Only prune when significantly over limit (10% buffer)
+        let prune_threshold = MAX_MESSAGES_PER_SERVER + (MAX_MESSAGES_PER_SERVER / 10);
+
+        // Quick count check
+        match database.pool().acquire().await {
+            Ok(mut conn) => {
+                use sqlx::Row;
+                let count_result = sqlx::query(
+                    "SELECT COUNT(*) as cnt FROM message_history WHERE server_id = ?"
+                )
+                .bind(server_id.to_string())
+                .fetch_one(&mut *conn)
+                .await;
+
+                if let Ok(row) = count_result {
+                    let count: i64 = row.get("cnt");
+                    if count > prune_threshold {
+                        if let Err(e) = database.prune_messages(server_id, MAX_MESSAGES_PER_SERVER).await {
+                            tracing::warn!("Failed to prune messages for server {}: {}", server_id, e);
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::trace!("Could not acquire connection for prune check: {}", e);
+            }
+        }
     }
 }
