@@ -417,22 +417,22 @@
   }
 
   /* Dark mode */
-  [data-theme="dark"] .diff-label.left {
+  :global([data-theme="dark"]) .diff-label.left {
     background: rgba(239, 68, 68, 0.2);
     color: var(--mcp-error-400);
   }
 
-  [data-theme="dark"] .diff-label.right {
+  :global([data-theme="dark"]) .diff-label.right {
     background: rgba(34, 197, 94, 0.2);
     color: var(--mcp-success-400);
   }
 
-  [data-theme="dark"] .diff-value.added {
+  :global([data-theme="dark"]) .diff-value.added {
     color: var(--mcp-success-400);
     background: rgba(34, 197, 94, 0.2);
   }
 
-  [data-theme="dark"] .diff-value.removed {
+  :global([data-theme="dark"]) .diff-value.removed {
     color: var(--mcp-error-400);
     background: rgba(239, 68, 68, 0.2);
   }

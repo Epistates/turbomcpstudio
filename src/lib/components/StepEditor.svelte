@@ -646,8 +646,8 @@
   }
 
   /* Dark theme adjustments */
-  [data-theme="dark"] .form-input:focus,
-  [data-theme="dark"] .form-select:focus {
+  :global([data-theme="dark"]) .form-input:focus,
+  :global([data-theme="dark"]) .form-select:focus {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
   }
 </style>

@@ -964,9 +964,9 @@
 
               {#if selectedTemplate.variables && Object.keys(selectedTemplate.variables).length > 0}
                 <div class="mt-4">
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Template Variables
-                  </label>
+                  </span>
                   <div class="space-y-2 max-h-[120px] overflow-y-auto">
                     {#each Object.entries(selectedTemplate.variables) as [key, defaultValue], i}
                       {@const value = templateVariables[key] ?? String(defaultValue ?? '')}

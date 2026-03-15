@@ -126,16 +126,17 @@
 <div
   class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
   onclick={handleClose}
-  role="dialog"
-  aria-modal="true"
-  aria-labelledby="edit-server-title"
-  tabindex="-1"
   onkeydown={(e) => e.key === 'Escape' && handleClose()}
+  role="presentation"
 >
   <div
     class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col"
     onclick={(e) => e.stopPropagation()}
-    role="document"
+    onkeydown={(e) => e.stopPropagation()}
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="edit-server-title"
+    tabindex="-1"
   >
     <!-- Header -->
     <div class="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-700">

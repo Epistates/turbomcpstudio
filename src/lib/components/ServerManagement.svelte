@@ -1204,7 +1204,6 @@
                                 {@const isToggling = togglingProfile === prof.id}
                                 <label
                                   class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors {isToggling ? 'opacity-50' : ''}"
-                                  onclick={(e) => e.stopPropagation()}
                                 >
                                   <input
                                     type="checkbox"

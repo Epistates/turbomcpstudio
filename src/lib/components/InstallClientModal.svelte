@@ -434,19 +434,27 @@
         showCopyDropdown = false;
       }
     }}
+    onkeydown={(e) => e.key === 'Escape' && handleClose()}
+    role="presentation"
   >
     <div
       class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
       onclick={() => showCopyDropdown = false}
+      onkeydown={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="install-client-title"
+      tabindex="-1"
     >
       <!-- Header -->
       <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+        <h2 id="install-client-title" class="text-lg font-semibold text-gray-900 dark:text-white">
           Export Server Configurations
         </h2>
         <button
           onclick={handleClose}
           class="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          aria-label="Close"
         >
           <X size={20} />
         </button>
@@ -747,7 +755,7 @@
                 if (step === 1) {
                   handleClose();
                 } else {
-                  step = 1 as any;
+                  step = 1;
                 }
               }}
               class="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -757,7 +765,7 @@
 
             {#if step === 1}
               <!-- Step 1: Two options - Copy to Clipboard OR Add to Client -->
-              <div class="relative" onclick={(e) => e.stopPropagation()}>
+              <div class="relative" role="presentation" onclick={(e) => e.stopPropagation()}>
                 <div class="flex">
                   <button
                     onclick={() => handleCopyToClipboard('full')}

@@ -49,7 +49,7 @@
 
 {#if label}
   <div>
-    <label class="form-label">{label}</label>
+    <span class="form-label">{label}</span>
     <div class="space-y-2">
       {#each pairs as pair, index}
         <div class="flex items-center space-x-2">

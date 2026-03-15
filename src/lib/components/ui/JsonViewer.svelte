@@ -462,19 +462,19 @@
   }
 
   /* Dark mode enhancements */
-  [data-theme="dark"] .json-key {
+  :global([data-theme="dark"]) .json-key {
     color: var(--mcp-primary-400);
   }
 
-  [data-theme="dark"] .json-string {
+  :global([data-theme="dark"]) .json-string {
     color: var(--mcp-success-400);
   }
 
-  [data-theme="dark"] .json-number {
+  :global([data-theme="dark"]) .json-number {
     color: var(--mcp-warning-400);
   }
 
-  [data-theme="dark"] .json-boolean {
+  :global([data-theme="dark"]) .json-boolean {
     color: var(--mcp-primary-400);
   }
 </style>

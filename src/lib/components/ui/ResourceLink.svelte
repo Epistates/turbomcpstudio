@@ -252,12 +252,12 @@
     cursor: not-allowed;
   }
 
-  [data-theme="dark"] .resource-link__trigger {
+  :global([data-theme="dark"]) .resource-link__trigger {
     background: rgb(30 58 138 / 0.2); /* blue-900/20 */
     border-color: rgb(30 64 175 / 1); /* blue-800 */
   }
 
-  [data-theme="dark"] .resource-link__trigger:hover:not(:disabled) {
+  :global([data-theme="dark"]) .resource-link__trigger:hover:not(:disabled) {
     background: rgb(30 58 138 / 0.3);
     border-color: rgb(37 99 235 / 1); /* blue-600 */
   }
@@ -278,7 +278,7 @@
     margin-bottom: 0.125rem;
   }
 
-  [data-theme="dark"] .resource-link__name {
+  :global([data-theme="dark"]) .resource-link__name {
     color: rgb(191 219 254 / 1); /* blue-200 */
   }
 
@@ -288,7 +288,7 @@
     margin-bottom: 0.25rem;
   }
 
-  [data-theme="dark"] .resource-link__description {
+  :global([data-theme="dark"]) .resource-link__description {
     color: rgb(147 197 253 / 1); /* blue-300 */
   }
 
@@ -301,7 +301,7 @@
     text-overflow: ellipsis;
   }
 
-  [data-theme="dark"] .resource-link__uri {
+  :global([data-theme="dark"]) .resource-link__uri {
     color: rgb(156 163 175 / 1); /* gray-400 */
   }
 
@@ -321,7 +321,7 @@
     color: rgb(153 27 27 / 1); /* red-900 */
   }
 
-  [data-theme="dark"] .resource-link__error {
+  :global([data-theme="dark"]) .resource-link__error {
     background: rgb(127 29 29 / 0.2); /* red-900/20 */
     border-color: rgb(153 27 27 / 1); /* red-900 */
     color: rgb(254 202 202 / 1); /* red-200 */
@@ -334,7 +334,7 @@
     border-radius: 0.5rem;
   }
 
-  [data-theme="dark"] .resource-link__loaded {
+  :global([data-theme="dark"]) .resource-link__loaded {
     background: rgb(30 58 138 / 0.2); /* blue-900/20 */
     border-color: rgb(30 64 175 / 1); /* blue-800 */
   }
@@ -354,7 +354,7 @@
     border-radius: 0.375rem;
   }
 
-  [data-theme="dark"] .resource-link__content {
+  :global([data-theme="dark"]) .resource-link__content {
     background: rgb(31 41 55 / 1); /* gray-800 */
     border-color: rgb(75 85 99 / 1); /* gray-600 */
   }
@@ -368,7 +368,7 @@
     margin: 0;
   }
 
-  [data-theme="dark"] .resource-link__text {
+  :global([data-theme="dark"]) .resource-link__text {
     color: rgb(243 244 246 / 1); /* gray-100 */
   }
 
@@ -381,7 +381,7 @@
     border-top: 1px solid rgb(219 234 254 / 1); /* blue-100 */
   }
 
-  [data-theme="dark"] .resource-link__footer {
+  :global([data-theme="dark"]) .resource-link__footer {
     border-color: rgb(30 64 175 / 1); /* blue-800 */
   }
 </style>

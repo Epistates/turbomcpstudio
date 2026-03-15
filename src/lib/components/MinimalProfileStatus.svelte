@@ -160,7 +160,7 @@
     text-overflow: ellipsis;
   }
 
-  .nav-icon {
+  :global(.nav-icon) {
     color: var(--mcp-text-tertiary);
     flex-shrink: 0;
   }

@@ -297,7 +297,7 @@
 		gap: 1rem;
 	}
 
-	.header-icon {
+	:global(.header-icon) {
 		color: var(--accent-color);
 	}
 
@@ -552,11 +552,11 @@
 		border-radius: 6px;
 	}
 
-	.property-icon {
+	:global(.property-icon) {
 		flex-shrink: 0;
 	}
 
-	.property-icon.success {
+	:global(.property-icon.success) {
 		color: var(--text-success);
 	}
 

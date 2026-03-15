@@ -159,16 +159,16 @@
 
 {#if wizardState}
 	<div class="wizard-modal">
-		<div class="wizard-overlay" onclick={cancel}></div>
+		<div class="wizard-overlay" onclick={cancel} onkeydown={(e) => e.key === 'Escape' && cancel()} role="presentation"></div>
 
-		<div class="wizard-container">
+		<div class="wizard-container" role="dialog" aria-modal="true" aria-labelledby="wizard-title" tabindex="-1">
 			<!-- Header -->
 			<div class="wizard-header">
 				<div class="header-title">
-					<h2>Configure OAuth Provider</h2>
+					<h2 id="wizard-title">Configure OAuth Provider</h2>
 					<p>{serverName}</p>
 				</div>
-				<button class="btn-close" onclick={cancel}>
+				<button class="btn-close" onclick={cancel} aria-label="Close">
 					<X size={20} />
 				</button>
 			</div>
@@ -800,10 +800,6 @@
 		color: white;
 	}
 
-	.feature-badge.secret {
-		background: var(--bg-warning-light);
-		color: var(--text-warning);
-	}
 
 	/* Discovery */
 	.discovery-loading,
@@ -862,7 +858,7 @@
 		color: var(--text-success);
 	}
 
-	.spinning {
+	:global(.spinning) {
 		animation: spin 1s linear infinite;
 	}
 

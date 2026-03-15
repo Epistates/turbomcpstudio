@@ -256,14 +256,17 @@
 <div
   class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
   onclick={handleClose}
-  role="dialog"
-  aria-modal="true"
   onkeydown={(e) => e.key === 'Escape' && handleClose()}
+  role="presentation"
 >
   <div
     class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
     onclick={(e) => e.stopPropagation()}
-    role="document"
+    onkeydown={(e) => e.stopPropagation()}
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="server-config-title"
+    tabindex="-1"
   >
     <div class="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-700">
       <div class="flex items-start gap-4 flex-1">
@@ -289,7 +292,7 @@
         {/if}
 
         <div class="flex-1">
-          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+          <h2 id="server-config-title" class="text-2xl font-bold text-gray-900 dark:text-white">
             {server.about?.title || server.name}
           </h2>
           <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -327,6 +330,7 @@
       <button
         onclick={handleClose}
         class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+        aria-label="Close"
       >
         <X size={24} />
       </button>
@@ -344,7 +348,7 @@
           </span>
         </div>
         {#if step < 3}
-          <div class="w-12 h-0.5 bg-gray-200 dark:border-gray-700" />
+          <div class="w-12 h-0.5 bg-gray-200 dark:border-gray-700"></div>
         {/if}
       {/each}
     </div>

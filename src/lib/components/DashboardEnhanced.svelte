@@ -261,7 +261,7 @@
     border: 1px solid var(--mcp-primary-200);
   }
 
-  [data-theme="dark"] .health-banner {
+  :global([data-theme="dark"]) .health-banner {
     background: linear-gradient(135deg, rgba(12, 74, 110, 0.2) 0%, rgba(12, 74, 110, 0.3) 100%);
     border-color: var(--mcp-primary-800);
   }

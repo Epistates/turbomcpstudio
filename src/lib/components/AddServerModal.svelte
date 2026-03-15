@@ -1719,12 +1719,12 @@
     background-color: var(--mcp-surface-elevated);
   }
 
-  .transport-option-icon-svg {
+  :global(.transport-option-icon-svg) {
     color: var(--mcp-text-secondary);
     transition: color var(--mcp-transition-fast);
   }
 
-  .transport-option-button:hover .transport-option-icon-svg {
+  .transport-option-button:hover :global(.transport-option-icon-svg) {
     color: var(--mcp-primary-600);
   }
 
@@ -1777,12 +1777,12 @@
     background-color: var(--mcp-surface-elevated);
   }
 
-  .json-import-icon-svg {
+  :global(.json-import-icon-svg) {
     color: var(--mcp-text-secondary);
     transition: color var(--mcp-transition-fast);
   }
 
-  .json-import-button:hover .json-import-icon-svg {
+  .json-import-button:hover :global(.json-import-icon-svg) {
     color: var(--mcp-primary-600);
   }
 

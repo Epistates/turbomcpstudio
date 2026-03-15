@@ -532,12 +532,12 @@
     color: var(--mcp-text-tertiary);
   }
 
-  .action-arrow {
+  :global(.action-arrow) {
     color: var(--mcp-text-tertiary);
     transition: transform 0.2s ease;
   }
 
-  .action-item:hover .action-arrow {
+  .action-item:hover :global(.action-arrow) {
     transform: translateX(4px);
   }
 

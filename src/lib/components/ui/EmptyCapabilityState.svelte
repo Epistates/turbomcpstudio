@@ -148,7 +148,7 @@
     margin-bottom: var(--mcp-space-6);
   }
 
-  .empty-capability-state__icon-bg {
+  :global(.empty-capability-state__icon-bg) {
     color: var(--mcp-text-tertiary);
     opacity: 0.3;
   }
@@ -208,7 +208,7 @@
   }
 
   /* Dark theme adjustments */
-  [data-theme="dark"] .empty-capability-state__suggestion {
+  :global([data-theme="dark"]) .empty-capability-state__suggestion {
     color: var(--mcp-warning-200);
     background: var(--mcp-warning-900);
     border-color: var(--mcp-warning-700);

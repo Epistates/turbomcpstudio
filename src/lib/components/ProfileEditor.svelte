@@ -241,20 +241,26 @@
 </script>
 
 <!-- Modal Overlay -->
-<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={onClose}>
+<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={onClose} onkeydown={(e) => e.key === 'Escape' && onClose()} role="presentation">
   <!-- Modal Content -->
   <div
     class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
     onclick={(e) => e.stopPropagation()}
+    onkeydown={(e) => e.stopPropagation()}
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="profile-editor-title"
+    tabindex="-1"
   >
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-      <h2 class="text-xl font-bold text-gray-900 dark:text-white">
+      <h2 id="profile-editor-title" class="text-xl font-bold text-gray-900 dark:text-white">
         {isEditMode ? 'Edit Profile' : 'Create Profile'}
       </h2>
       <button
         onclick={onClose}
         class="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+        aria-label="Close"
       >
         <X size={20} />
       </button>
@@ -277,10 +283,11 @@
           <div class="space-y-4">
             <!-- Name -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label for="profile-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Name *
               </label>
               <input
+                id="profile-name"
                 type="text"
                 bind:value={name}
                 placeholder="e.g., AI Development, Production, Testing"
@@ -290,10 +297,11 @@
 
             <!-- Description -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label for="profile-description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Description
               </label>
               <textarea
+                id="profile-description"
                 bind:value={description}
                 placeholder="Optional description for this profile..."
                 rows="2"
@@ -305,14 +313,16 @@
             <div class="grid grid-cols-2 gap-4">
               <!-- Icon Picker -->
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <p id="profile-icon-label" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Icon
-                </label>
-                <div class="flex flex-wrap gap-2">
+                </p>
+                <div class="flex flex-wrap gap-2" role="group" aria-labelledby="profile-icon-label">
                   {#each iconOptions as iconOption}
                     <button
                       type="button"
                       onclick={() => icon = iconOption}
+                      aria-label={iconOption}
+                      aria-pressed={icon === iconOption}
                       class={`w-10 h-10 flex items-center justify-center text-2xl border-2 rounded-lg transition-colors ${
                         icon === iconOption
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
@@ -327,14 +337,16 @@
 
               <!-- Color Picker -->
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <p id="profile-color-label" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Color
-                </label>
-                <div class="flex flex-wrap gap-2">
+                </p>
+                <div class="flex flex-wrap gap-2" role="group" aria-labelledby="profile-color-label">
                   {#each colorOptions as colorOption}
                     <button
                       type="button"
                       onclick={() => color = colorOption.value}
+                      aria-label={colorOption.name}
+                      aria-pressed={color === colorOption.value}
                       class="w-10 h-10 rounded-lg border-2 transition-all"
                       style="background-color: {colorOption.value}"
                       class:border-gray-900={color === colorOption.value}
@@ -342,7 +354,6 @@
                       class:scale-110={color === colorOption.value}
                       class:border-gray-300={color !== colorOption.value}
                       class:dark:border-gray-600={color !== colorOption.value}
-                      title={colorOption.name}
                     ></button>
                   {/each}
                 </div>
@@ -501,10 +512,11 @@
                     <div class="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 space-y-3">
                       <!-- Startup Delay -->
                       <div>
-                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <label for="startup-delay-{server.server_id}" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Startup Delay (ms)
                         </label>
                         <input
+                          id="startup-delay-{server.server_id}"
                           type="number"
                           value={server.startup_delay_ms}
                           oninput={(e) => updateServerConfig(server.server_id, { startup_delay_ms: parseInt(e.currentTarget.value) || 0 })}

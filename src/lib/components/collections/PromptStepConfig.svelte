@@ -183,9 +183,9 @@
     {@const schema = getPromptSchema()}
     {#if schema}
       <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+        <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
           Arguments
-        </label>
+        </span>
 
         <DynamicForm
           {schema}
