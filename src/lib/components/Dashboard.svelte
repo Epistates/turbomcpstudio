@@ -54,14 +54,14 @@
   );
 
   const connectedServers = $derived(
-    displayServers().filter((s: any) => getServerStatus(s) === 'connected')
+    displayServers().filter((s: ServerInfo) => getServerStatus(s) === 'connected')
   );
 
   const stats = $derived({
     total: displayServers().length,
     connected: connectedServers.length,
-    disconnected: displayServers().filter((s: any) => getServerStatus(s) === 'disconnected').length,
-    error: displayServers().filter((s: any) => getServerStatus(s) === 'error').length,
+    disconnected: displayServers().filter((s: ServerInfo) => getServerStatus(s) === 'disconnected').length,
+    error: displayServers().filter((s: ServerInfo) => getServerStatus(s) === 'error').length,
   });
 
   // Profile metrics when active

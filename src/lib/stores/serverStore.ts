@@ -2,6 +2,7 @@ import { writable, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { withTimeout, globalRequestManager } from '$lib/utils/asyncHelpers';
 import { createLogger } from '$lib/utils/logger';
+import type { Prompt, Resource } from '$lib/types/mcp';
 
 export interface ServerConfig {
   id: string;
@@ -65,7 +66,7 @@ export interface ConnectionMetrics {
 export interface ToolDefinition {
   name: string;
   description?: string;
-  input_schema: any;
+  input_schema: Record<string, any>;
 }
 
 export interface ToolExecution {
@@ -73,7 +74,7 @@ export interface ToolExecution {
   serverId: string;
   serverName: string;
   tool: string;
-  parameters: any;
+  parameters: Record<string, any>;
   result: any;
   timestamp: string;
   duration?: number;
@@ -644,9 +645,9 @@ function createServerStore() {
       }
     },
 
-    async listPrompts(serverId: string) {
+    async listPrompts(serverId: string): Promise<Prompt[]> {
       try {
-        const prompts: any[] = await invoke('list_prompts', { serverId });
+        const prompts: Prompt[] = await invoke('list_prompts', { serverId });
         return prompts;
       } catch (error) {
         logger.error('Failed to list prompts:', error);
@@ -654,9 +655,9 @@ function createServerStore() {
       }
     },
 
-    async listResources(serverId: string) {
+    async listResources(serverId: string): Promise<Resource[]> {
       try {
-        const resources: any[] = await invoke('list_resources', { serverId });
+        const resources: Resource[] = await invoke('list_resources', { serverId });
         return resources;
       } catch (error) {
         logger.error('Failed to list resources:', error);
@@ -705,9 +706,9 @@ function createServerStore() {
     },
 
     // ✅ FIXED: Handle MCP events from backend (with Map)
-    handleMcpEvent(event: any) {
+    handleMcpEvent(event: McpEvent) {
       // Handle Rust enum serialization - the variant name becomes the key
-      if (event.StatusChanged) {
+      if ('StatusChanged' in event) {
         // Validate status field to prevent runtime errors (handle case sensitivity)
         const statusValue = event.StatusChanged.status;
         const statusLower = typeof statusValue === 'string' ? statusValue.toLowerCase() : 'error';
@@ -724,7 +725,7 @@ function createServerStore() {
           }
           return { ...state, servers: newServers };
         });
-      } else if (event.CapabilitiesUpdated) {
+      } else if ('CapabilitiesUpdated' in event) {
         logger.info('[CapabilitiesUpdated] 🎯 Event received:', {
           server_id: event.CapabilitiesUpdated.server_id,
           capabilities: event.CapabilitiesUpdated.capabilities
@@ -744,7 +745,7 @@ function createServerStore() {
           }
           return { ...state, servers: newServers };
         });
-      } else if (event.MetricsUpdated) {
+      } else if ('MetricsUpdated' in event) {
         update(state => {
           const newServers = new Map(state.servers);
           const server = newServers.get(event.MetricsUpdated.server_id);
@@ -756,7 +757,7 @@ function createServerStore() {
           }
           return { ...state, servers: newServers };
         });
-      } else if (event.ProcessUpdated) {
+      } else if ('ProcessUpdated' in event) {
         update(state => {
           const newServers = new Map(state.servers);
           const server = newServers.get(event.ProcessUpdated.server_id);
@@ -768,7 +769,7 @@ function createServerStore() {
           }
           return { ...state, servers: newServers };
         });
-      } else if (event.Error) {
+      } else if ('Error' in event) {
         logger.error('❌ MCP Connection Error:', event.Error);
         logger.error('MCP Error details:', JSON.stringify(event.Error, null, 2));
         update(state => {
@@ -857,3 +858,10 @@ export function getServerStatus(server: ServerInfo | undefined): string {
     ? server.status
     : 'error';
 }
+
+export type McpEvent =
+  | { StatusChanged: { server_id: string; status: string } }
+  | { CapabilitiesUpdated: { server_id: string; capabilities: ServerCapabilities } }
+  | { MetricsUpdated: { server_id: string; metrics: ConnectionMetrics } }
+  | { ProcessUpdated: { server_id: string; process_info: ProcessInfo } }
+  | { Error: { server_id: string; error: string } };

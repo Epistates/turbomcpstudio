@@ -1,12 +1,13 @@
 <script lang="ts">
   import { Folder, AlertCircle, Info, Eye, EyeOff, ChevronDown, ChevronRight } from 'lucide-svelte';
   import { open } from '@tauri-apps/plugin-dialog';
+  import type { JsonSchema } from '$lib/types/mcp';
 
   // @ts-ignore - Tauri plugin types
   const dialog = { open };
 
   // Props
-  export let schema: any;
+  export let schema: JsonSchema;
   export let serverName: string;
   export let values: Record<string, any> = {};
   export let errors: Record<string, string> = {};
@@ -34,7 +35,7 @@
     collapsedSections = { ...collapsedSections };
   }
 
-  function handleInputChange(path: string, value: any, propertyType: string) {
+  function handleInputChange(path: string, value: any, propertyType: string | undefined) {
     // Type coercion
     let typedValue = value;
 
@@ -45,7 +46,7 @@
     } else if (propertyType === 'array') {
       // Arrays can be comma-separated strings or actual arrays
       if (typeof value === 'string') {
-        typedValue = value.split(',').map((v) => v.trim()).filter((v) => v);
+        typedValue = value.split(',').map((v: string) => v.trim()).filter((v: string) => v);
       }
     }
 
@@ -84,7 +85,7 @@
     return current;
   }
 
-  function getInputType(propertyType: string, name: string): string {
+  function getInputType(propertyType: string | undefined, name: string): string {
     // Check if it's a password-like field
     if (
       name.toLowerCase().includes('password') ||
@@ -120,12 +121,12 @@
     );
   }
 
-  function isArrayField(property: any): boolean {
+  function isArrayField(property: JsonSchema): boolean {
     return property.type === 'array';
   }
 
-  function isObjectField(property: any): boolean {
-    return property.type === 'object' && property.properties;
+  function isObjectField(property: JsonSchema): boolean {
+    return property.type === 'object' && !!property.properties;
   }
 
   function formatLabel(name: string): string {
@@ -135,7 +136,7 @@
   function getConditionalRequirementHint(): string {
     if (anyOf.length === 0) return '';
 
-    const requiredGroups = anyOf.map((group: any) => {
+    const requiredGroups = anyOf.map((group: JsonSchema) => {
       if (group.required && Array.isArray(group.required)) {
         return group.required.map(formatLabel).join(' + ');
       }
@@ -152,10 +153,10 @@
   // Render a single field (can be nested)
   function renderField(
     name: string,
-    property: any,
+    property: JsonSchema,
     basePath: string = '',
     level: number = 0
-  ): { component: any; path: string } {
+  ): { component: JsonSchema; path: string } {
     const fullPath = basePath ? `${basePath}.${name}` : name;
     return { component: property, path: fullPath };
   }
@@ -182,11 +183,11 @@
   {#if Object.keys(properties).length === 0}
     <div class="text-center py-8 text-gray-500 dark:text-gray-400">
       <Info class="mx-auto mb-2" size={32} />
-      <p>No configuration required for this server</p>
+      <p>No configuration required for this server {serverName}</p>
     </div>
   {:else}
     {#each Object.entries(properties) as [name, property]}
-      {@const prop = property as any}
+      {@const prop = property as JsonSchema}
       {@const propertyType = prop.type}
       {@const description = prop.description}
       {@const defaultValue = prop.default}
@@ -237,10 +238,10 @@
             </button>
 
             <!-- Nested Properties -->
-            {#if !isCollapsed}
+            {#if !isCollapsed && prop.properties}
               <div class="p-3 pt-0 space-y-3 border-t border-gray-200 dark:border-gray-700">
                 {#each Object.entries(prop.properties) as [nestedName, nestedProperty]}
-                  {@const nestedProp = nestedProperty as any}
+                  {@const nestedProp = nestedProperty as JsonSchema}
                   {@const nestedPath = `${name}.${nestedName}`}
                   {@const nestedType = nestedProp.type}
                   {@const nestedDescription = nestedProp.description}

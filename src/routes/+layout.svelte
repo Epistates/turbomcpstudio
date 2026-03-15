@@ -11,6 +11,7 @@
   import AppLoadingScreen from '$lib/components/AppLoadingScreen.svelte';
   import ElicitationDialog from '$lib/components/ElicitationDialog.svelte';
   import type { JsonSchema } from '$lib/utils/schemaValidation';
+  import type { McpEvent } from '$lib/types/system';
 
   // Svelte 5 snippet props
   const { children } = $props();
@@ -60,7 +61,7 @@
   let initializationStartTime = Date.now();
 
   // Elicitation event handlers
-  async function handleElicitationResponse(data: any) {
+  async function handleElicitationResponse(data: Record<string, unknown>) {
     if (!elicitationRequest) return;
 
     try {
@@ -95,7 +96,7 @@
     // This ensures listeners are registered before backend emits events
     console.log('🎧 Setting up event listeners...');
 
-    mcpUnlisten = await listen('mcp-event', (event) => {
+    mcpUnlisten = await listen<McpEvent>('mcp-event', (event) => {
       try {
         serverStore.handleMcpEvent(event.payload);
       } catch (err) {
@@ -105,7 +106,7 @@
       }
     });
 
-    elicitationUnlisten = await listen('elicitation_requested', (event: any) => {
+    elicitationUnlisten = await listen<ElicitationRequest>('elicitation_requested', (event) => {
       try {
         console.log('🔔 Received elicitation_requested event:', event.payload);
         const payload = event.payload;
@@ -134,7 +135,7 @@
       }
     });
 
-    await listen('app-early-ready', (event) => {
+    await listen<boolean>('app-early-ready', (event) => {
       try {
         console.log('🟢 Received app-early-ready event');
         appStore.setMcpManagerReady(true);
@@ -144,7 +145,7 @@
       }
     });
 
-    await listen('app-ready', async (event) => {
+    await listen<void>('app-ready', async (event) => {
       try {
         if (appReadyReceived) {
           console.log('⏭️ app-ready already received, skipping');
@@ -185,7 +186,14 @@
     });
 
     // Issue #16 fix: Listen for initialization errors from backend
-    await listen('initialization-error', (event: any) => {
+    interface InitializationError {
+      message: string;
+      critical?: boolean;
+      userAction?: string;
+      fallbackUsed?: string;
+    }
+
+    await listen<InitializationError>('initialization-error', (event) => {
       try {
         const error = event.payload;
         console.error('🚨 Initialization error:', error);

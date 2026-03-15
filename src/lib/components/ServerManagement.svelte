@@ -127,7 +127,7 @@
     // Build map using Array.map to avoid .set() calls inside $derived
     const entries: [string, string | null][] = servers.map(server => {
       // Check if server is in active profile
-      const isInActiveProfile = activeProfile?.servers?.some((ps: any) => ps.server_id === server.id);
+      const isInActiveProfile = activeProfile?.servers?.some((ps: { server_id: string }) => ps.server_id === server.id);
       return [server.id, isInActiveProfile ? (activeProfile?.profile?.id || null) : null];
     });
 
@@ -263,9 +263,9 @@
   }
 
   // Helper to extract just the MCP config object (without mcpServers wrapper)
-  function extractMcpConfig(server: ServerInfo): Record<string, any> {
+  function extractMcpConfig(server: ServerInfo): Record<string, unknown> {
     const config = server.config;
-    const mcpConfig: any = {};
+    const mcpConfig: Record<string, unknown> = {};
 
     if (config.transport_config?.type === 'stdio') {
       mcpConfig.command = config.transport_config.command;
@@ -307,7 +307,7 @@
     }
 
     try {
-      const mcpServersConfig: Record<string, any> = {};
+      const mcpServersConfig: Record<string, Record<string, unknown>> = {};
 
       // Build config for all servers
       for (const server of servers) {

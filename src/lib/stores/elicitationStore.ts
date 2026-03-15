@@ -33,7 +33,7 @@ export interface CompletedElicitationRequest extends ActiveElicitationRequest {
 	// Full response tracking
 	response?: {
 		action: 'accept' | 'decline' | 'cancel';
-		content?: Record<string, any>;
+		content?: Record<string, unknown>;
 	};
 
 	// Outcome tracking
@@ -47,7 +47,7 @@ export interface ElicitationReplayTemplate {
 	id: string;
 	name: string;
 	schema: JsonSchema;
-	response: Record<string, any>;
+	response: Record<string, unknown>;
 	createdAt: string;
 	lastUsed?: string;
 	useCount: number;
@@ -104,7 +104,7 @@ function createElicitationStore() {
 
 	const initializeEventListener = async () => {
 		try {
-			eventUnlisten = await listen<any>('elicitation_requested', (event) => {
+			eventUnlisten = await listen<ActiveElicitationRequest & { protocolMessageId?: string; timeout?: number }>('elicitation_requested', (event) => {
 				const payload = event.payload;
 
 				const request: ActiveElicitationRequest = {
@@ -150,7 +150,7 @@ function createElicitationStore() {
 		 * @param requestId - Unique request identifier
 		 * @param content - The form data provided by the user
 		 */
-		async accept(requestId: string, content: Record<string, any>): Promise<void> {
+		async accept(requestId: string, content: Record<string, unknown>): Promise<void> {
 			update((s) => ({ ...s, loading: true, error: null }));
 
 			try {

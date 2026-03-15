@@ -728,7 +728,7 @@
   }
 
   // ✅ FIXED: Add servers without auto-connecting (respects user's workflow choice)
-  async function importServers(serversConfig: Record<string, any>) {
+  async function importServers(serversConfig: Record<string, Record<string, unknown>>) {
     // ✅ Set loading state for the import button
     uiStore.setModalLoading('addServer', true);
 
@@ -745,9 +745,9 @@
         // ✅ Create server config once (not twice!)
         return serverStore.createServerConfig(
           name,
-          serverConfig.description || undefined,
+          (serverConfig.description as string) || undefined,
           transport,
-          serverConfig.env || {}
+          (serverConfig.env as Record<string, string>) || {}
         );
       });
 
@@ -788,39 +788,39 @@
   }
 
   // ✅ FIXED: Only build the transport config object, don't create in DB yet
-  function buildTransportConfigFromMCP(mcpConfig: any): TransportConfig {
+  function buildTransportConfigFromMCP(mcpConfig: Record<string, unknown>): TransportConfig {
     if (mcpConfig.command) {
       return {
         type: 'stdio',
-        command: mcpConfig.command,
-        args: mcpConfig.args || [],
-        working_directory: mcpConfig.cwd || undefined,
+        command: mcpConfig.command as string,
+        args: (mcpConfig.args as string[]) || [],
+        working_directory: (mcpConfig.cwd as string) || undefined,
       };
     } else if (mcpConfig.url) {
-      const url = mcpConfig.url.toLowerCase();
+      const url = (mcpConfig.url as string).toLowerCase();
       if (url.startsWith('ws://') || url.startsWith('wss://')) {
         return {
           type: 'webSocket',  // ✅ camelCase to match Rust serialization
-          url: mcpConfig.url,
-          headers: mcpConfig.headers || {},
+          url: mcpConfig.url as string,
+          headers: (mcpConfig.headers as Record<string, string>) || {},
         };
       } else {
         return {
           type: 'http',
-          url: mcpConfig.url,
-          headers: mcpConfig.headers || {},
+          url: mcpConfig.url as string,
+          headers: (mcpConfig.headers as Record<string, string>) || {},
         };
       }
     } else if (mcpConfig.host && mcpConfig.port) {
       return {
         type: 'tcp',
-        host: mcpConfig.host,
-        port: mcpConfig.port,
+        host: mcpConfig.host as string,
+        port: mcpConfig.port as number,
       };
     } else if (mcpConfig.path) {
       return {
         type: 'unix',
-        path: mcpConfig.path,
+        path: mcpConfig.path as string,
       };
     } else {
       throw new Error(`Unable to determine transport type for config`);

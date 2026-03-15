@@ -578,15 +578,29 @@
 
 <!-- Diff Panel Modal -->
 {#if showDiffPanel && compareMessages.left && compareMessages.right}
-	<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={closeDiffPanel}>
-		<div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[80vh] flex flex-col overflow-hidden" onclick={(e) => e.stopPropagation()}>
+	<div
+		class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+		onclick={closeDiffPanel}
+		onkeydown={(e) => e.key === 'Escape' && closeDiffPanel()}
+		role="button"
+		tabindex="-1"
+		aria-label="Close comparison panel"
+	>
+		<div
+			class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[80vh] flex flex-col overflow-hidden"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.stopPropagation()}
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="diff-panel-title"
+			tabindex="0"
+		>
 			<!-- Header -->
 			<div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
 				<div class="flex items-center gap-3">
 					<GitCompare size={20} class="text-purple-600 dark:text-purple-400" />
-					<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Message Comparison</h2>
-				</div>
-				<button
+					<h2 id="diff-panel-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">Message Comparison</h2>
+				</div>				<button
 					onclick={closeDiffPanel}
 					class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all"
 				>

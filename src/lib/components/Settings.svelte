@@ -1267,7 +1267,6 @@
     align-items: center;
     gap: var(--mcp-space-2);
     padding: var(--mcp-space-3) var(--mcp-space-6);
-    text-sm font-medium;
     border-bottom: 2px solid transparent;
     transition: all var(--mcp-transition-fast);
     color: var(--mcp-text-secondary);

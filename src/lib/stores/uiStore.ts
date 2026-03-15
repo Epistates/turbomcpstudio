@@ -1,5 +1,7 @@
 import { writable } from 'svelte/store';
 import { notificationStore } from './notificationStore';
+import type { PendingSamplingRequest } from './samplingStore';
+import type { ActiveElicitationRequest } from './elicitationStore';
 
 export type View = 'dashboard' | 'servers' | 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | 'protocol' | 'chat' | 'testing' | 'collections' | 'oauth' | 'settings';
 
@@ -36,9 +38,9 @@ interface UiStoreState {
     elicitationDialog: ModalState;
   };
   // Sampling approval modal state
-  pendingSamplingRequest?: any;
+  pendingSamplingRequest?: PendingSamplingRequest;
   // Elicitation dialog state
-  pendingElicitationRequest?: any;
+  pendingElicitationRequest?: ActiveElicitationRequest;
   // Profile editor state
   editingProfileId?: string | null;
   // Tool Explorer state persistence
@@ -241,7 +243,7 @@ function createUiStore() {
     },
 
     // Sampling approval modal management
-    showSamplingApproval(request: any) {
+    showSamplingApproval(request: PendingSamplingRequest) {
       update(state => ({
         ...state,
         currentView: 'sampling', // Auto-navigate to sampling tab
@@ -265,7 +267,7 @@ function createUiStore() {
     },
 
     // Elicitation dialog management
-    showElicitationDialog(request: any) {
+    showElicitationDialog(request: ActiveElicitationRequest) {
       update(state => ({
         ...state,
         currentView: 'elicitation', // Auto-navigate to elicitation tab

@@ -37,8 +37,13 @@
     source?: {
       project?: string;
     };
-    config?: any;
-    oauth?: any[];
+    config?: {
+      description?: string;
+      secrets?: Array<{ name: string; env: string; example?: string; required?: boolean }>;
+      env?: Array<{ name: string; example?: any; value?: string }>;
+      parameters?: any;
+    };
+    oauth?: Array<{ provider?: string; secret?: string; env?: string }>;
   }
 
   interface ServerDisplayInfo {
@@ -74,8 +79,8 @@
   async function fetchRegistry() {
     loading = true;
     try {
-      servers = await invoke('fetch_registry_catalog');
-      categories = await invoke('get_registry_categories', { servers });
+      servers = await invoke<Record<string, RegistryServer>>('fetch_registry_catalog');
+      categories = await invoke<string[]>('get_registry_categories', { servers });
       updateDisplay();
       uiStore.showSuccess('Registry loaded successfully');
     } catch (error) {
@@ -89,8 +94,8 @@
   async function refreshRegistry() {
     loading = true;
     try {
-      servers = await invoke('refresh_registry_catalog');
-      categories = await invoke('get_registry_categories', { servers });
+      servers = await invoke<Record<string, RegistryServer>>('refresh_registry_catalog');
+      categories = await invoke<string[]>('get_registry_categories', { servers });
       updateDisplay();
       uiStore.showSuccess('Registry refreshed successfully');
     } catch (error) {
@@ -276,6 +281,10 @@
           <div
             class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-lg transition-all cursor-pointer group"
             onclick={() => openConfigModal(server.name)}
+            onkeydown={(e) => e.key === 'Enter' && openConfigModal(server.name)}
+            role="button"
+            tabindex="0"
+            aria-label="View configuration for {server.title}"
           >
             <!-- Server Header -->
             <div class="flex items-start gap-3 mb-3">

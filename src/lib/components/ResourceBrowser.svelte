@@ -659,13 +659,14 @@
 
                 <div class="space-y-4">
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <label for="resource-param-{parameterName}" class="block text-sm font-medium text-gray-700 mb-1">
                       {parameterName}
                       <span class="text-red-500">*</span>
                     </label>
 
                     {#if parameterOptions.length > 0}
                       <select
+                        id="resource-param-{parameterName}"
                         bind:value={resourceParameters[parameterName]}
                         class="form-select w-full"
                       >
@@ -676,6 +677,7 @@
                       </select>
                     {:else}
                       <input
+                        id="resource-param-{parameterName}"
                         type="text"
                         bind:value={resourceParameters[parameterName]}
                         placeholder="Enter {parameterName}..."

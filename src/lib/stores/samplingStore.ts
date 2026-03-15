@@ -39,7 +39,7 @@ export interface SamplingRequestDetails {
 export interface SamplingMessage {
 	role: 'user' | 'assistant';
 	content: MessageContent;
-	metadata?: Record<string, any>;
+	metadata?: Record<string, unknown>;
 }
 
 export interface MessageContent {
@@ -77,7 +77,7 @@ export interface CompletedSamplingRequest extends PendingSamplingRequest {
 	};
 
 	// Legacy fields
-	result?: any;
+	result?: unknown;
 	error?: string;
 }
 

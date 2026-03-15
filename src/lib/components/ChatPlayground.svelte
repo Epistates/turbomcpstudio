@@ -2,19 +2,7 @@
 	import { onMount } from 'svelte';
 	import { invoke } from '@tauri-apps/api/core';
 	import { Send, Bot, User, AlertCircle, Loader2, Sparkles, DollarSign, GitBranch, ChevronDown, X, Plus, Trash2 } from 'lucide-svelte';
-
-	// Type definitions
-	interface LLMProviderStatus {
-		provider_id: string;
-		display_name: string;
-		provider_type: string;
-		enabled: boolean;
-		configured: boolean;
-		active: boolean;
-		available_models: string[];
-		base_url?: string;
-		last_error?: string;
-	}
+	import type { LLMProviderStatus, LLMConfiguration, LLMMessageResponse, LLMMessageRequest } from '$lib/types/llm';
 
 	// Message types
 	interface Message {
@@ -81,7 +69,7 @@
 		try {
 			const [providerStatuses, llmConfig] = await Promise.all([
 				invoke<LLMProviderStatus[]>('list_llm_providers'),
-				invoke<any>('get_llm_config')
+				invoke<LLMConfiguration>('get_llm_config')
 			]);
 
 			providers = providerStatuses;
@@ -143,7 +131,7 @@
 
 		try {
 			const currentMessages = [...currentBranch.messages, userMessage];
-			const result = await invoke<any>('send_llm_message', {
+			const result = await invoke<LLMMessageResponse>('send_llm_message', {
 				request: {
 					messages: currentMessages.map((m) => ({
 						role: m.role,
@@ -151,17 +139,17 @@
 					})),
 					modelPreferences: selectedModel ? { hints: [{ name: selectedModel }] } : undefined,
 					maxTokens: 4000
-				},
+				} as LLMMessageRequest,
 				providerId: selectedProvider || null
 			});
 
 			// Extract text content from response
 			let assistantContent = '';
 			if (result.content && Array.isArray(result.content)) {
-				assistantContent = result.content.map((c: any) => c.text || '').join('');
+				assistantContent = result.content.map((c) => (c as { text: string }).text || '').join('');
 			} else if (typeof result.content === 'string') {
 				assistantContent = result.content;
-			} else if (result.content?.text) {
+			} else if (result.content && typeof result.content === 'object' && 'text' in result.content) {
 				assistantContent = result.content.text;
 			}
 
@@ -193,8 +181,8 @@
 					chatContainer.scrollTop = chatContainer.scrollHeight;
 				}
 			}, 100);
-		} catch (e: any) {
-			error = e.toString();
+		} catch (e: unknown) {
+			error = String(e);
 			// Remove user message if failed
 			updateBranchMessages(currentBranch.messages.filter((m) => m.id !== userMessage.id));
 			// Restore input
@@ -268,7 +256,7 @@
 		});
 	}
 
-	function calculateCost(usage: any, providerId: string): number {
+	function calculateCost(usage: { input_tokens: number; output_tokens: number } | undefined, providerId: string): number {
 		if (!usage) return 0;
 
 		// Simple cost calculation (approximate rates - Q1 2026)
@@ -390,11 +378,10 @@
 							</div>
 							<div class="max-h-64 overflow-y-auto">
 								{#each branches as branch (branch.id)}
-									<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 									<div
-										class="flex items-center justify-between px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 cursor-pointer {branch.id === activeBranchId ? 'bg-purple-50 dark:bg-purple-900/20' : ''}"
+										class="w-full flex items-center justify-between px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 cursor-pointer {branch.id === activeBranchId ? 'bg-purple-50 dark:bg-purple-900/20' : ''}"
 										onclick={() => { switchBranch(branch.id); showBranchPanel = false; }}
-										onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { switchBranch(branch.id); showBranchPanel = false; } }}
+										onkeydown={(e) => e.key === 'Enter' && (switchBranch(branch.id), showBranchPanel = false)}
 										role="button"
 										tabindex="0"
 									>
@@ -408,6 +395,7 @@
 												<button
 													onclick={(e) => { e.stopPropagation(); deleteBranch(branch.id); }}
 													class="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
+													aria-label="Delete branch"
 												>
 													<Trash2 class="h-3 w-3" />
 												</button>

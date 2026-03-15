@@ -525,7 +525,7 @@
               <div class="space-y-4">
                 {#each selectedPrompt.arguments as arg}
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <label for="prompt-arg-{arg.name}" class="block text-sm font-medium text-gray-700 mb-1">
                       {arg.name}
                       {#if arg.required}
                         <span class="text-red-500">*</span>
@@ -538,14 +538,16 @@
 
                     {#if getArgumentType(arg) === 'textarea'}
                       <textarea
+                        id="prompt-arg-{arg.name}"
                         bind:value={promptArguments[arg.name]}
                         placeholder={arg.default ? `Default: ${arg.default}` : ''}
                         class="form-input h-24 resize-none"
                         required={arg.required}
                       ></textarea>
                     {:else if getArgumentType(arg) === 'checkbox'}
-                      <label class="flex items-center">
+                      <label for="prompt-arg-{arg.name}" class="flex items-center">
                         <input
+                          id="prompt-arg-{arg.name}"
                           type="checkbox"
                           bind:checked={promptArguments[arg.name]}
                           class="form-checkbox"
@@ -554,6 +556,7 @@
                       </label>
                     {:else}
                       <input
+                        id="prompt-arg-{arg.name}"
                         type={getArgumentType(arg)}
                         bind:value={promptArguments[arg.name]}
                         placeholder={arg.default ? `Default: ${arg.default}` : ''}

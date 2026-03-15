@@ -46,7 +46,11 @@
   <div
     class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full"
     onclick={(e) => e.stopPropagation()}
-    role="document"
+    onkeydown={(e) => e.key === 'Escape' && handleCancel()}
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="confirm-title"
+    tabindex="0"
   >
     <!-- Header -->
     <div class="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-700">
@@ -60,7 +64,7 @@
             <AlertTriangle class="text-yellow-600 dark:text-yellow-400" size={20} />
           </div>
         {/if}
-        <h2 class="text-xl font-bold text-gray-900 dark:text-white">
+        <h2 id="confirm-title" class="text-xl font-bold text-gray-900 dark:text-white">
           {title}
         </h2>
       </div>
