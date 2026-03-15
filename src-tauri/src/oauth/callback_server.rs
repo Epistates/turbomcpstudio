@@ -1,11 +1,12 @@
 /// Local HTTP server for OAuth 2.0/2.1 redirect callbacks
 ///
-/// Runs on localhost:8080 to capture OAuth authorization codes after user authorization.
-/// This server handles the redirect from the authorization server back to the application.
+/// Binds to a random OS-assigned port on 127.0.0.1 to capture OAuth
+/// authorization codes after user authorization.  Using port 0 avoids the
+/// fixed-port conflict risk that existed with the previous hardcoded port 8080.
 ///
 /// Flow:
 /// 1. User authorizes in browser at auth server
-/// 2. Auth server redirects to http://localhost:8080/callback?code=...&state=...
+/// 2. Auth server redirects to http://localhost:{actual_port}/callback?code=...&state=...
 /// 3. This server captures the code and state
 /// 4. Returns success page to user
 /// 5. Notifies waiting OAuth flow via oneshot channel
@@ -31,11 +32,14 @@ pub struct CallbackParams {
 
 /// Local HTTP server for OAuth redirects
 ///
-/// Listens on localhost:8080/callback for OAuth authorization responses.
-/// Uses a oneshot channel to notify the OAuth flow manager when a callback is received.
+/// Listens on a random available port on 127.0.0.1/callback for OAuth
+/// authorization responses.  The actual port is chosen by the OS at bind time
+/// (port 0 strategy) so that there are no conflicts with other processes.
+/// Uses a oneshot channel to notify the OAuth flow manager when a callback
+/// is received.
 pub struct CallbackServer {
-    /// Port to listen on (default: 8080)
-    port: u16,
+    /// Actual port chosen by the OS after binding (0 until the server starts).
+    port: Arc<Mutex<u16>>,
     /// Pending callback sender (only one flow can be active at a time)
     pending_callback:
         Arc<Mutex<Option<oneshot::Sender<Result<(String, String), (String, String)>>>>>,
@@ -44,13 +48,14 @@ pub struct CallbackServer {
 }
 
 impl CallbackServer {
-    /// Create a new callback server
+    /// Create a new callback server.
     ///
-    /// # Arguments
-    /// * `port` - Port to listen on (typically 8080)
-    pub fn new(port: u16) -> Self {
+    /// The actual listening port is determined at startup time when the OS
+    /// assigns a free port.  Call `redirect_uri()` after `wait_for_callback()`
+    /// (or after `start_server()`) to obtain the URI with the concrete port.
+    pub fn new() -> Self {
         Self {
-            port,
+            port: Arc::new(Mutex::new(0)),
             pending_callback: Arc::new(Mutex::new(None)),
             is_running: Arc::new(Mutex::new(false)),
         }
@@ -80,10 +85,16 @@ impl CallbackServer {
             })
     }
 
-    /// Start the HTTP server
+    /// Start the HTTP server (crate-visible for pre-binding before building the auth URL).
     ///
-    /// Spawns an Axum server on localhost:{port} if not already running.
-    /// The server handles GET requests to /callback and displays a success page.
+    /// Binds to 127.0.0.1:0 so the OS assigns a free port, then records the
+    /// actual port for use in redirect URIs.  Spawns an Axum server in the
+    /// background if not already running.  Safe to call multiple times; the
+    /// second and subsequent calls are no-ops if the server is already running.
+    pub(crate) async fn start_server_internal(&self) -> McpResult<()> {
+        self.start_server().await
+    }
+
     async fn start_server(&self) -> McpResult<()> {
         // Check if already running
         {
@@ -162,7 +173,7 @@ impl CallbackServer {
                                 </head>
                                 <body>
                                     <div class="container">
-                                        <h1> Authorization Failed</h1>
+                                        <h1> Authorization Failed</h1>
                                         <p>The OAuth authorization was not successful.</p>
                                         <div class="error-code">
                                             <strong>Error:</strong> {}<br>
@@ -232,7 +243,7 @@ impl CallbackServer {
                         </head>
                         <body>
                             <div class="container">
-                                <h1> Authorization Successful</h1>
+                                <h1> Authorization Successful</h1>
                                 <p>Exchanging authorization code for access token...</p>
                                 <div style="margin-top: 1rem;">
                                     <div class="spinner"></div>
@@ -252,12 +263,21 @@ impl CallbackServer {
             ),
         );
 
-        let addr = format!("127.0.0.1:{}", self.port);
-        let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|e| {
-            McpError::new(ErrorKind::Internal, format!("Failed to bind OAuth callback server to {}: {}", addr, e))
+        // Bind to port 0 so the OS assigns a free port, eliminating the fixed
+        // port 8080 conflict risk.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.map_err(|e| {
+            McpError::new(ErrorKind::Internal, format!("Failed to bind OAuth callback server: {}", e))
         })?;
 
-        tracing::info!("OAuth callback server listening on {}", addr);
+        // Record the actual port assigned by the OS so redirect_uri() returns
+        // the correct value before the browser redirect happens.
+        let actual_port = listener
+            .local_addr()
+            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to get local address: {}", e)))?
+            .port();
+        *self.port.lock() = actual_port;
+
+        tracing::info!("OAuth callback server listening on 127.0.0.1:{}", actual_port);
 
         // Spawn server in background
         let is_running = self.is_running.clone();
@@ -271,17 +291,26 @@ impl CallbackServer {
         Ok(())
     }
 
-    /// Get the redirect URI for this callback server
+    /// Get the redirect URI for this callback server.
     ///
     /// Returns the full URI that should be registered with OAuth providers.
+    /// The port reflects the OS-assigned value and is only valid after the
+    /// server has been started via `wait_for_callback()`.
     pub fn redirect_uri(&self) -> String {
-        format!("http://localhost:{}/callback", self.port)
+        format!("http://localhost:{}/callback", *self.port.lock())
+    }
+
+    /// Get the actual port the server is listening on.
+    ///
+    /// Returns 0 if the server has not been started yet.
+    pub fn port(&self) -> u16 {
+        *self.port.lock()
     }
 }
 
 impl Default for CallbackServer {
     fn default() -> Self {
-        Self::new(8080)
+        Self::new()
     }
 }
 
@@ -290,14 +319,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_redirect_uri() {
-        let server = CallbackServer::new(8080);
-        assert_eq!(server.redirect_uri(), "http://localhost:8080/callback");
-    }
-
-    #[test]
-    fn test_custom_port() {
-        let server = CallbackServer::new(3000);
-        assert_eq!(server.redirect_uri(), "http://localhost:3000/callback");
+    fn test_redirect_uri_before_start() {
+        // Before start_server() is called the port is 0.
+        let server = CallbackServer::new();
+        assert_eq!(server.redirect_uri(), "http://localhost:0/callback");
+        assert_eq!(server.port(), 0);
     }
 }

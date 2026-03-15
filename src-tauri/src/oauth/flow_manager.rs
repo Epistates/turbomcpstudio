@@ -163,7 +163,9 @@ impl OAuthFlowManager {
             flows: Arc::new(RwLock::new(HashMap::new())),
             discovery: Arc::new(MetadataDiscovery::new()),
             token_store: Arc::new(TokenStore::new("TurboMCP Studio")),
-            callback_server: Arc::new(CallbackServer::new(8080)),
+            // Port 0 causes the OS to assign a free ephemeral port at bind time,
+            // preventing conflicts with other processes that may use port 8080.
+            callback_server: Arc::new(CallbackServer::new()),
         }
     }
 
@@ -189,7 +191,7 @@ impl OAuthFlowManager {
     pub async fn start_authorization_flow(
         &self,
         server_id: i64,
-        config: OAuthConfig,
+        mut config: OAuthConfig,
     ) -> McpResult<String> {
         let flow_id = Uuid::new_v4().to_string();
 
@@ -207,7 +209,18 @@ impl OAuthFlowManager {
             config: config.clone(),
         };
 
-        // Step 1: Generate PKCE verifier (if enabled)
+        // Step 1: Start callback server first so we know the actual port before
+        // building the authorization URL.  The server binds to 127.0.0.1:0
+        // and the OS assigns a free ephemeral port.  We must do this before
+        // constructing the redirect_uri that goes into the auth URL.
+        Self::add_step(&mut flow, "Start Callback Server", "Binding local callback server to obtain redirect URI");
+        self.callback_server.start_server_internal().await?;
+        // Override the redirect_uri in the config with the actual OS-assigned port.
+        config.redirect_uri = self.callback_server.redirect_uri();
+        flow.config.redirect_uri = config.redirect_uri.clone();
+        tracing::info!("OAuth callback server bound, redirect_uri = {}", config.redirect_uri);
+
+        // Step 2: Generate PKCE verifier (if enabled)
         let (_pkce_verifier, pkce_challenge) = if config.use_pkce {
             Self::add_step(&mut flow, "Generate PKCE", "Generating PKCE code verifier and challenge");
 
@@ -220,18 +233,18 @@ impl OAuthFlowManager {
             (None, None)
         };
 
-        // Step 2: Generate state parameter (CSRF protection)
+        // Step 3: Generate state parameter (CSRF protection)
         Self::add_step(&mut flow, "Generate State", "Generating state parameter for CSRF protection");
         let state_param = Uuid::new_v4().to_string();
         flow.state_param = Some(state_param.clone());
 
-        // Step 3: Build authorization URL
+        // Step 4: Build authorization URL
         Self::add_step(&mut flow, "Build Authorization URL", "Building authorization URL with parameters");
 
         let auth_url = self.build_auth_url(&config, &state_param, pkce_challenge.as_deref())?;
         flow.auth_url = Some(auth_url.clone());
 
-        // Step 4: Open browser
+        // Step 5: Open browser
         Self::add_step(&mut flow, "Open Browser", "Opening system browser for user authorization");
         flow.state = FlowState::AwaitingAuthorization;
 
@@ -242,7 +255,7 @@ impl OAuthFlowManager {
         open::that(&auth_url)
             .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to open browser: {}", e)))?;
 
-        // Start callback listener
+        // Start callback listener (the server is already bound; this just waits for the request)
         self.start_callback_listener(flow_id.clone()).await?;
 
         Ok(flow_id)
