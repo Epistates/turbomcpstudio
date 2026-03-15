@@ -16,7 +16,7 @@ use tokio::sync::{broadcast, RwLock};
 use tracing::{debug, info, warn};
 use turbomcp_client::sampling::SamplingHandler;
 use turbomcp_protocol::types::{
-    Content, CreateMessageRequest, CreateMessageResult, Role, TextContent,
+    ContentBlock, CreateMessageRequest, CreateMessageResult, Role, TextContent,
 };
 use uuid::Uuid;
 
@@ -309,7 +309,7 @@ impl HITLSamplingManager {
             request_id: pending_request.id.clone(),
             response: CreateMessageResult {
                 role: Role::Assistant,
-                content: Content::Text(TextContent {
+                content: ContentBlock::Text(TextContent {
                     text: "Request queued for human approval. Please check the HITL interface."
                         .to_string(),
                     annotations: None,
@@ -502,7 +502,7 @@ impl HITLSamplingManager {
             .iter()
             .map(|msg| {
                 let content_preview = match &msg.content {
-                    Content::Text(text) => {
+                    ContentBlock::Text(text) => {
                         let preview = if text.text.len() > 100 {
                             format!("{}...", &text.text[..97])
                         } else {
@@ -534,23 +534,55 @@ impl HITLSamplingManager {
     }
 
     /// Estimate request cost and tokens
+    ///
+    /// Uses heuristic: ~4 chars per token (industry standard approximation).
+    /// Cost estimation based on active provider's pricing.
     async fn estimate_request_cost(
         &self,
-        _request: &CreateMessageRequest, // TODO: Use request for actual cost estimation
+        request: &CreateMessageRequest,
     ) -> McpResult<(Option<f64>, Option<u32>, Option<String>)> {
-        // TODO: Implement real cost estimation based on model and message length
-        let estimated_tokens = 1000; // Placeholder
-        let estimated_cost = 0.001; // Placeholder
-        let selected_model = Some("gpt-4o-mini".to_string()); // Placeholder
+        // Estimate tokens from message content (~4 chars per token)
+        let estimated_tokens: u32 = request
+            .messages
+            .iter()
+            .map(|msg| match &msg.content {
+                ContentBlock::Text(text) => (text.text.len() / 4) as u32,
+                _ => 50, // Default estimate for non-text content
+            })
+            .sum::<u32>()
+            + request
+                .system_prompt
+                .as_ref()
+                .map(|s| (s.len() / 4) as u32)
+                .unwrap_or(0);
+
+        // Get active provider info for cost estimation
+        let config = self.llm_config.get_config().await;
+        let active_provider_id = config.active_provider.as_deref().unwrap_or("unknown");
+
+        // Look up cost config from provider settings
+        let cost_per_1k = config
+            .providers
+            .get(active_provider_id)
+            .map(|p| p.cost_config.input_cost_per_1k)
+            .unwrap_or(0.001); // Conservative default
+
+        let estimated_cost = (estimated_tokens as f64 / 1000.0) * cost_per_1k;
+        let selected_model = config
+            .providers
+            .get(active_provider_id)
+            .map(|p| p.default_model.clone())
+            .or_else(|| Some(active_provider_id.to_string()));
 
         Ok((Some(estimated_cost), Some(estimated_tokens), selected_model))
     }
 
     /// Estimate output tokens from response
+    ///
+    /// Uses heuristic: ~4 chars per token.
     async fn estimate_output_tokens(&self, response: &CreateMessageResult) -> u32 {
-        // TODO: Implement real token counting
         match &response.content {
-            Content::Text(text) => (text.text.len() / 4) as u32, // Rough estimate
+            ContentBlock::Text(text) => (text.text.len() / 4) as u32,
             _ => 0,
         }
     }

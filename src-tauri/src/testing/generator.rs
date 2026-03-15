@@ -13,7 +13,7 @@ use crate::types::{
 };
 use futures::future::join_all;
 use std::sync::Arc;
-use turbomcp_protocol::types::{Content, CreateMessageRequest, ModelHint, ModelPreferences, Role, SamplingMessage, TextContent};
+use turbomcp_protocol::types::{ContentBlock, CreateMessageRequest, ModelHint, ModelPreferences, Role, SamplingMessage, TextContent};
 
 /// AI-powered test generator
 pub struct TestGenerator {
@@ -352,7 +352,7 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
         let request = CreateMessageRequest {
             messages: vec![SamplingMessage {
                 role: Role::User,
-                content: Content::Text(TextContent {
+                content: ContentBlock::Text(TextContent {
                     text: prompt.to_string(),
                     annotations: None,
                     meta: None,
@@ -397,7 +397,7 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
 
         // Extract text content
         let response_text = match response.content {
-            Content::Text(text_content) => text_content.text,
+            ContentBlock::Text(text_content) => text_content.text,
             _ => {
                 return Err(McpStudioError::ConfigError(format!(
                     "Unexpected response format for tool {} category {}",
