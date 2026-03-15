@@ -10,9 +10,7 @@ use async_openai::{
 use std::future::Future;
 use std::pin::Pin;
 use turbomcp_client::sampling::{LLMServerClient, ServerInfo};
-use turbomcp_protocol::types::{
-    CreateMessageRequest, CreateMessageResult, Role, TextContent
-};
+use turbomcp_protocol::types::{CreateMessageRequest, CreateMessageResult, Role};
 
 /// Boxed future type alias for sampling operations (inlined from turbomcp-client v3 private type)
 type BoxSamplingFuture<'a, T> =
