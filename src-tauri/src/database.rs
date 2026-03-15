@@ -3,6 +3,8 @@ use crate::types::{collections::*, MessageHistory, ServerConfig};
 use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use std::collections::HashMap;
 use uuid::Uuid;
+// keyring is used for secure storage of OAuth client_secret
+use keyring;
 
 /// Database manager for MCP Studio
 #[derive(Debug)]
@@ -1697,7 +1699,56 @@ impl Database {
     // OAuth Configuration Methods
     // =========================================================================
 
-    /// Save OAuth configuration for a server
+    // =========================================================================
+    // OAuth client_secret keyring helpers
+    // =========================================================================
+
+    /// Keyring service name used for OAuth client secrets
+    const OAUTH_SECRET_SERVICE: &'static str = "turbomcp-oauth-secret";
+
+    /// Keyring key for a given config server_id
+    fn oauth_secret_keyring_key(server_id: &str) -> String {
+        format!("oauth_client_secret_{}", server_id)
+    }
+
+    /// Store client_secret in the OS keyring.
+    /// Returns an error if the keyring write fails.
+    fn store_client_secret_in_keyring(server_id: &str, secret: &str) -> McpResult<()> {
+        let key = Self::oauth_secret_keyring_key(server_id);
+        let entry = keyring::Entry::new(Self::OAUTH_SECRET_SERVICE, &key)
+            .map_err(|e| McpStudioError::ConfigError(format!("Failed to create keyring entry for client_secret: {}", e)))?;
+        entry
+            .set_password(secret)
+            .map_err(|e| McpStudioError::ConfigError(format!("Failed to store client_secret in keyring: {}", e)))?;
+        Ok(())
+    }
+
+    /// Retrieve client_secret from the OS keyring.
+    /// Returns `None` if no entry exists (public client / no secret set).
+    fn retrieve_client_secret_from_keyring(server_id: &str) -> Option<String> {
+        let key = Self::oauth_secret_keyring_key(server_id);
+        let entry = keyring::Entry::new(Self::OAUTH_SECRET_SERVICE, &key).ok()?;
+        entry.get_password().ok()
+    }
+
+    /// Delete client_secret from the OS keyring (best-effort, ignores missing entry).
+    fn delete_client_secret_from_keyring(server_id: &str) {
+        let key = Self::oauth_secret_keyring_key(server_id);
+        if let Ok(entry) = keyring::Entry::new(Self::OAUTH_SECRET_SERVICE, &key) {
+            let _ = entry.delete_credential();
+        }
+    }
+
+    // =========================================================================
+    // OAuth Configuration Methods
+    // =========================================================================
+
+    /// Save OAuth configuration for a server.
+    ///
+    /// The `client_secret`, if present, is stored in the OS keyring rather than
+    /// in the SQLite database.  A sentinel placeholder is written to the
+    /// `client_secret` column so that the schema remains intact and existing
+    /// rows are detectable, but no actual secret material lands on disk.
     pub async fn save_oauth_config(&self, config: &crate::oauth::OAuthConfig) -> McpResult<String> {
         let id = uuid::Uuid::new_v4().to_string();
         let now = std::time::SystemTime::now()
@@ -1707,6 +1758,18 @@ impl Database {
             .to_string();
         let scopes_json = serde_json::to_string(&config.scopes)?;
         let metadata_json = config.metadata.as_ref().map(|m| serde_json::to_string(m)).transpose()?;
+
+        // Store the actual secret in the OS keyring; write a placeholder to the DB.
+        let db_secret_placeholder: Option<String> = if let Some(ref secret) = config.client_secret {
+            if !secret.is_empty() {
+                Self::store_client_secret_in_keyring(&config.server_id, secret)?;
+                Some("[STORED_IN_KEYRING]".to_string())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         sqlx::query(
             r#"
@@ -1723,7 +1786,7 @@ impl Database {
         .bind(&config.auth_server_url)
         .bind(&config.token_endpoint)
         .bind(&config.client_id)
-        .bind(&config.client_secret)
+        .bind(&db_secret_placeholder)
         .bind(&config.redirect_uri)
         .bind(&scopes_json)
         .bind(&config.resource_uri)
@@ -1738,7 +1801,11 @@ impl Database {
         Ok(id)
     }
 
-    /// Get OAuth configuration by server ID
+    /// Get OAuth configuration by server ID.
+    ///
+    /// After reading the row from SQLite, the `client_secret` is restored from
+    /// the OS keyring.  If no keyring entry exists the field is returned as
+    /// `None` (public client).
     pub async fn get_oauth_config(&self, server_id: &str) -> McpResult<Option<crate::oauth::OAuthConfig>> {
         let row = sqlx::query(
             r#"
@@ -1756,14 +1823,19 @@ impl Database {
             Some(row) => {
                 let scopes_json: String = row.get("scopes");
                 let metadata_json: Option<String> = row.get("metadata");
+                let db_server_id: String = row.get("server_id");
+
+                // Restore the actual secret from the OS keyring, ignoring the
+                // sentinel placeholder that is stored in the database column.
+                let client_secret = Self::retrieve_client_secret_from_keyring(&db_server_id);
 
                 Ok(Some(crate::oauth::OAuthConfig {
-                    server_id: row.get("server_id"),
+                    server_id: db_server_id,
                     protocol_version: row.get("protocol_version"),
                     auth_server_url: row.get("auth_server_url"),
                     token_endpoint: row.get("token_endpoint"),
                     client_id: row.get("client_id"),
-                    client_secret: row.get("client_secret"),
+                    client_secret,
                     redirect_uri: row.get("redirect_uri"),
                     scopes: serde_json::from_str(&scopes_json).unwrap_or_default(),
                     resource_uri: row.get("resource_uri"),
@@ -1776,7 +1848,12 @@ impl Database {
         }
     }
 
-    /// Update OAuth configuration
+    /// Update OAuth configuration.
+    ///
+    /// If the incoming config carries a real secret (non-empty, non-sentinel)
+    /// the keyring entry is refreshed.  If the secret is empty or absent the
+    /// existing keyring entry is left untouched so that a partial update (e.g.
+    /// only changing scopes) does not inadvertently erase the stored secret.
     pub async fn update_oauth_config(&self, server_id: &str, config: &crate::oauth::OAuthConfig) -> McpResult<()> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1785,6 +1862,19 @@ impl Database {
             .to_string();
         let scopes_json = serde_json::to_string(&config.scopes)?;
         let metadata_json = config.metadata.as_ref().map(|m| serde_json::to_string(m)).transpose()?;
+
+        // Only update the keyring when a real (non-sentinel) secret is provided.
+        let db_secret_placeholder: Option<String> = match &config.client_secret {
+            Some(secret) if !secret.is_empty() && secret != "[STORED_IN_KEYRING]" => {
+                Self::store_client_secret_in_keyring(server_id, secret)?;
+                Some("[STORED_IN_KEYRING]".to_string())
+            }
+            Some(_) => {
+                // Sentinel or empty string passed in — preserve existing keyring entry.
+                Some("[STORED_IN_KEYRING]".to_string())
+            }
+            None => None,
+        };
 
         sqlx::query(
             r#"
@@ -1799,7 +1889,7 @@ impl Database {
         .bind(&config.auth_server_url)
         .bind(&config.token_endpoint)
         .bind(&config.client_id)
-        .bind(&config.client_secret)
+        .bind(&db_secret_placeholder)
         .bind(&config.redirect_uri)
         .bind(&scopes_json)
         .bind(&config.resource_uri)
@@ -1814,17 +1904,26 @@ impl Database {
         Ok(())
     }
 
-    /// Delete OAuth configuration for a server
+    /// Delete OAuth configuration for a server.
+    ///
+    /// Also removes any stored client_secret from the OS keyring so that no
+    /// orphaned credentials are left behind.
     pub async fn delete_oauth_config(&self, server_id: &str) -> McpResult<()> {
         sqlx::query("DELETE FROM oauth_configs WHERE server_id = ?")
             .bind(server_id)
             .execute(&self.pool)
             .await?;
 
+        // Clean up the keyring entry (best-effort, non-fatal).
+        Self::delete_client_secret_from_keyring(server_id);
+
         Ok(())
     }
 
-    /// List all OAuth configurations
+    /// List all OAuth configurations.
+    ///
+    /// For each row the `client_secret` is restored from the OS keyring rather
+    /// than being read from the SQLite column.
     pub async fn list_oauth_configs(&self) -> McpResult<Vec<crate::oauth::OAuthConfig>> {
         let rows = sqlx::query(
             r#"
@@ -1841,14 +1940,18 @@ impl Database {
         for row in rows {
             let scopes_json: String = row.get("scopes");
             let metadata_json: Option<String> = row.get("metadata");
+            let db_server_id: String = row.get("server_id");
+
+            // Restore actual secret from keyring; the DB column only holds the sentinel.
+            let client_secret = Self::retrieve_client_secret_from_keyring(&db_server_id);
 
             configs.push(crate::oauth::OAuthConfig {
-                server_id: row.get("server_id"),
+                server_id: db_server_id,
                 protocol_version: row.get("protocol_version"),
                 auth_server_url: row.get("auth_server_url"),
                 token_endpoint: row.get("token_endpoint"),
                 client_id: row.get("client_id"),
-                client_secret: row.get("client_secret"),
+                client_secret,
                 redirect_uri: row.get("redirect_uri"),
                 scopes: serde_json::from_str(&scopes_json).unwrap_or_default(),
                 resource_uri: row.get("resource_uri"),

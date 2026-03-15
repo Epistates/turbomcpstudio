@@ -73,7 +73,12 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_sql::Builder::default().build())
+        // tauri_plugin_sql is intentionally not registered here.
+        // The application manages its own SQLite database through sqlx (database.rs)
+        // and does not expose any SQL API surface to the frontend WebView.
+        // Registering tauri_plugin_sql would allow arbitrary frontend JavaScript
+        // to execute SQL queries directly against the database, which would be
+        // a significant privilege escalation vulnerability.
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())

@@ -6,7 +6,6 @@
 //! - Manage server templates
 //! - Load and delete configurations
 
-use crate::database::Database;
 use crate::types::{ServerConfig, TransportConfig};
 use crate::AppState;
 use serde::{Deserialize, Serialize};
@@ -165,7 +164,22 @@ pub async fn test_server_config(
                 (command.clone(), None)
             };
 
-            // Test if the executable is actually executable by trying to run it with --help
+            // Verify the resolved command path refers to a regular file, not a
+            // directory or a device node.  This prevents path tricks where an
+            // attacker supplies something like "/etc" or a block device path.
+            // Symlinks are acceptable; the OS resolves them at exec() time.
+            let cmd_path = Path::new(&actual_command);
+            if cmd_path.exists() && !cmd_path.is_file() {
+                return Err(format!(
+                    "Command path '{}' is not a regular file",
+                    actual_command
+                ));
+            }
+
+            // Test if the executable is actually executable by trying to run it
+            // with --help ONLY.  Config-supplied args are intentionally excluded
+            // from this test invocation to prevent argument injection via the
+            // config reaching an arbitrary binary.
             let mut test_cmd = Command::new(&actual_command);
             test_cmd.arg("--help");
 
@@ -437,9 +451,12 @@ pub async fn update_server_config(
 pub async fn load_server_configs(
     app_handle: tauri::AppHandle,
 ) -> Result<Vec<ServerConfig>, String> {
-    // Try to get database, return empty list if not ready
-    let database = app_handle
-        .try_state::<Database>()
+    let app_state = app_handle
+        .try_state::<AppState>()
+        .ok_or_else(|| "AppState not yet initialized. Please try again in a moment.".to_string())?;
+    let db_lock = app_state.database.read().await;
+    let database = db_lock
+        .as_ref()
         .ok_or_else(|| "Database not yet initialized. Please try again in a moment.".to_string())?;
 
     let configs = database

@@ -63,39 +63,6 @@ pub async fn get_app_paths(app_handle: tauri::AppHandle) -> Result<AppPaths, Str
     })
 }
 
-/// Open a URL in the system's default browser
-/// Note: Future feature - not yet registered
-#[allow(dead_code)]
-#[tauri::command]
-pub async fn open_url(url: String) -> Result<(), String> {
-    // Use system's default command to open URL
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg(&url)
-            .spawn()
-            .map_err(|e| format!("Failed to open URL: {}", e))?;
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(&url)
-            .spawn()
-            .map_err(|e| format!("Failed to open URL: {}", e))?;
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("cmd")
-            .args(&["/C", "start", &url])
-            .spawn()
-            .map_err(|e| format!("Failed to open URL: {}", e))?;
-    }
-
-    Ok(())
-}
-
 /// Fetch available models from LLM API (avoids CORS issues)
 #[tauri::command]
 pub async fn fetch_llm_models(base_url: String) -> Result<Value, String> {

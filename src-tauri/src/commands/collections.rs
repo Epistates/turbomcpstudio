@@ -213,14 +213,44 @@ pub async fn export_collection_to_file(
     include_execution_history: Option<bool>,
     app_state: State<'_, AppState>,
 ) -> Result<String, String> {
+    // Path validation: canonicalize the parent directory so that any `..`
+    // components and symlinks are fully resolved before we write.  The file
+    // itself need not exist yet, but its parent directory must.
+    let path = std::path::Path::new(&file_path);
+    let parent = path
+        .parent()
+        .ok_or_else(|| "Export path has no parent directory".to_string())?;
+
+    // An empty parent means the current working directory; resolve it.
+    let parent_to_check = if parent == std::path::Path::new("") {
+        std::path::Path::new(".")
+    } else {
+        parent
+    };
+
+    let canonical_parent = parent_to_check
+        .canonicalize()
+        .map_err(|e| format!("Invalid directory path: {}", e))?;
+
+    if !canonical_parent.is_dir() {
+        return Err("Export path parent is not a directory".to_string());
+    }
+
+    // Reconstruct the final path from the resolved parent and the bare file name.
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| "Export path has no file name".to_string())?;
+    let safe_path = canonical_parent.join(file_name);
+
     // Get collection data
     let export_json =
         export_collection(collection_id, include_execution_history, app_state).await?;
 
-    // Write to file
-    std::fs::write(&file_path, export_json).map_err(|e| format!("Failed to write file: {}", e))?;
+    // Write to file using the validated, canonical path
+    std::fs::write(&safe_path, export_json)
+        .map_err(|e| format!("Failed to write file: {}", e))?;
 
-    Ok(file_path)
+    Ok(safe_path.to_string_lossy().into_owned())
 }
 
 /// Import collection from file using specified path
@@ -230,9 +260,19 @@ pub async fn import_collection_from_file(
     overwrite_existing: Option<bool>,
     app_state: State<'_, AppState>,
 ) -> Result<String, String> {
-    // Read file
-    let json_data =
-        std::fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))?;
+    // Path validation: canonicalize the full path, which resolves all `..`
+    // components and symlinks and verifies that the file actually exists.
+    let canonical = std::path::Path::new(&file_path)
+        .canonicalize()
+        .map_err(|e| format!("Invalid file path: {}", e))?;
+
+    if !canonical.is_file() {
+        return Err("Import path is not a regular file".to_string());
+    }
+
+    // Read file using the resolved, canonical path
+    let json_data = std::fs::read_to_string(&canonical)
+        .map_err(|e| format!("Failed to read file: {}", e))?;
 
     // Import the collection
     import_collection(json_data, overwrite_existing, app_state).await
