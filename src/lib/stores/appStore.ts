@@ -145,9 +145,7 @@ export const appStore = {
   },
 
   // Complete initialization sequence
-  completeInitialization() {
-    const startTime = Date.now();
-
+  completeInitialization(startTime?: number) {
     // Mark all pending steps as completed
     loadingSteps.update(steps =>
       steps.map(step =>
@@ -162,7 +160,7 @@ export const appStore = {
       isInitializing: false,
       databaseReady: true,
       mcpManagerReady: true,
-      startupTime: Date.now() - startTime,
+      startupTime: startTime ? Date.now() - startTime : 0,
     }));
   },
 

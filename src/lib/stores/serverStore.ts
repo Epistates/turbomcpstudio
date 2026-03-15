@@ -237,7 +237,7 @@ function createServerStore() {
 
             if (existingServer) {
               // ✅ Server exists, reconnect to it
-              console.log(`♻️ Reconnecting to existing server: ${config.name}`);
+              logger.info(`Reconnecting to existing server: ${config.name}`);
               serverConfig = existingServer.config;
 
               // Update status to connecting
@@ -251,7 +251,7 @@ function createServerStore() {
               });
             } else {
               // ✅ NEW: New server - create config in database first
-              console.log(`✨ Creating new server: ${config.name}`);
+              logger.info(`Creating new server: ${config.name}`);
 
               serverConfig = await withTimeout(
                 invoke('create_server_config', {
@@ -290,7 +290,7 @@ function createServerStore() {
             }
 
             // ✅ Now connect to the server (both new and existing go through here)
-            console.log(`🔌 Connecting to server: ${serverConfig.name}`);
+            logger.info(`Connecting to server: ${serverConfig.name}`);
             const serverInfo: ServerInfo = await withTimeout(
               invoke('connect_server', { serverConfig }),
               30000,
@@ -309,7 +309,7 @@ function createServerStore() {
               };
             });
 
-            console.log(`✅ Successfully connected to: ${serverConfig.name}`);
+            logger.info(`Successfully connected to: ${serverConfig.name}`);
             return serverInfo;
           } catch (error) {
             logger.error('❌ Failed to connect server:', error);
@@ -431,7 +431,7 @@ function createServerStore() {
           return { ...state, servers: newServers };
         });
 
-        console.log(`✅ Created server config: ${name}`);
+        logger.info(`Created server config: ${name}`);
         return config;
       } catch (error) {
         logger.error('❌ Failed to create server config:', error);
@@ -504,7 +504,7 @@ function createServerStore() {
           return { ...state, servers: newServers };
         });
 
-        console.log(`✅ Updated server config: ${name}`);
+        logger.info(`Updated server config: ${name}`);
         return updatedConfig;
       } catch (error) {
         logger.error('❌ Failed to update server config:', error);

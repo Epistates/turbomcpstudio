@@ -57,6 +57,8 @@
   // Track cleanup functions
   let mcpUnlisten: (() => void) | null = null;
   let elicitationUnlisten: (() => void) | null = null;
+  let appEarlyReadyUnlisten: (() => void) | null = null;
+  let appReadyUnlisten: (() => void) | null = null;
   let appReadyReceived = false;
   let initializationStartTime = Date.now();
 
@@ -135,7 +137,7 @@
       }
     });
 
-    await listen<boolean>('app-early-ready', (event) => {
+    appEarlyReadyUnlisten = await listen<boolean>('app-early-ready', (event) => {
       try {
         console.log('🟢 Received app-early-ready event');
         appStore.setMcpManagerReady(true);
@@ -145,7 +147,7 @@
       }
     });
 
-    await listen<void>('app-ready', async (event) => {
+    appReadyUnlisten = await listen<void>('app-ready', async (event) => {
       try {
         if (appReadyReceived) {
           console.log('⏭️ app-ready already received, skipping');
@@ -173,15 +175,15 @@
           // Continue anyway - UI should still be usable
         } finally {
           // CRITICAL: Always complete initialization to unblock UI, even if there are errors
-          appStore.completeInitialization();
+          appStore.completeInitialization(initializationStartTime);
         }
       } catch (err) {
         console.error('❌ Failed to process app-ready event:', err);
-        appStore.markStepError('app-ready', err instanceof Error ? err.message : 'Unknown error');
+        appStore.markStepError('servers', err instanceof Error ? err.message : 'Unknown error');
         // Force completion despite error to unblock UI
         appStore.setDatabaseReady(true);
         appStore.setMcpManagerReady(true);
-        appStore.completeInitialization();
+        appStore.completeInitialization(initializationStartTime);
       }
     });
 
@@ -228,23 +230,6 @@
     await emit('frontend-ready', {});
     console.log('📤 Emitted frontend-ready signal to backend');
 
-    // Mark servers step as loading
-    appStore.markStepLoading('servers');
-
-    // Attempt initial server load (non-blocking, might fail if database not ready)
-    serverStore.initialize().then(async () => {
-      // Don't complete here - wait for app-ready event for proper sequencing
-      // Also attempt to load profiles (may fail if database not ready)
-      try {
-        await profileStore.loadProfiles();
-        await profileStore.loadActiveProfiles();
-      } catch (err) {
-        // Silent fail - will retry after database ready
-      }
-    }).catch(err => {
-      appStore.markStepError('servers', 'Database not ready yet');
-    });
-
     // Issue #5 fix: Timeout removed - backend panic hook now handles all failure cases
     // Backend always emits either:
     // 1. "app-ready" on successful initialization (even with fallbacks)
@@ -265,6 +250,14 @@
     if (elicitationUnlisten) {
       elicitationUnlisten();
       elicitationUnlisten = null;
+    }
+    if (appEarlyReadyUnlisten) {
+      appEarlyReadyUnlisten();
+      appEarlyReadyUnlisten = null;
+    }
+    if (appReadyUnlisten) {
+      appReadyUnlisten();
+      appReadyUnlisten = null;
     }
   });
 </script>

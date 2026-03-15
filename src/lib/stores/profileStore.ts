@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { uiStore } from './uiStore';
 import { createLogger } from '$lib/utils/logger';
@@ -312,11 +312,8 @@ function createProfileStore() {
 
     // Check if a profile is currently active
     isProfileActive(profileId: string): boolean {
-      let isActive = false;
-      this.subscribe((state) => {
-        isActive = state.activeProfiles.has(profileId);
-      })();
-      return isActive;
+      const state = get({ subscribe });
+      return state.activeProfiles.has(profileId);
     },
 
     // Toggle a profile (activate if inactive, deactivate if active)
