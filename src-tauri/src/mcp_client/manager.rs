@@ -53,7 +53,13 @@ use super::mcp_operations::McpOperations;
 use super::message_history::MessageHistory;
 use super::misc_operations::MiscOperations;
 use super::monitoring_loop::MonitoringLoop;
+use super::notification_handlers::{
+    StudioLogHandler, StudioProgressHandler, StudioPromptListChangedHandler,
+    StudioResourceListChangedHandler, StudioResourceUpdateHandler,
+    StudioToolListChangedHandler,
+};
 use super::process::ManagedProcess;
+use super::rate_limiter::RateLimiter;
 use super::sampling::StudioSamplingHandler;
 use super::sampling_logic::SamplingLogic;
 use super::transport_layer::TransportLayer;
@@ -77,6 +83,27 @@ pub struct McpClientManager {
 
     /// Elicitation handler for server-initiated user input requests
     elicitation_handler: Arc<StudioElicitationHandler>,
+
+    /// Log handler for server log messages
+    log_handler: Arc<StudioLogHandler>,
+
+    /// Resource update handler for resource change notifications
+    resource_update_handler: Arc<StudioResourceUpdateHandler>,
+
+    /// Progress handler for progress notifications
+    progress_handler: Arc<StudioProgressHandler>,
+
+    /// Tool list changed handler
+    tool_list_changed_handler: Arc<StudioToolListChangedHandler>,
+
+    /// Prompt list changed handler
+    prompt_list_changed_handler: Arc<StudioPromptListChangedHandler>,
+
+    /// Resource list changed handler
+    resource_list_changed_handler: Arc<StudioResourceListChangedHandler>,
+
+    /// Rate limiter for MCP operations
+    rate_limiter: Arc<RateLimiter>,
 
     /// Tauri app handle for emitting events
     app_handle: tauri::AppHandle,
@@ -103,12 +130,36 @@ impl McpClientManager {
         // Initialize elicitation handler with Tauri app handle and protocol logging
         let elicitation_handler = Arc::new(StudioElicitationHandler::new(app_handle.clone(), db));
 
+        // Initialize log handler for server log messages
+        let log_handler = Arc::new(StudioLogHandler::new(app_handle.clone()));
+
+        // Initialize resource update handler for resource change notifications
+        let resource_update_handler = Arc::new(StudioResourceUpdateHandler::new(app_handle.clone()));
+
+        // Initialize progress handler for progress notifications
+        let progress_handler = Arc::new(StudioProgressHandler::new(app_handle.clone()));
+
+        // Initialize list changed handlers
+        let tool_list_changed_handler = Arc::new(StudioToolListChangedHandler::new(app_handle.clone()));
+        let prompt_list_changed_handler = Arc::new(StudioPromptListChangedHandler::new(app_handle.clone()));
+        let resource_list_changed_handler = Arc::new(StudioResourceListChangedHandler::new(app_handle.clone()));
+
+        // Initialize rate limiter (100 requests per minute per server, disabled in dev mode)
+        let rate_limiter = Arc::new(RateLimiter::new(100, 60));
+
         let manager = Self {
             connections: Arc::new(DashMap::new()),
             system: Arc::new(RwLock::new(System::new_all())),
             event_sender,
             sampling_handler,
             elicitation_handler,
+            log_handler,
+            resource_update_handler,
+            progress_handler,
+            tool_list_changed_handler,
+            prompt_list_changed_handler,
+            resource_list_changed_handler,
+            rate_limiter,
             app_handle,
         };
 
@@ -372,6 +423,12 @@ impl McpClientManager {
             connection,
             self.sampling_handler.clone(),
             self.elicitation_handler.clone(),
+            self.log_handler.clone(),
+            self.resource_update_handler.clone(),
+            self.progress_handler.clone(),
+            self.tool_list_changed_handler.clone(),
+            self.prompt_list_changed_handler.clone(),
+            self.resource_list_changed_handler.clone(),
         )
         .await
     }
@@ -390,13 +447,21 @@ impl McpClientManager {
         Ok(servers)
     }
 
-    /// Send a tool call to an MCP server with automatic retry logic
+    /// Send a tool call to an MCP server with automatic retry logic and rate limiting
     pub async fn call_tool(
         &self,
         server_id: Uuid,
         tool_name: &str,
         parameters: Value,
     ) -> McpResult<Value> {
+        // Enforce rate limiting
+        self.rate_limiter
+            .check_rate_limit(server_id)
+            .map_err(McpStudioError::RateLimitExceeded)?;
+
+        // Validate input parameters
+        McpOperations::validate_tool_call_input(tool_name, &parameters)?;
+
         McpOperations::call_tool(&self.connections, server_id, tool_name, parameters).await
     }
 
@@ -638,6 +703,28 @@ impl McpClientManager {
             .ok_or_else(|| McpStudioError::ServerNotFound(server_id.to_string()))?;
 
         MiscOperations::get_handler_status(&connection, server_id).await
+    }
+
+    // ========================================================================
+    // Resource Subscription Methods
+    // ========================================================================
+
+    /// Subscribe to resource updates on an MCP server
+    pub async fn subscribe_resource(
+        &self,
+        server_id: Uuid,
+        uri: String,
+    ) -> McpResult<()> {
+        McpOperations::subscribe_resource(&self.connections, server_id, &uri).await
+    }
+
+    /// Unsubscribe from resource updates on an MCP server
+    pub async fn unsubscribe_resource(
+        &self,
+        server_id: Uuid,
+        uri: String,
+    ) -> McpResult<()> {
+        McpOperations::unsubscribe_resource(&self.connections, server_id, &uri).await
     }
 
     // ========================================================================
