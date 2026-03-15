@@ -80,7 +80,7 @@
 			<div class="flow-state" data-state={flow.state.toLowerCase()}>
 				{#if flow.state in stateConfig}
 					{@const config = stateConfig[flow.state as keyof typeof stateConfig]}
-					<svelte:component this={config.icon} class="state-icon {config.color}" size={20} />
+					<config.icon class="state-icon {config.color}" size={20} />
 					<span class="state-label {config.color}">{config.label}</span>
 				{/if}
 			</div>
@@ -121,7 +121,7 @@
 						class:completed={flow.steps.some((s) => s.step_type.includes(stateName))}
 					>
 						<div class="node-icon {config.color}">
-							<svelte:component this={config.icon} size={24} />
+							<config.icon size={24} />
 						</div>
 						<span class="node-label">{config.label}</span>
 					</div>

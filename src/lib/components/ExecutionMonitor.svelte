@@ -792,22 +792,22 @@
   }
 
   /* Dark theme adjustments */
-  [data-theme="dark"] .execution-monitor__operation-type {
+  :global([data-theme="dark"]) .execution-monitor__operation-type {
     background: var(--mcp-primary-900);
     color: var(--mcp-primary-300);
   }
 
-  [data-theme="dark"] .execution-monitor__event--step_started {
+  :global([data-theme="dark"]) .execution-monitor__event--step_started {
     background: rgba(var(--mcp-primary-500-rgb), 0.1);
   }
 
-  [data-theme="dark"] .execution-monitor__event--step_completed,
-  [data-theme="dark"] .execution-monitor__event--execution_completed {
+  :global([data-theme="dark"]) .execution-monitor__event--step_completed,
+  :global([data-theme="dark"]) .execution-monitor__event--execution_completed {
     background: rgba(var(--mcp-success-500-rgb), 0.1);
   }
 
-  [data-theme="dark"] .execution-monitor__event--step_failed,
-  [data-theme="dark"] .execution-monitor__event--execution_failed {
+  :global([data-theme="dark"]) .execution-monitor__event--step_failed,
+  :global([data-theme="dark"]) .execution-monitor__event--execution_failed {
     background: rgba(var(--mcp-error-500-rgb), 0.1);
   }
 

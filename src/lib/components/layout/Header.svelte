@@ -541,17 +541,17 @@
   }
 
   /* Dark theme adjustments */
-  [data-theme="dark"] .mcp-header__status-indicator--connected {
+  :global([data-theme="dark"]) .mcp-header__status-indicator--connected {
     background: var(--mcp-success-900);
     color: var(--mcp-success-300);
   }
 
-  [data-theme="dark"] .mcp-header__status-indicator--partial {
+  :global([data-theme="dark"]) .mcp-header__status-indicator--partial {
     background: var(--mcp-warning-900);
     color: var(--mcp-warning-300);
   }
 
-  [data-theme="dark"] .mcp-header__status-indicator--disconnected {
+  :global([data-theme="dark"]) .mcp-header__status-indicator--disconnected {
     background: var(--mcp-gray-800);
     color: var(--mcp-gray-300);
   }

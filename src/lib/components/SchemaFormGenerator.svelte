@@ -397,7 +397,7 @@
                   errors[name] ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                 }`}
                 rows="3"
-              />
+              ></textarea>
 
             {:else if propertyType === 'integer' || propertyType === 'number'}
               <!-- Number -->
@@ -492,10 +492,24 @@
 
 <style>
   .form-field {
-    @apply bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg;
+    background-color: var(--mcp-surface-secondary);
+    padding: var(--mcp-space-3);
+    border-radius: var(--mcp-radius-lg);
+  }
+
+  :global([data-theme="dark"]) .form-field {
+    background-color: rgba(31, 41, 55, 0.5);
   }
 
   .nested-field {
-    @apply bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700;
+    background-color: var(--mcp-surface-primary);
+    padding: var(--mcp-space-3);
+    border-radius: var(--mcp-radius-lg);
+    border: 1px solid var(--mcp-border-primary);
+  }
+
+  :global([data-theme="dark"]) .nested-field {
+    background-color: var(--mcp-surface-secondary);
+    border-color: var(--mcp-border-secondary);
   }
 </style>

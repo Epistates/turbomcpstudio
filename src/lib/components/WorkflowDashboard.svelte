@@ -238,7 +238,7 @@
           {#each suggestedActions() as action}
             <button class="action-item" onclick={action.action}>
               <div class="action-icon">
-                <svelte:component this={action.icon} size={20} />
+                <action.icon size={20} />
               </div>
               <div class="action-content">
                 <span class="action-label">{action.label}</span>

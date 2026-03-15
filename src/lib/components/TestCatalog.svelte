@@ -346,10 +346,11 @@
 				<!-- LLM Provider Selector (only show when multiple providers available) -->
 				{#if showProviderSelector}
 					<div class="mb-2">
-						<label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+						<label for="provider-select" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
 							Provider
 						</label>
 						<select
+							id="provider-select"
 							bind:value={selectedProvider}
 							class="w-full px-3 py-1.5 text-sm bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
 						>
@@ -369,10 +370,11 @@
 
 				<!-- Model Selector -->
 				<div class="mb-3">
-					<label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+					<label for="model-select" class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
 						Model
 					</label>
 					<select
+						id="model-select"
 						bind:value={selectedModel}
 						disabled={!selectedProvider || availableModels.length === 0}
 						class="w-full px-3 py-1.5 text-sm bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
@@ -671,6 +673,7 @@
 	.line-clamp-2 {
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
+		line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 	}

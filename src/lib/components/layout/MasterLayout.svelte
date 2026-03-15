@@ -292,7 +292,7 @@
   }
 
   /* Dark theme adjustments */
-  [data-theme="dark"] .mcp-mobile-overlay {
+  :global([data-theme="dark"]) .mcp-mobile-overlay {
     background: rgba(0, 0, 0, 0.7);
   }
 

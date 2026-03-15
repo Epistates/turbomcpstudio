@@ -100,13 +100,15 @@
     uiStore.setSelectedTool(execution.tool, execution.serverId);
     uiStore.setView('tools');
   }
+
+  const HealthIcon = $derived(getHealthIcon());
 </script>
 
 <div class="mission-control">
   <!-- System Health Bar -->
   <div class="health-bar">
     <div class="health-status">
-      <svelte:component this={getHealthIcon()} size={24} class={getHealthColor()} />
+      <HealthIcon size={24} class={getHealthColor()} />
       <div class="health-text">
         <span class="health-count">
           {health().connected}/{health().total} connected

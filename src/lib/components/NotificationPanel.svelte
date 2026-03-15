@@ -104,8 +104,12 @@
 
   <!-- Panel Dropdown -->
   {#if panelOpen}
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <div class="notification-panel" onclick={(e) => e.stopPropagation()}>
+    <div
+      class="notification-panel"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.key === 'Escape' && closePanel()}
+      role="presentation"
+    >
       <!-- Header -->
       <div class="notification-panel-header">
         <h3 class="notification-panel-title">Notifications</h3>
@@ -115,6 +119,7 @@
               onclick={markAllAsRead}
               class="notification-action-btn"
               title="Mark all as read"
+              aria-label="Mark all as read"
             >
               <Check size={14} />
             </button>
@@ -122,6 +127,7 @@
               onclick={clearAll}
               class="notification-action-btn"
               title="Clear all"
+              aria-label="Clear all"
             >
               <Trash2 size={14} />
             </button>
@@ -130,6 +136,7 @@
             onclick={closePanel}
             class="notification-action-btn"
             title="Close"
+            aria-label="Close"
           >
             <X size={14} />
           </button>
@@ -137,7 +144,7 @@
       </div>
 
       <!-- Notifications List -->
-      <div class="notification-list">
+      <div class="notification-list" role="list">
         {#if notifications.length === 0}
           <div class="notification-empty">
             <Bell size={32} class="text-gray-300 dark:text-gray-600 mb-2" />
@@ -151,6 +158,10 @@
               class="notification-item"
               class:unread={!notification.read}
               onclick={() => markAsRead(notification.id)}
+              onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && markAsRead(notification.id)}
+              role="button"
+              tabindex="0"
+              aria-label="Notification: {notification.title}"
             >
               <div class="notification-icon {getIconColor(notification.type)}">
                 <IconComponent size={16} />
@@ -169,6 +180,7 @@
                 onclick={(e) => { e.stopPropagation(); removeNotification(notification.id); }}
                 class="notification-remove"
                 title="Dismiss"
+                aria-label="Dismiss notification"
               >
                 <X size={12} />
               </button>
@@ -327,7 +339,7 @@
     background: var(--mcp-primary-50);
   }
 
-  [data-theme="dark"] .notification-item.unread {
+  :global([data-theme="dark"]) .notification-item.unread {
     background: rgba(59, 130, 246, 0.1);
   }
 
@@ -377,6 +389,7 @@
     line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }

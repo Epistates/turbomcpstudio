@@ -1,14 +1,13 @@
 <script lang="ts">
   import { proxyStore, activeProxy, runningProxies } from '$lib/stores/proxyStore';
-  import { createEventDispatcher, onMount } from 'svelte';
-
-  const dispatch = createEventDispatcher();
+  import { onMount } from 'svelte';
 
   interface Props {
     selectedProxyId: string;
+    onclose?: () => void;
   }
 
-  let { selectedProxyId }: Props = $props();
+  let { selectedProxyId, onclose }: Props = $props();
 
   // Use $effect to reactively get the proxy from the store
   let proxy = $state<any>(undefined);
@@ -56,7 +55,7 @@
   });
 
   function handleClose() {
-    dispatch('close');
+    onclose?.();
   }
 
   function formatLatency(ms: number): string {
@@ -76,7 +75,7 @@
 
 <div class="proxy-monitor">
   <div class="monitor-header">
-    <button class="btn-back" on:click={handleClose}>
+    <button class="btn-back" onclick={handleClose}>
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           stroke-linecap="round"
@@ -105,8 +104,9 @@
     <div class="header-actions">
       <button
         class="btn-icon"
-        on:click={() => (autoRefresh = !autoRefresh)}
+        onclick={() => (autoRefresh = !autoRefresh)}
         title={autoRefresh ? 'Auto-refresh enabled' : 'Auto-refresh disabled'}
+        aria-label={autoRefresh ? 'Disable auto-refresh' : 'Enable auto-refresh'}
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -118,7 +118,12 @@
         </svg>
       </button>
 
-      <button class="btn-icon" on:click={loadMetrics} disabled={loadingMetrics}>
+      <button
+        class="btn-icon"
+        onclick={loadMetrics}
+        disabled={loadingMetrics}
+        aria-label="Refresh metrics"
+      >
         {#if loadingMetrics}
           <svg class="spinner" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" />

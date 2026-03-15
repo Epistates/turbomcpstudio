@@ -13,13 +13,13 @@
     await proxyStore.loadProxies();
   });
 
-  function handleSelectProxy(event: CustomEvent<{ id: string }>) {
-    selectedProxyId = event.detail.id;
+  function handleSelectProxy(detail: { id: string }) {
+    selectedProxyId = detail.id;
     view = 'monitor';
   }
 
-  function handleProxyCreated(event: CustomEvent<{ id: string }>) {
-    selectedProxyId = event.detail.id;
+  function handleProxyCreated(detail: { id: string }) {
+    selectedProxyId = detail.id;
     view = 'monitor';
   }
 
@@ -51,9 +51,10 @@
 
       <nav class="flex gap-2">
         <button
+          type="button"
           class="btn"
           class:active={view === 'list'}
-          on:click={() => handleBackToList()}
+          onclick={() => handleBackToList()}
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -66,9 +67,10 @@
           <span>All Proxies</span>
         </button>
         <button
+          type="button"
           class="btn btn-primary"
           class:active={view === 'create'}
-          on:click={() => (view = 'create')}
+          onclick={() => (view = 'create')}
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -103,11 +105,11 @@
 
   <main class="proxy-content">
     {#if view === 'list'}
-      <ProxyList on:select={handleSelectProxy} />
+      <ProxyList onselect={handleSelectProxy} />
     {:else if view === 'create'}
-      <ProxyCreator on:created={handleProxyCreated} />
+      <ProxyCreator oncreated={handleProxyCreated} />
     {:else if view === 'monitor' && selectedProxyId}
-      <ProxyMonitor {selectedProxyId} on:close={handleBackToList} />
+      <ProxyMonitor {selectedProxyId} onclose={handleBackToList} />
     {/if}
   </main>
 </div>

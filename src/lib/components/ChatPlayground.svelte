@@ -390,9 +390,13 @@
 							</div>
 							<div class="max-h-64 overflow-y-auto">
 								{#each branches as branch (branch.id)}
+									<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 									<div
 										class="flex items-center justify-between px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 cursor-pointer {branch.id === activeBranchId ? 'bg-purple-50 dark:bg-purple-900/20' : ''}"
 										onclick={() => { switchBranch(branch.id); showBranchPanel = false; }}
+										onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { switchBranch(branch.id); showBranchPanel = false; } }}
+										role="button"
+										tabindex="0"
 									>
 										<div class="flex items-center gap-2 flex-1 min-w-0">
 											<GitBranch class="h-4 w-4 flex-shrink-0 {branch.id === activeBranchId ? 'text-purple-600 dark:text-purple-400' : 'text-zinc-400'}" />
@@ -605,6 +609,7 @@
 					bind:value={input}
 					onkeydown={handleKeyDown}
 					placeholder="Ask anything... (Enter to send, Shift+Enter for new line)"
+					aria-label="Chat input"
 					disabled={loading || enabledProviders.length === 0}
 					class="min-h-[60px] max-h-[200px] flex-1 resize-none rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-3 text-sm placeholder-zinc-400 focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:bg-zinc-800"
 					rows="2"

@@ -34,7 +34,7 @@
   let messages = $state<any[]>([]);
   let input = $state('');
   let isLoading = $state(false);
-  let chatContainer: HTMLDivElement;
+  let chatContainer = $state<HTMLDivElement | undefined>(undefined);
 
   // Tabs
   let activeTab = $state<'suggestions' | 'insights' | 'chat'>('suggestions');
@@ -42,9 +42,10 @@
   // Effects
   $effect(() => {
     // Auto-scroll chat to bottom
-    if (chatContainer) {
+    const container = chatContainer;
+    if (container) {
       setTimeout(() => {
-        chatContainer.scrollTop = chatContainer.scrollHeight;
+        container.scrollTop = container.scrollHeight;
       }, 0);
     }
   });
@@ -265,7 +266,7 @@
             onkeydown={handleKeydown}
             disabled={isLoading}
             rows={2}
-          />
+          ></textarea>
           <button
             class="send-button"
             onclick={sendMessage}

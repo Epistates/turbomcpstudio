@@ -1327,7 +1327,7 @@
               </div>
 
               <div>
-                <label class="form-label">Headers</label>
+                <span class="form-label block mb-2">Headers</span>
                 {#each headerPairs as pair, index}
                   <div class="flex items-center space-x-2 mb-2">
                     <label for="add-server-header-key-{index}" class="sr-only">Header name</label>
@@ -1428,17 +1428,21 @@
 
             <!-- Environment Variables -->
             <div>
-              <label class="form-label">Environment Variables</label>
+              <span class="form-label block mb-2">Environment Variables</span>
               {#each envPairs as pair, index}
                 <div class="flex items-center space-x-2 mb-2">
+                  <label for="add-server-env-key-{index}" class="sr-only">Variable name</label>
                   <input
+                    id="add-server-env-key-{index}"
                     type="text"
                     bind:value={pair.key}
                     oninput={updateEnvironmentVariables}
                     placeholder="Variable name"
                     class="form-input flex-1"
                   />
+                  <label for="add-server-env-value-{index}" class="sr-only">Variable value</label>
                   <input
+                    id="add-server-env-value-{index}"
                     type="text"
                     bind:value={pair.value}
                     oninput={updateEnvironmentVariables}
@@ -1448,6 +1452,7 @@
                   <button
                     onclick={() => removeEnvPair(index)}
                     class="p-2 text-red-600 hover:bg-red-50 rounded"
+                    aria-label="Remove variable"
                   >
                     <X size={16} />
                   </button>
@@ -1613,8 +1618,9 @@
 
         <!-- Textarea Container - Takes remaining space -->
         <div class="flex-1 flex flex-col min-h-0 mb-3">
-          <label class="form-label mb-2 flex-shrink-0">JSON Configuration</label>
+          <label for="add-server-json-config" class="form-label mb-2 flex-shrink-0">JSON Configuration</label>
           <textarea
+            id="add-server-json-config"
             bind:value={jsonConfig}
             placeholder='Paste your MCP server configuration JSON here...'
             class="form-input font-mono text-xs sm:text-sm flex-1 min-h-[200px] resize-none"

@@ -90,27 +90,30 @@
     <!-- Tab navigation -->
     <div class="tab-nav">
       <button
+        type="button"
         class="nav-tab"
         class:active={activeTab === 'coverage'}
-        on:click={() => (activeTab = 'coverage')}
+        onclick={() => (activeTab = 'coverage')}
       >
         <span class="tab-icon">✅</span>
         <span class="tab-label">Test Coverage</span>
         <span class="tab-badge">{coverage.testedTools}/{coverage.totalTools} tools</span>
       </button>
       <button
+        type="button"
         class="nav-tab"
         class:active={activeTab === 'copilot'}
-        on:click={() => (activeTab = 'copilot')}
+        onclick={() => (activeTab = 'copilot')}
       >
         <span class="tab-icon">🤖</span>
         <span class="tab-label">AI Copilot</span>
         <span class="tab-badge">{suggestions.length} suggestions</span>
       </button>
       <button
+        type="button"
         class="nav-tab"
         class:active={activeTab === 'insights'}
-        on:click={() => (activeTab = 'insights')}
+        onclick={() => (activeTab = 'insights')}
       >
         <span class="tab-icon">📈</span>
         <span class="tab-label">Insights</span>

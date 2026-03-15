@@ -828,23 +828,23 @@
   }
 
   /* Dark theme adjustments */
-  [data-theme="dark"] .mcp-sidebar__add-button {
+  :global([data-theme="dark"]) .mcp-sidebar__add-button {
     background: var(--mcp-surface-tertiary);
     color: var(--mcp-primary-300);
   }
 
-  [data-theme="dark"] .mcp-sidebar__add-button:hover {
+  :global([data-theme="dark"]) .mcp-sidebar__add-button:hover {
     background: var(--mcp-surface-elevated);
   }
 
-  [data-theme="dark"] .nav-item-active {
+  :global([data-theme="dark"]) .nav-item-active {
     background: var(--mcp-primary-800);
     color: var(--mcp-primary-100);
     font-weight: var(--mcp-font-semibold);
     border-left: 3px solid var(--mcp-primary-400);
   }
 
-  [data-theme="dark"] .mcp-sidebar__server-item:hover {
+  :global([data-theme="dark"]) .mcp-sidebar__server-item:hover {
     background: rgba(12, 74, 110, 0.2); /* mcp-primary-900/20 */
     border-color: var(--mcp-primary-600);
   }
@@ -893,27 +893,27 @@
     color: rgb(190 24 93); /* pink-700 */
   }
 
-  [data-theme="dark"] .capability-badge--tools {
+  :global([data-theme="dark"]) .capability-badge--tools {
     background: rgba(59, 130, 246, 0.2);
     color: rgb(147, 197, 253);
   }
 
-  [data-theme="dark"] .capability-badge--resources {
+  :global([data-theme="dark"]) .capability-badge--resources {
     background: rgba(34, 197, 94, 0.2);
     color: rgb(134, 239, 172);
   }
 
-  [data-theme="dark"] .capability-badge--prompts {
+  :global([data-theme="dark"]) .capability-badge--prompts {
     background: rgba(168, 85, 247, 0.2);
     color: rgb(216, 180, 254);
   }
 
-  [data-theme="dark"] .capability-badge--sampling {
+  :global([data-theme="dark"]) .capability-badge--sampling {
     background: rgba(249, 115, 22, 0.2);
     color: rgb(253, 186, 116);
   }
 
-  [data-theme="dark"] .capability-badge--elicitation {
+  :global([data-theme="dark"]) .capability-badge--elicitation {
     background: rgba(236, 72, 153, 0.2);
     color: rgb(249, 168, 212);
   }

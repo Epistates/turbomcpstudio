@@ -851,10 +851,11 @@
       </h3>
 
       <div class="flex-1 overflow-hidden">
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label for="import-collection-json" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Collection JSON Data
         </label>
         <textarea
+          id="import-collection-json"
           bind:value={importData}
           placeholder="Paste your collection JSON here..."
           class="w-full h-[300px] p-3 border border-gray-300 dark:border-gray-600 rounded-lg
@@ -949,10 +950,11 @@
 
           {#if selectedTemplate}
             <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label for="template-collection-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Collection Name
               </label>
               <input
+                id="template-collection-name"
                 bind:value={templateName}
                 placeholder="Enter collection name..."
                 class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg
@@ -966,13 +968,14 @@
                     Template Variables
                   </label>
                   <div class="space-y-2 max-h-[120px] overflow-y-auto">
-                    {#each Object.entries(selectedTemplate.variables) as [key, defaultValue]}
+                    {#each Object.entries(selectedTemplate.variables) as [key, defaultValue], i}
                       {@const value = templateVariables[key] ?? String(defaultValue ?? '')}
                       <div>
-                        <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        <label for="template-var-{i}" class="block text-xs text-gray-600 dark:text-gray-400 mb-1">
                           {key}
                         </label>
                         <input
+                          id="template-var-{i}"
                           value={value}
                           oninput={(e) => templateVariables[key] = (e.target as HTMLInputElement).value}
                           placeholder={String(defaultValue ?? '')}

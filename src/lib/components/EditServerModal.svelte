@@ -128,6 +128,8 @@
   onclick={handleClose}
   role="dialog"
   aria-modal="true"
+  aria-labelledby="edit-server-title"
+  tabindex="-1"
   onkeydown={(e) => e.key === 'Escape' && handleClose()}
 >
   <div
@@ -138,7 +140,7 @@
     <!-- Header -->
     <div class="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-700">
       <div>
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+        <h2 id="edit-server-title" class="text-2xl font-bold text-gray-900 dark:text-white">
           Edit Server Configuration
         </h2>
         <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -148,6 +150,7 @@
       <button
         onclick={handleClose}
         class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+        aria-label="Close"
       >
         <X size={24} />
       </button>
@@ -158,10 +161,11 @@
       <!-- Basic Info -->
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label for="edit-server-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Server Name <span class="text-red-500">*</span>
           </label>
           <input
+            id="edit-server-name"
             type="text"
             bind:value={name}
             class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -170,15 +174,16 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label for="edit-server-description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Description
           </label>
           <textarea
+            id="edit-server-description"
             bind:value={description}
             rows="2"
             class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             placeholder="Optional description"
-          />
+          ></textarea>
         </div>
       </div>
 
@@ -188,10 +193,11 @@
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Transport Configuration</h3>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label for="edit-server-stdio-command" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Command <span class="text-red-500">*</span>
             </label>
             <input
+              id="edit-server-stdio-command"
               type="text"
               bind:value={command}
               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
@@ -200,23 +206,25 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label for="edit-server-stdio-args" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Arguments (one per line)
             </label>
             <textarea
+              id="edit-server-stdio-args"
               value={args.join('\n')}
               oninput={(e) => args = e.currentTarget.value.split('\n').filter(a => a.trim())}
               rows="3"
               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
               placeholder="server.js"
-            />
+            ></textarea>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label for="edit-server-stdio-workdir" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Working Directory
             </label>
             <input
+              id="edit-server-stdio-workdir"
               type="text"
               bind:value={workingDirectory}
               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
@@ -229,10 +237,11 @@
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Transport Configuration</h3>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label for="edit-server-url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               URL <span class="text-red-500">*</span>
             </label>
             <input
+              id="edit-server-url"
               type="text"
               bind:value={url}
               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
@@ -253,15 +262,18 @@
 
         {#if Object.keys(envVars).length > 0}
           <div class="space-y-2">
-            {#each Object.entries(envVars) as [key, value]}
+            {#each Object.entries(envVars) as [key, value], i}
               <div class="flex gap-2 items-center">
                 <input
                   type="text"
                   value={key}
                   disabled
+                  aria-label="Variable name"
                   class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white font-mono text-sm"
                 />
+                <label for="edit-server-env-value-{i}" class="sr-only">Value for {key}</label>
                 <input
+                  id="edit-server-env-value-{i}"
                   type="text"
                   bind:value={envVars[key]}
                   class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
@@ -269,6 +281,7 @@
                 <button
                   onclick={() => handleEnvVarRemove(key)}
                   class="px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                  aria-label="Remove environment variable {key}"
                 >
                   <X size={16} />
                 </button>

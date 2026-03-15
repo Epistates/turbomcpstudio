@@ -75,7 +75,7 @@
 			class="w-full px-4 py-2 flex items-center justify-between hover:opacity-80 transition-opacity"
 		>
 			<div class="flex items-center gap-2">
-				<svelte:component this={config.icon} size={16} class={config.iconClass} />
+				<config.icon size={16} class={config.iconClass} />
 				<span class="text-sm font-medium {config.secondaryClass}">
 					{config.label}
 				</span>
@@ -98,7 +98,7 @@
 					<div
 						class="w-10 h-10 rounded-lg {config.bgClass} border {config.borderClass} flex items-center justify-center"
 					>
-						<svelte:component this={config.icon} size={20} class={config.iconClass} />
+						<config.icon size={20} class={config.iconClass} />
 					</div>
 				</div>
 				<div class="flex-1 min-w-0">

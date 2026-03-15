@@ -1,8 +1,7 @@
 <script lang="ts">
   import { proxies, proxyStore } from '$lib/stores/proxyStore';
-  import { createEventDispatcher } from 'svelte';
 
-  const dispatch = createEventDispatcher<{ select: { id: string } }>();
+  const { onselect }: { onselect?: (detail: { id: string }) => void } = $props();
 
   let loading = $state<Record<string, boolean>>({});
 
@@ -39,7 +38,7 @@
   }
 
   function handleSelect(proxyId: string) {
-    dispatch('select', { id: proxyId });
+    onselect?.({ id: proxyId });
   }
 </script>
 
@@ -64,8 +63,8 @@
           class="proxy-card"
           role="button"
           tabindex="0"
-          on:click={() => handleSelect(proxy.id.value)}
-          on:keydown={(e) => e.key === 'Enter' && handleSelect(proxy.id.value)}
+          onclick={() => handleSelect(proxy.id.value)}
+          onkeydown={(e) => e.key === 'Enter' && handleSelect(proxy.id.value)}
         >
           <div class="card-header">
             <div class="flex items-center gap-2 flex-1">
@@ -73,17 +72,19 @@
                 class="status-indicator"
                 class:running={proxy.running}
                 title={proxy.running ? 'Running' : 'Stopped'}
-              />
+              ></div>
               <h3 class="card-title">{proxy.name}</h3>
             </div>
 
             <div class="card-actions">
               {#if proxy.running}
                 <button
+                  type="button"
                   class="action-btn stop"
-                  on:click={(e) => handleStop(proxy.id.value, e)}
+                  onclick={(e) => handleStop(proxy.id.value, e)}
                   disabled={loading[proxy.id.value]}
                   title="Stop proxy"
+                  aria-label="Stop proxy"
                 >
                   {#if loading[proxy.id.value]}
                     <svg class="spinner" viewBox="0 0 24 24">
@@ -97,10 +98,12 @@
                 </button>
               {:else}
                 <button
+                  type="button"
                   class="action-btn start"
-                  on:click={(e) => handleStart(proxy.id.value, e)}
+                  onclick={(e) => handleStart(proxy.id.value, e)}
                   disabled={loading[proxy.id.value]}
                   title="Start proxy"
+                  aria-label="Start proxy"
                 >
                   {#if loading[proxy.id.value]}
                     <svg class="spinner" viewBox="0 0 24 24">
@@ -120,9 +123,11 @@
               {/if}
 
               <button
+                type="button"
                 class="action-btn delete"
-                on:click={(e) => handleDelete(proxy.id.value, e)}
+                onclick={(e) => handleDelete(proxy.id.value, e)}
                 title="Delete proxy"
+                aria-label="Delete proxy"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path

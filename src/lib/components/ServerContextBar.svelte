@@ -137,6 +137,8 @@
     }
   });
 
+  const StatusIcon = $derived(statusConfig().icon);
+
   // Actions
   function toggleDropdown() {
     isDropdownOpen = !isDropdownOpen;
@@ -202,7 +204,7 @@
 
       <button class="server-selector" onclick={toggleDropdown}>
         <span class="server-status {statusConfig().color}">
-          <svelte:component this={statusConfig().icon} size={14} />
+          <StatusIcon size={14} />
         </span>
         <span class="server-name">{selectedServer.config.name}</span>
         <span class="capability-badges">

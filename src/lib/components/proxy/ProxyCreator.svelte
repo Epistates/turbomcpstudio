@@ -1,8 +1,7 @@
 <script lang="ts">
   import { proxyStore, type CreateProxyInput, type ServerSpec } from '$lib/stores/proxyStore';
-  import { createEventDispatcher } from 'svelte';
 
-  const dispatch = createEventDispatcher<{ created: { id: string } }>();
+  const { oncreated }: { oncreated?: (detail: { id: string }) => void } = $props();
 
   let form = $state({
     name: '',
@@ -99,7 +98,7 @@
       };
 
       const proxyId = await proxyStore.createProxy(input);
-      dispatch('created', { id: proxyId });
+      oncreated?.({ id: proxyId });
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to create proxy';
     } finally {
@@ -118,7 +117,7 @@
       </div>
     {/if}
 
-    <form on:submit|preventDefault={handleSubmit} class="creator-form">
+    <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="creator-form">
       <!-- Basic Information -->
       <div class="form-section">
         <h3 class="section-title">Proxy Configuration</h3>
@@ -142,7 +141,7 @@
             placeholder="Optional description of this proxy"
             bind:value={form.description}
             rows="2"
-          />
+          ></textarea>
         </div>
       </div>
 
@@ -151,16 +150,17 @@
         <h3 class="section-title">Backend Server</h3>
 
         <div class="form-group">
-          <label>Backend Type *</label>
+          <label for="backend-type-stdio">Backend Type *</label>
           <div class="radio-group">
             {#each ['stdio', 'http', 'tcp', 'websocket'] as type}
               <label class="radio-label">
                 <input
+                  id="backend-type-{type}"
                   type="radio"
                   name="backend_type"
                   value={type}
                   checked={form.backend_type === type}
-                  on:change={() => updateBackendType(type)}
+                  onchange={() => updateBackendType(type)}
                 />
                 <span class="radio-text">{type.toUpperCase()}</span>
               </label>
@@ -183,15 +183,16 @@
           </div>
 
           <div class="form-group">
-            <label>Arguments</label>
+            <label for="backend-args">Arguments</label>
             <div class="arg-input">
               <input
+                id="backend-args"
                 type="text"
                 placeholder="e.g., server.py"
                 bind:value={newArg}
-                on:keydown={(e) => e.key === 'Enter' && (e.preventDefault(), addArg())}
+                onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), addArg())}
               />
-              <button type="button" on:click={addArg} class="btn-small">Add</button>
+              <button type="button" onclick={addArg} class="btn-small">Add</button>
             </div>
 
             {#if Array.isArray(form.backend_config.args) && form.backend_config.args.length > 0}
@@ -201,7 +202,7 @@
                     <span>{arg}</span>
                     <button
                       type="button"
-                      on:click={() => removeArg(i)}
+                      onclick={() => removeArg(i)}
                       class="btn-remove"
                     >
                       ✕
@@ -273,11 +274,12 @@
         <h3 class="section-title">Frontend Exposure</h3>
 
         <div class="form-group">
-          <label>Frontend Type *</label>
+          <label for="frontend-type-http">Frontend Type *</label>
           <div class="radio-group">
             {#each ['http', 'websocket', 'tcp'] as type}
               <label class="radio-label">
                 <input
+                  id="frontend-type-{type}"
                   type="radio"
                   name="frontend_type"
                   value={type}
@@ -295,7 +297,7 @@
       <div class="form-actions">
         <button
           type="button"
-          on:click={handleIntrospect}
+          onclick={handleIntrospect}
           disabled={loading}
           class="btn-secondary"
         >
