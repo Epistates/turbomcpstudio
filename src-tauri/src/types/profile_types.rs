@@ -116,4 +116,3 @@ pub struct AddServerToProfileRequest {
     #[serde(flatten)]
     pub config: ProfileServerConfig,
 }
-

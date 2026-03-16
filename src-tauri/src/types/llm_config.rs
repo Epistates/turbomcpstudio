@@ -315,7 +315,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 45, // Higher timeout for complex reasoning
-                max_tokens: 16000, // Cloud provider - maximum
+                max_tokens: 16000,   // Cloud provider - maximum
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 100,
                     tokens_per_minute: Some(1000000), // 1M token context support
@@ -372,7 +372,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 60, // Higher timeout for complex reasoning
-                max_tokens: 16000, // Claude Opus - maximum
+                max_tokens: 16000,   // Claude Opus - maximum
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 50, // Lower rate limit for premium model
                     tokens_per_minute: Some(500000),
@@ -429,7 +429,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 120, // Much higher timeout for thinking token processing
-                max_tokens: 16000, // Claude thinking - maximum
+                max_tokens: 16000,    // Claude thinking - maximum
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 30, // Lower rate limit for premium thinking model
                     tokens_per_minute: Some(300000),
@@ -548,7 +548,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 180, // Increased from 60 - LM Studio can be slow with large prompts
-                max_tokens: 15000, // LM Studio - near maximum
+                max_tokens: 15000,    // LM Studio - near maximum
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 1000, // No rate limits for local
                     tokens_per_minute: None,
@@ -602,7 +602,7 @@ impl Default for LLMConfiguration {
                 organization: None,
                 max_retries: 3,
                 timeout_seconds: 120, // Ollama can be slower
-                max_tokens: 15000, // Ollama - near maximum
+                max_tokens: 15000,    // Ollama - near maximum
                 rate_limit: RateLimitConfig {
                     requests_per_minute: 1000,
                     tokens_per_minute: None,

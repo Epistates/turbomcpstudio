@@ -132,7 +132,7 @@ impl<T: Transport + 'static> Transport for InterceptedTransport<T> {
     ) -> Pin<Box<dyn Future<Output = TransportResult<()>> + Send + '_>> {
         let message_arc = Arc::new(message);
         self.broadcast(Direction::Outgoing, Arc::clone(&message_arc));
-        
+
         let inner = self.inner.clone();
         Box::pin(async move {
             let message_clone = (*message_arc).clone();
@@ -145,12 +145,12 @@ impl<T: Transport + 'static> Transport for InterceptedTransport<T> {
     ) -> Pin<Box<dyn Future<Output = TransportResult<Option<TransportMessage>>> + Send + '_>> {
         let inner = self.inner.clone();
         let tx = self.tx.clone();
-        
+
         Box::pin(async move {
             let message_opt = inner.receive().await?;
             if let Some(message) = message_opt {
                 let message_arc = Arc::new(message);
-                
+
                 let intercepted = Arc::new(InternalInterceptedMessage {
                     direction: Direction::Incoming,
                     timestamp: Instant::now(),
@@ -283,7 +283,8 @@ mod tests {
 
         fn receive(
             &self,
-        ) -> Pin<Box<dyn Future<Output = TransportResult<Option<TransportMessage>>> + Send + '_>> {
+        ) -> Pin<Box<dyn Future<Output = TransportResult<Option<TransportMessage>>> + Send + '_>>
+        {
             Box::pin(async move { Ok(None) })
         }
 

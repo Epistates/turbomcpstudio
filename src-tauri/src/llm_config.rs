@@ -1,7 +1,5 @@
 use crate::error::McpStudioError;
-use crate::llm_providers::{
-    AnthropicClient, GeminiClient, OpenAICompatibleClient, OpenAIClient,
-};
+use crate::llm_providers::{AnthropicClient, GeminiClient, OpenAIClient, OpenAICompatibleClient};
 use crate::types::{
     LLMConfiguration, LLMProviderStatus, ProviderUsageStats, SetAPIKeyRequest,
     UpdateLLMConfigRequest,
@@ -723,9 +721,7 @@ impl LLMConfigManager {
                 api_key.to_string(),
                 Some(provider_config.default_model.clone()),
             )),
-            id if id.starts_with("claude-") => {
-                Arc::new(AnthropicClient::new(api_key.to_string()))
-            }
+            id if id.starts_with("claude-") => Arc::new(AnthropicClient::new(api_key.to_string())),
             "gemini" => Arc::new(GeminiClient::new(api_key.to_string())),
             _ => {
                 return Err(format!("Unknown cloud provider: {}", provider_id).into());

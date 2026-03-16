@@ -77,7 +77,7 @@ impl LLMServerClient for OpenAICompatibleClient {
                 // Using JSON fallback to avoid complex type mismatch issues with SamplingContentBlock
                 let msg_json = serde_json::to_value(&msg)?;
                 let content = &msg_json["content"];
-                
+
                 let text = if content.is_string() {
                     content.as_str().unwrap_or("").to_string()
                 } else if content.is_object() && content["type"] == "text" {
@@ -97,18 +97,14 @@ impl LLMServerClient for OpenAICompatibleClient {
                 };
 
                 let openai_msg: ChatCompletionRequestMessage = match msg.role {
-                    Role::User => {
-                        ChatCompletionRequestUserMessageArgs::default()
-                            .content(text)
-                            .build()?
-                            .into()
-                    }
-                    Role::Assistant => {
-                        ChatCompletionRequestAssistantMessageArgs::default()
-                            .content(text)
-                            .build()?
-                            .into()
-                    }
+                    Role::User => ChatCompletionRequestUserMessageArgs::default()
+                        .content(text)
+                        .build()?
+                        .into(),
+                    Role::Assistant => ChatCompletionRequestAssistantMessageArgs::default()
+                        .content(text)
+                        .build()?
+                        .into(),
                 };
                 messages.push(openai_msg);
             }
@@ -119,7 +115,7 @@ impl LLMServerClient for OpenAICompatibleClient {
                     CreateChatCompletionRequestArgs::default()
                         .model(model)
                         .messages(messages)
-                        .max_tokens(request.max_tokens as u32)
+                        .max_tokens(request.max_tokens)
                         .temperature(request.temperature.unwrap_or(0.7) as f32)
                         .build()?,
                 )
@@ -128,13 +124,9 @@ impl LLMServerClient for OpenAICompatibleClient {
             let choice = response
                 .choices
                 .first()
-                .ok_or_else(|| "No completion choices returned")?;
+                .ok_or("No completion choices returned")?;
 
-            let content = choice
-                .message
-                .content
-                .clone()
-                .unwrap_or_else(|| "".to_string());
+            let content = choice.message.content.clone().unwrap_or_default();
 
             // Convert to JSON and back to CreateMessageResult to bypass strict type construction
             let result_json = serde_json::json!({

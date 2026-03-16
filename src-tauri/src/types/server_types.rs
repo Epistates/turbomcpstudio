@@ -101,7 +101,7 @@ pub struct ToolDefinition {
 }
 
 /// Connection status for MCP servers
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ConnectionStatus {
     /// Successfully connected and initialized
@@ -109,6 +109,7 @@ pub enum ConnectionStatus {
     /// Currently attempting to connect
     Connecting,
     /// Connection failed or lost
+    #[default]
     Disconnected,
     /// Server encountered an error
     Error,
@@ -154,7 +155,7 @@ pub struct ProcessInfo {
 }
 
 /// Status of a managed process
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProcessStatus {
     /// Process is running normally
     Running,
@@ -163,6 +164,7 @@ pub enum ProcessStatus {
     /// Process is in zombie state
     Zombie,
     /// Process status unknown
+    #[default]
     Unknown,
 }
 
@@ -201,12 +203,6 @@ pub enum ExecutionStatus {
     Cancelled,
 }
 
-impl Default for ConnectionStatus {
-    fn default() -> Self {
-        Self::Disconnected
-    }
-}
-
 impl Default for ConnectionMetrics {
     fn default() -> Self {
         Self {
@@ -220,12 +216,6 @@ impl Default for ConnectionMetrics {
             bytes_received: 0,
             uptime_seconds: 0,
         }
-    }
-}
-
-impl Default for ProcessStatus {
-    fn default() -> Self {
-        Self::Unknown
     }
 }
 

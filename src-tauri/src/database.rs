@@ -4,7 +4,6 @@ use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use std::collections::HashMap;
 use uuid::Uuid;
 // keyring is used for secure storage of OAuth client_secret
-use keyring;
 
 /// Database manager for MCP Studio
 #[derive(Debug)]
@@ -770,9 +769,11 @@ impl Database {
 
         // Create indexes for OAuth tables
         tracing::info!("Creating idx_oauth_configs_server_id index");
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_oauth_configs_server_id ON oauth_configs(server_id)")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_oauth_configs_server_id ON oauth_configs(server_id)",
+        )
+        .execute(&self.pool)
+        .await?;
 
         tracing::info!("Creating idx_oauth_flow_logs_config_id index");
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_oauth_flow_logs_config_id ON oauth_flow_logs(config_id)")
@@ -780,9 +781,11 @@ impl Database {
             .await?;
 
         tracing::info!("Creating idx_oauth_tokens_server_id index");
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_oauth_tokens_server_id ON oauth_tokens(server_id)")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_oauth_tokens_server_id ON oauth_tokens(server_id)",
+        )
+        .execute(&self.pool)
+        .await?;
 
         let migration_duration = migration_start.elapsed();
         tracing::info!("Database migrations completed successfully in {:?} (15 tables + 7 indexes, typically 3-15ms)", migration_duration);
@@ -1295,11 +1298,7 @@ impl Database {
     ///
     /// Keeps the most recent `max_messages` per server.
     /// Returns the number of rows deleted.
-    pub async fn prune_messages(
-        &self,
-        server_id: Uuid,
-        max_messages: i64,
-    ) -> McpResult<u64> {
+    pub async fn prune_messages(&self, server_id: Uuid, max_messages: i64) -> McpResult<u64> {
         let result = sqlx::query(
             r#"
             DELETE FROM message_history
@@ -1343,7 +1342,9 @@ impl Database {
         for row in rows {
             let server_id_str: String = row.get("server_id");
             if let Ok(server_id) = Uuid::parse_str(&server_id_str) {
-                total_deleted += self.prune_messages(server_id, max_messages_per_server).await?;
+                total_deleted += self
+                    .prune_messages(server_id, max_messages_per_server)
+                    .await?;
             }
         }
 
@@ -1463,10 +1464,7 @@ impl Database {
     // Proxy-related database methods
 
     /// Save proxy configuration (insert or replace)
-    pub async fn save_proxy_config(
-        &self,
-        config: &crate::proxy::ProxyConfig,
-    ) -> McpResult<()> {
+    pub async fn save_proxy_config(&self, config: &crate::proxy::ProxyConfig) -> McpResult<()> {
         let backend_config_json = serde_json::to_string(&config.backend_config)?;
         let frontend_config_json = serde_json::to_string(&config.frontend_config)?;
         let auth_config_json = serde_json::to_string(&config.auth_config)?;
@@ -1487,23 +1485,34 @@ impl Database {
         .bind(&backend_config_json)
         .bind(format!("{:?}", config.frontend_type).to_lowercase())
         .bind(&frontend_config_json)
-        .bind(format!("{:?}", match &config.auth_config {
-            crate::proxy::AuthConfig::None => "none",
-            crate::proxy::AuthConfig::Bearer { .. } => "bearer",
-            crate::proxy::AuthConfig::ApiKey { .. } => "api_key",
-            crate::proxy::AuthConfig::Jwt { .. } => "jwt",
-        }))
+        .bind(format!(
+            "{:?}",
+            match &config.auth_config {
+                crate::proxy::AuthConfig::None => "none",
+                crate::proxy::AuthConfig::Bearer { .. } => "bearer",
+                crate::proxy::AuthConfig::ApiKey { .. } => "api_key",
+                crate::proxy::AuthConfig::Jwt { .. } => "jwt",
+            }
+        ))
         .bind(&auth_config_json)
         .bind(config.metrics_enabled as i32)
         .bind(config.max_requests_tracked as i32)
-        .bind(config.created_at.duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs()
-            .to_string())
-        .bind(config.updated_at.duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs()
-            .to_string())
+        .bind(
+            config
+                .created_at
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                .to_string(),
+        )
+        .bind(
+            config
+                .updated_at
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                .to_string(),
+        )
         .bind(config.last_started_at.map(|t| {
             t.duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -1523,7 +1532,10 @@ impl Database {
     }
 
     /// Get proxy configuration by ID
-    pub async fn get_proxy_config(&self, proxy_id: &str) -> McpResult<Option<crate::proxy::ProxyConfig>> {
+    pub async fn get_proxy_config(
+        &self,
+        proxy_id: &str,
+    ) -> McpResult<Option<crate::proxy::ProxyConfig>> {
         let row = sqlx::query(
             r#"
             SELECT id, name, description, backend_type, backend_config, frontend_type, frontend_config,
@@ -1546,19 +1558,19 @@ impl Database {
 
             let auth_config = match row.get::<Option<String>, _>("auth_type").as_deref() {
                 Some("bearer") => {
-                    let json: serde_json::Value = serde_json::from_str(
-                        &row.get::<String, _>("auth_config")
-                    )?;
+                    let json: serde_json::Value =
+                        serde_json::from_str(&row.get::<String, _>("auth_config"))?;
                     if let Some(token) = json.get("token").and_then(|t| t.as_str()) {
-                        crate::proxy::AuthConfig::Bearer { token: token.to_string() }
+                        crate::proxy::AuthConfig::Bearer {
+                            token: token.to_string(),
+                        }
                     } else {
                         crate::proxy::AuthConfig::None
                     }
                 }
                 Some("api_key") => {
-                    let json: serde_json::Value = serde_json::from_str(
-                        &row.get::<String, _>("auth_config")
-                    )?;
+                    let json: serde_json::Value =
+                        serde_json::from_str(&row.get::<String, _>("auth_config"))?;
                     if let (Some(key), Some(header)) = (
                         json.get("key").and_then(|k| k.as_str()),
                         json.get("header").and_then(|h| h.as_str()),
@@ -1572,9 +1584,8 @@ impl Database {
                     }
                 }
                 Some("jwt") => {
-                    let json: serde_json::Value = serde_json::from_str(
-                        &row.get::<String, _>("auth_config")
-                    )?;
+                    let json: serde_json::Value =
+                        serde_json::from_str(&row.get::<String, _>("auth_config"))?;
                     if let (Some(issuer), Some(audience)) = (
                         json.get("issuer").and_then(|i| i.as_str()),
                         json.get("audience").and_then(|a| a.as_str()),
@@ -1582,7 +1593,10 @@ impl Database {
                         crate::proxy::AuthConfig::Jwt {
                             issuer: issuer.to_string(),
                             audience: audience.to_string(),
-                            secret: json.get("secret").and_then(|s| s.as_str()).map(|s| s.to_string()),
+                            secret: json
+                                .get("secret")
+                                .and_then(|s| s.as_str())
+                                .map(|s| s.to_string()),
                         }
                     } else {
                         crate::proxy::AuthConfig::None
@@ -1605,14 +1619,22 @@ impl Database {
                 auth_config,
                 metrics_enabled: row.get::<i32, _>("metrics_enabled") != 0,
                 max_requests_tracked: row.get::<i32, _>("max_requests_tracked") as usize,
-                created_at: std::time::UNIX_EPOCH + std::time::Duration::from_secs(created_at_secs as u64),
-                updated_at: std::time::UNIX_EPOCH + std::time::Duration::from_secs(updated_at_secs as u64),
-                last_started_at: row.get::<Option<String>, _>("last_started_at")
+                created_at: std::time::UNIX_EPOCH
+                    + std::time::Duration::from_secs(created_at_secs as u64),
+                updated_at: std::time::UNIX_EPOCH
+                    + std::time::Duration::from_secs(updated_at_secs as u64),
+                last_started_at: row
+                    .get::<Option<String>, _>("last_started_at")
                     .and_then(|s| s.parse::<i64>().ok())
-                    .map(|secs| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs as u64)),
-                last_stopped_at: row.get::<Option<String>, _>("last_stopped_at")
+                    .map(|secs| {
+                        std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs as u64)
+                    }),
+                last_stopped_at: row
+                    .get::<Option<String>, _>("last_stopped_at")
                     .and_then(|s| s.parse::<i64>().ok())
-                    .map(|secs| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs as u64)),
+                    .map(|secs| {
+                        std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs as u64)
+                    }),
             }))
         } else {
             Ok(None)
@@ -1645,11 +1667,12 @@ impl Database {
 
             let auth_config = match row.get::<Option<String>, _>("auth_type").as_deref() {
                 Some("bearer") => {
-                    let json: serde_json::Value = serde_json::from_str(
-                        &row.get::<String, _>("auth_config")
-                    )?;
+                    let json: serde_json::Value =
+                        serde_json::from_str(&row.get::<String, _>("auth_config"))?;
                     if let Some(token) = json.get("token").and_then(|t| t.as_str()) {
-                        crate::proxy::AuthConfig::Bearer { token: token.to_string() }
+                        crate::proxy::AuthConfig::Bearer {
+                            token: token.to_string(),
+                        }
                     } else {
                         crate::proxy::AuthConfig::None
                     }
@@ -1671,14 +1694,22 @@ impl Database {
                 auth_config,
                 metrics_enabled: row.get::<i32, _>("metrics_enabled") != 0,
                 max_requests_tracked: row.get::<i32, _>("max_requests_tracked") as usize,
-                created_at: std::time::UNIX_EPOCH + std::time::Duration::from_secs(created_at_secs as u64),
-                updated_at: std::time::UNIX_EPOCH + std::time::Duration::from_secs(updated_at_secs as u64),
-                last_started_at: row.get::<Option<String>, _>("last_started_at")
+                created_at: std::time::UNIX_EPOCH
+                    + std::time::Duration::from_secs(created_at_secs as u64),
+                updated_at: std::time::UNIX_EPOCH
+                    + std::time::Duration::from_secs(updated_at_secs as u64),
+                last_started_at: row
+                    .get::<Option<String>, _>("last_started_at")
                     .and_then(|s| s.parse::<i64>().ok())
-                    .map(|secs| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs as u64)),
-                last_stopped_at: row.get::<Option<String>, _>("last_stopped_at")
+                    .map(|secs| {
+                        std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs as u64)
+                    }),
+                last_stopped_at: row
+                    .get::<Option<String>, _>("last_stopped_at")
                     .and_then(|s| s.parse::<i64>().ok())
-                    .map(|secs| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs as u64)),
+                    .map(|secs| {
+                        std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs as u64)
+                    }),
             });
         }
 
@@ -1715,11 +1746,15 @@ impl Database {
     /// Returns an error if the keyring write fails.
     fn store_client_secret_in_keyring(server_id: &str, secret: &str) -> McpResult<()> {
         let key = Self::oauth_secret_keyring_key(server_id);
-        let entry = keyring::Entry::new(Self::OAUTH_SECRET_SERVICE, &key)
-            .map_err(|e| McpStudioError::ConfigError(format!("Failed to create keyring entry for client_secret: {}", e)))?;
-        entry
-            .set_password(secret)
-            .map_err(|e| McpStudioError::ConfigError(format!("Failed to store client_secret in keyring: {}", e)))?;
+        let entry = keyring::Entry::new(Self::OAUTH_SECRET_SERVICE, &key).map_err(|e| {
+            McpStudioError::ConfigError(format!(
+                "Failed to create keyring entry for client_secret: {}",
+                e
+            ))
+        })?;
+        entry.set_password(secret).map_err(|e| {
+            McpStudioError::ConfigError(format!("Failed to store client_secret in keyring: {}", e))
+        })?;
         Ok(())
     }
 
@@ -1757,7 +1792,11 @@ impl Database {
             .as_secs()
             .to_string();
         let scopes_json = serde_json::to_string(&config.scopes)?;
-        let metadata_json = config.metadata.as_ref().map(|m| serde_json::to_string(m)).transpose()?;
+        let metadata_json = config
+            .metadata
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()?;
 
         // Store the actual secret in the OS keyring; write a placeholder to the DB.
         let db_secret_placeholder: Option<String> = if let Some(ref secret) = config.client_secret {
@@ -1806,7 +1845,10 @@ impl Database {
     /// After reading the row from SQLite, the `client_secret` is restored from
     /// the OS keyring.  If no keyring entry exists the field is returned as
     /// `None` (public client).
-    pub async fn get_oauth_config(&self, server_id: &str) -> McpResult<Option<crate::oauth::OAuthConfig>> {
+    pub async fn get_oauth_config(
+        &self,
+        server_id: &str,
+    ) -> McpResult<Option<crate::oauth::OAuthConfig>> {
         let row = sqlx::query(
             r#"
             SELECT id, server_id, protocol_version, auth_server_url, token_endpoint, client_id,
@@ -1854,14 +1896,22 @@ impl Database {
     /// the keyring entry is refreshed.  If the secret is empty or absent the
     /// existing keyring entry is left untouched so that a partial update (e.g.
     /// only changing scopes) does not inadvertently erase the stored secret.
-    pub async fn update_oauth_config(&self, server_id: &str, config: &crate::oauth::OAuthConfig) -> McpResult<()> {
+    pub async fn update_oauth_config(
+        &self,
+        server_id: &str,
+        config: &crate::oauth::OAuthConfig,
+    ) -> McpResult<()> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs()
             .to_string();
         let scopes_json = serde_json::to_string(&config.scopes)?;
-        let metadata_json = config.metadata.as_ref().map(|m| serde_json::to_string(m)).transpose()?;
+        let metadata_json = config
+            .metadata
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()?;
 
         // Only update the keyring when a real (non-sentinel) secret is provided.
         let db_secret_placeholder: Option<String> = match &config.client_secret {
