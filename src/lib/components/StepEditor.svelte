@@ -53,10 +53,9 @@
   let loadingPrompts = $state(false);
 
   // Get available servers based on operation type
-  const availableServers = $derived(() => {
-    // Filter to only connected servers
-    return servers.filter((s: any) => s.status?.toLowerCase() === 'connected');
-  });
+  const availableServers = $derived(
+    servers.filter((s: any) => s.status?.toLowerCase() === 'connected')
+  );
 
   // Load tools when tool operation server changes
   $effect(() => {
@@ -224,7 +223,7 @@
           <label class="form-label" for="step-tool-server">Server</label>
           <select id="step-tool-server" bind:value={operation.server_alias} class="form-select">
             <option value="">Select a server...</option>
-            {#each availableServers() as server}
+            {#each availableServers as server}
               <option value={server.id}>{server.config.name}</option>
             {/each}
           </select>
@@ -257,7 +256,7 @@
           <label class="form-label" for="step-resource-server">Server</label>
           <select id="step-resource-server" bind:value={operation.server_alias} class="form-select">
             <option value="">Select a server...</option>
-            {#each availableServers() as server}
+            {#each availableServers as server}
               <option value={server.id}>{server.config.name}</option>
             {/each}
           </select>
@@ -281,7 +280,7 @@
           <label class="form-label" for="step-prompt-server">Server</label>
           <select id="step-prompt-server" bind:value={operation.server_alias} class="form-select">
             <option value="">Select a server...</option>
-            {#each availableServers() as server}
+            {#each availableServers as server}
               <option value={server.id}>{server.config.name}</option>
             {/each}
           </select>
@@ -314,7 +313,7 @@
           <label class="form-label" for="step-sampling-server">Server</label>
           <select id="step-sampling-server" bind:value={operation.server_alias} class="form-select">
             <option value="">Select a server...</option>
-            {#each availableServers() as server}
+            {#each availableServers as server}
               <option value={server.id}>{server.config.name}</option>
             {/each}
           </select>

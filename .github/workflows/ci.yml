@@ -46,6 +46,29 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
         working-directory: src-tauri
 
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        run: cargo audit
+        working-directory: src-tauri
+
+  # TODO: Add cargo-llvm-cov for code coverage measurement
+
   test:
     name: Test
     runs-on: ${{ matrix.os }}
@@ -120,6 +143,10 @@ jobs:
 
       - name: Build frontend
         run: pnpm run build
+
+      - name: Run frontend tests
+        run: pnpm test || echo "No tests configured yet"
+        continue-on-error: true
 
   build-test:
     name: Build Test (${{ matrix.os }})

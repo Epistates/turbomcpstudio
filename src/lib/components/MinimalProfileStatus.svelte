@@ -24,7 +24,7 @@
   );
 
   // Calculate connection status
-  const connectionStatus = $derived(() => {
+  const connectionStatus = $derived.by(() => {
     if (!activeProfile?.profile || !activeProfile.servers) {
       return { connected: 0, total: 0, allConnected: false };
     }
@@ -50,8 +50,8 @@
   <!-- Active Profile State -->
   <button class="profile-status-mini active" onclick={goToServerManager}>
     <div class="profile-indicator">
-      <span class="status-icon" class:all-connected={connectionStatus().allConnected}>
-        {#if connectionStatus().allConnected}
+      <span class="status-icon" class:all-connected={connectionStatus.allConnected}>
+        {#if connectionStatus.allConnected}
           <Zap size={14} />
         {:else}
           <Server size={14} />
@@ -60,7 +60,7 @@
       <div class="profile-details">
         <span class="profile-name">{activeProfile.profile.name}</span>
         <span class="profile-status">
-          {connectionStatus().connected}/{connectionStatus().total} connected
+          {connectionStatus.connected}/{connectionStatus.total} connected
         </span>
       </div>
     </div>

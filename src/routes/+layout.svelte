@@ -29,36 +29,16 @@
   let elicitationDialogVisible = $state(false);
   let elicitationRequest = $state<ElicitationRequest | null>(null);
 
-  // Reactive state using Svelte 5 runes - access store values directly
-  let isAppReady = $state(false);
-  let currentAppState = $state<AppState>({
-    isInitializing: true,
-    databaseReady: false,
-    mcpManagerReady: false,
-    initializationError: null,
-    startupTime: null
-  });
-
-  // Subscribe to store changes and update reactive state
-  $effect(() => {
-    const unsubscribeReady = appStoreIsReady.subscribe(value => {
-      isAppReady = value;
-    });
-    const unsubscribeState = appStoreState.subscribe(value => {
-      currentAppState = value;
-    });
-
-    return () => {
-      unsubscribeReady();
-      unsubscribeState();
-    };
-  });
+  // Reactive state — derived directly from stores (no manual subscribe/unsubscribe needed)
+  const isAppReady = $derived($appStoreIsReady);
+  const currentAppState = $derived($appStoreState);
 
   // Track cleanup functions
   let mcpUnlisten: (() => void) | null = null;
   let elicitationUnlisten: (() => void) | null = null;
   let appEarlyReadyUnlisten: (() => void) | null = null;
   let appReadyUnlisten: (() => void) | null = null;
+  let initErrorUnlisten: (() => void) | null = null;
   let appReadyReceived = false;
   let initializationStartTime = Date.now();
 
@@ -195,7 +175,7 @@
       fallbackUsed?: string;
     }
 
-    await listen<InitializationError>('initialization-error', (event) => {
+    initErrorUnlisten = await listen<InitializationError>('initialization-error', (event) => {
       try {
         const error = event.payload;
         console.error('🚨 Initialization error:', error);
@@ -259,19 +239,20 @@
       appReadyUnlisten();
       appReadyUnlisten = null;
     }
+    if (initErrorUnlisten) {
+      initErrorUnlisten();
+      initErrorUnlisten = null;
+    }
   });
 </script>
 
-<!-- Loading Screen - Only show when app is not ready -->
-{#if !isAppReady}
-  <AppLoadingScreen />
-{/if}
-
-<!-- Enterprise App Shell -->
+<!-- App Shell: show content once ready, loading screen otherwise -->
 {#if isAppReady}
   <div class="mcp-app">
     {@render children()}
   </div>
+{:else}
+  <AppLoadingScreen />
 {/if}
 
 <!-- Elicitation Dialog (Global) -->

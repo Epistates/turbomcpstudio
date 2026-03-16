@@ -20,7 +20,7 @@
   );
 
   // Advanced metrics
-  const metrics = $derived(() => {
+  const metrics = $derived.by(() => {
     const connected = servers.filter(s => getServerStatus(s) === 'connected');
     const total = servers.length;
     const errors = servers.filter(s => getServerStatus(s) === 'error');
@@ -105,28 +105,28 @@
   <!-- System Health Overview -->
   <div class="health-banner">
     <div class="health-indicator">
-      <div class="health-score {getHealthColor(metrics().healthScore)}">
-        {metrics().healthScore}
+      <div class="health-score {getHealthColor(metrics.healthScore)}">
+        {metrics.healthScore}
       </div>
       <div class="health-label">
         <h2>System Health</h2>
-        <p class={getHealthColor(metrics().healthScore)}>{getHealthLabel(metrics().healthScore)}</p>
+        <p class={getHealthColor(metrics.healthScore)}>{getHealthLabel(metrics.healthScore)}</p>
       </div>
     </div>
     <div class="health-stats">
       <div class="stat">
         <CheckCircle size={20} class="text-green-600" />
-        <span class="stat-value">{metrics().connected}/{metrics().total}</span>
+        <span class="stat-value">{metrics.connected}/{metrics.total}</span>
         <span class="stat-label">Connected</span>
       </div>
       <div class="stat">
         <Activity size={20} class="text-blue-600" />
-        <span class="stat-value">{metrics().recentlyActive}</span>
+        <span class="stat-value">{metrics.recentlyActive}</span>
         <span class="stat-label">Recently Active</span>
       </div>
       <div class="stat">
         <AlertCircle size={20} class="text-red-600" />
-        <span class="stat-value">{metrics().errors}</span>
+        <span class="stat-value">{metrics.errors}</span>
         <span class="stat-label">Errors</span>
       </div>
     </div>
@@ -144,32 +144,32 @@
         <div class="status-bar">
           <div
             class="status-segment status-connected"
-            style="width: {(metrics().connected / metrics().total) * 100}%"
-            title="Connected: {metrics().connected}"
+            style="width: {(metrics.connected / metrics.total) * 100}%"
+            title="Connected: {metrics.connected}"
           ></div>
           <div
             class="status-segment status-disconnected"
-            style="width: {(metrics().disconnected / metrics().total) * 100}%"
-            title="Disconnected: {metrics().disconnected}"
+            style="width: {(metrics.disconnected / metrics.total) * 100}%"
+            title="Disconnected: {metrics.disconnected}"
           ></div>
           <div
             class="status-segment status-error"
-            style="width: {(metrics().errors / metrics().total) * 100}%"
-            title="Errors: {metrics().errors}"
+            style="width: {(metrics.errors / metrics.total) * 100}%"
+            title="Errors: {metrics.errors}"
           ></div>
         </div>
         <div class="status-legend">
           <div class="legend-item">
             <div class="legend-dot status-connected"></div>
-            <span>Connected ({metrics().connected})</span>
+            <span>Connected ({metrics.connected})</span>
           </div>
           <div class="legend-item">
             <div class="legend-dot status-disconnected"></div>
-            <span>Disconnected ({metrics().disconnected})</span>
+            <span>Disconnected ({metrics.disconnected})</span>
           </div>
           <div class="legend-item">
             <div class="legend-dot status-error"></div>
-            <span>Errors ({metrics().errors})</span>
+            <span>Errors ({metrics.errors})</span>
           </div>
         </div>
       </div>
@@ -184,15 +184,15 @@
       <div class="performance-metrics">
         <div class="perf-stat">
           <span class="perf-label">Avg Response Time</span>
-          <span class="perf-value">{metrics().avgResponseTime}ms</span>
+          <span class="perf-value">{metrics.avgResponseTime}ms</span>
         </div>
         <div class="perf-stat">
           <span class="perf-label">Error Rate</span>
-          <span class="perf-value">{metrics().errorRate}%</span>
+          <span class="perf-value">{metrics.errorRate}%</span>
         </div>
         <div class="perf-stat">
           <span class="perf-label">Total Requests</span>
-          <span class="perf-value">{metrics().totalRequests.toLocaleString()}</span>
+          <span class="perf-value">{metrics.totalRequests.toLocaleString()}</span>
         </div>
       </div>
     </div>
@@ -206,14 +206,14 @@
       <div class="activity-metrics">
         <div class="activity-stat">
           <span class="activity-label">Data Transferred</span>
-          <span class="activity-value">{formatBytes(metrics().totalData)}</span>
+          <span class="activity-value">{formatBytes(metrics.totalData)}</span>
         </div>
-        {#if metrics().mostActive?.config?.name}
-          {@const mostActive = metrics().mostActive}
+        {#if metrics.mostActive?.config?.name}
+          {@const mostActive = metrics.mostActive}
           <div class="activity-stat">
             <span class="activity-label">Most Active Server</span>
             <span class="activity-value text-primary">{mostActive?.config?.name}</span>
-            <span class="activity-detail">{metrics().mostActiveRequests} requests</span>
+            <span class="activity-detail">{metrics.mostActiveRequests} requests</span>
           </div>
         {/if}
       </div>

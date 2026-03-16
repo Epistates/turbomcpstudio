@@ -19,12 +19,13 @@ A native desktop application for developing, testing, and debugging Model Contex
 
 ## Why TurboMCP Studio?
 
-- **Native Performance** - Built with Rust and Tauri for blazing-fast native desktop experience
-- **Beautiful UI** - Modern design system with light/dark themes and responsive layouts
-- **Multi-Transport** - STDIO, HTTP, WebSocket, TCP, and Unix socket support
-- **Enterprise Ready** - Production-grade error handling and state management
-- **Type Safe** - Full TypeScript integration throughout
-- **Cross-Platform** - Single codebase for macOS, Windows, and Linux
+- **Native Performance** — Built with Rust and Tauri 2.0 for a fast, native desktop experience
+- **Multi-Transport** — STDIO, HTTP/SSE, WebSocket, TCP, and Unix socket support out of the box
+- **Protocol Inspector** — Real-time message tracing with latency tracking and filtering
+- **OAuth 2.1 Built-in** — PKCE, token refresh, and provider templates for secured MCP servers
+- **Sampling & Elicitation** — Human-in-the-loop approval for LLM sampling requests
+- **Cross-Platform** — Single codebase for macOS, Windows, and Linux
+- **Developer-Friendly** — Think Postman, but for MCP servers
 
 ## Quick Start
 
@@ -36,16 +37,42 @@ A native desktop application for developing, testing, and debugging Model Contex
 
 ## Features
 
-### Current (v0.1.0)
+### Server Management
+- Connect to MCP servers over STDIO, HTTP/SSE, WebSocket, TCP, or Unix sockets
+- Profile-based configuration with server groups and persistence
+- Health monitoring with automatic reconnection and status tracking
+- Rate limiting (configurable per-server) to protect upstream services
 
-- ✅ **Server Management** - Connect, configure, and manage MCP servers with profiles and persistence
-- ✅ **Enterprise UI** - Complete design system with light/dark themes
-- ✅ **Tool Explorer** - Discover and test MCP tools
-- ✅ **Resource Browser** - Navigate and inspect MCP resources
-- ✅ **Prompt Designer** - Create and test MCP prompts
-- ✅ **Sampling & Elicitation Flow** - Complete sampling and prompt elicitation workflow for model testing
-- ✅ **Protocol Inspector** - Real-time protocol message viewing
-- ✅ **Settings** - Configure application preferences and themes
+### Developer Tools
+- **Tool Explorer** — Discover, inspect, and invoke MCP tools with schema validation
+- **Resource Browser** — Navigate and inspect MCP resources with content preview
+- **Prompt Designer** — Create and test MCP prompts with variable interpolation
+- **Protocol Inspector** — Real-time message tracing with request/response correlation and latency
+- **Developer Console** — Integrated logging with level filtering
+
+### Sampling & Elicitation
+- Human-in-the-loop approval flow for MCP sampling requests
+- Configurable auto-approve, manual, and LLM-assisted modes
+- Cost estimation and request history tracking
+- Elicitation support for structured user input from MCP servers
+
+### OAuth 2.1
+- Built-in OAuth flow with PKCE (S256) support
+- Provider templates for common OAuth servers
+- Secure credential storage via OS keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+- Token refresh and session management
+
+### Workflow Engine
+- Define multi-step workflows against MCP servers
+- Variable interpolation across steps
+- Execution history with database persistence
+
+### Additional
+- Light/dark theme with system preference detection
+- Server registry browser for discovering MCP servers
+- Proxy server management for MCP traffic inspection
+- Collections for organizing and replaying MCP operations
+- SQLite-backed local storage for history and configuration
 
 ## Installation
 
@@ -121,11 +148,7 @@ cd turbomcpstudio
 pnpm install
 ```
 
-TurboMCP is published to [crates.io](https://crates.io/crates/turbomcp) and handled automatically during the build process.
-
-**Current Version**: TurboMCP v2.0.4 (stable, production-ready)
-
-All TurboMCP dependencies are fetched from crates.io during build. No additional setup required.
+TurboMCP v3.0.4 is published to [crates.io](https://crates.io/crates/turbomcp-client) and fetched automatically during the build process. No additional setup required.
 
 ### Development Build
 
@@ -276,21 +299,25 @@ pnpm run check:watch
 
 ```bash
 # Run Rust tests
-cd src-tauri
-cargo test
+cd src-tauri && cargo test --all-features
 
-# Run Rust tests with output
+# Run with output
 cargo test -- --nocapture
 
 # Run specific test
 cargo test test_name
 
-# Lint Rust code
-cargo clippy --all-targets --all-features
+# Run integration tests that require external binaries
+TURBOMCP_DEMO_PATH=/path/to/binary cargo test --ignored
 
-# Format Rust code
-cargo fmt
+# Lint and format
+cargo clippy --all-targets --all-features -- -D warnings
+cargo fmt --check
 ```
+
+> **Note:** Some integration tests are `#[ignore]`d by default because they require
+> external MCP server binaries. Set the `TURBOMCP_DEMO_PATH` environment variable
+> to run them locally.
 
 ## Development
 
@@ -298,59 +325,78 @@ cargo fmt
 
 ```
 turbomcpstudio/
-├── src/                          # SvelteKit frontend
-│   ├── routes/                  # File-based routing
-│   ├── lib/
-│   │   ├── components/         # Svelte components
-│   │   ├── stores/             # State management
-│   │   ├── styles/             # CSS architecture
-│   │   └── types/              # TypeScript types
-│   └── app.html
-├── src-tauri/                   # Rust backend
+├── src/                            # SvelteKit frontend
+│   ├── routes/                     #   Page routes (+layout.svelte, +page.svelte)
+│   └── lib/
+│       ├── components/             #   Svelte 5 components (runes mode)
+│       │   ├── layout/             #     Shell: Sidebar, MasterLayout, StatusBar
+│       │   ├── ui/                 #     Reusable: Button, JsonViewer, FormField, etc.
+│       │   └── sampling/           #     Sampling approval UI
+│       ├── stores/                 #   Svelte stores (server, profile, sampling, OAuth, etc.)
+│       ├── types/                  #   TypeScript type definitions
+│       ├── utils/                  #   Helpers: logger, schema validation, cost estimation
+│       └── constants/              #   App-wide constants and timeouts
+├── src-tauri/                      # Rust backend (Tauri 2.0)
 │   ├── src/
-│   │   ├── commands/           # Tauri command handlers
-│   │   ├── mcp_client/         # MCP client manager
-│   │   ├── database/           # SQLite layer
-│   │   └── lib.rs              # Entry point
+│   │   ├── commands/               #   Tauri IPC command handlers
+│   │   ├── mcp_client/             #   MCP client: transport, health, sampling, rate limiting
+│   │   ├── oauth/                  #   OAuth 2.1: flows, tokens, callback server, DPoP
+│   │   ├── proxy/                  #   MCP proxy server management
+│   │   ├── types/                  #   Shared Rust type definitions
+│   │   ├── database.rs             #   SQLite via sqlx (migrations, queries)
+│   │   ├── hitl_sampling.rs        #   Human-in-the-loop sampling manager
+│   │   ├── workflow_engine.rs      #   Multi-step workflow execution
+│   │   ├── error.rs                #   Structured error types
+│   │   └── lib.rs                  #   App setup, state, plugin registration
+│   ├── tests/                      #   Integration tests
 │   ├── Cargo.toml
-│   └── tauri.conf.json         # Tauri configuration
-├── static/                      # Static assets
+│   └── tauri.conf.json             #   Tauri config, CSP, capabilities
+├── .github/workflows/ci.yml       # CI: fmt, clippy, test, audit, build
+├── static/                         # Static assets (logos, screenshots)
 └── package.json
 ```
 
 ### Key Technologies
 
-- **Frontend**: SvelteKit 5 + TypeScript + Tailwind CSS
-- **Backend**: Rust + Tauri 2.0
-- **MCP Client**: TurboMCP (enterprise-grade)
-- **Database**: SQLite (local-first)
-- **Build Tool**: Vite
-- **Package Manager**: pnpm
+| Layer | Stack |
+|-------|-------|
+| Frontend | SvelteKit 5 (runes mode) + TypeScript (strict) + Tailwind CSS |
+| Backend | Rust + Tauri 2.0 + tokio async runtime |
+| MCP Client | [TurboMCP](https://github.com/Epistates/turbomcp) — multi-transport, protocol-compliant |
+| Database | SQLite via sqlx (local-first, migrations) |
+| Auth | OAuth 2.1 with PKCE, OS keyring for credential storage |
+| Build | Vite + pnpm + cargo |
+| CI | GitHub Actions — fmt, clippy, test, cargo audit, cross-platform build |
 
 ### Architecture
 
-TurboMCP Studio uses a three-layer architecture:
-
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Frontend (SvelteKit + TypeScript + Tailwind)                  │
-│  • Operation-specific UIs for each MCP capability              │
-│  • Real-time protocol visualization                            │
-│  • Collections and scenario management                         │
-└─────────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────────┐
-│  Tauri Bridge Layer                                            │
-│  • Type-safe IPC with serde serialization                      │
-│  • Native process spawning and management                      │
-│  • File system access and window management                    │
-└─────────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────────┐
-│  Native Engine (Rust + TurboMCP)                               │
-│  • Production-grade MCP client with enterprise features        │
-│  • Multi-transport support (STDIO/HTTP/WebSocket/TCP/Unix)     │
-│  • Process lifecycle management and health monitoring          │
-│  • Protocol analysis and message replay capabilities           │
-│  • SQLite storage with collections and history                 │
+│  Frontend (SvelteKit 5 + TypeScript + Tailwind)                │
+│  • Svelte 5 runes for reactive state                           │
+│  • Store-per-concern (server, profile, sampling, OAuth, UI)    │
+│  • Real-time protocol visualization and message history        │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ Tauri IPC (structured JSON, typed commands)
+┌──────────────────────────┴──────────────────────────────────────┐
+│  Rust Backend (Tauri 2.0 + tokio)                              │
+│  ┌──────────────┐ ┌──────────────┐ ┌─────────────────────────┐ │
+│  │ MCP Client   │ │ OAuth 2.1    │ │ Workflow Engine          │ │
+│  │ • Transport  │ │ • PKCE (S256)│ │ • Step execution         │ │
+│  │ • Health mon │ │ • Keyring    │ │ • Variable interpolation │ │
+│  │ • Rate limit │ │ • Callback   │ │ • DB persistence         │ │
+│  │ • Interceptor│ │ • Refresh    │ │                          │ │
+│  └──────┬───────┘ └──────────────┘ └─────────────────────────┘ │
+│         │          ┌──────────────┐ ┌─────────────────────────┐ │
+│         │          │ HITL Sampling│ │ SQLite (sqlx)           │ │
+│         │          │ • Approve    │ │ • Servers & profiles    │ │
+│         │          │ • Cost est.  │ │ • Message history       │ │
+│         │          │ • History    │ │ • Workflow executions    │ │
+│         │          └──────────────┘ └─────────────────────────┘ │
+└─────────┼───────────────────────────────────────────────────────┘
+          │ STDIO / HTTP / WebSocket / TCP / Unix
+┌─────────┴───────────────────────────────────────────────────────┐
+│  MCP Servers                                                    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -397,12 +443,23 @@ TurboMCP Studio uses a three-layer architecture:
 }
 ```
 
+## Security
+
+TurboMCP Studio is a developer tool. Like Postman, it allows connecting to arbitrary servers including local development instances over plaintext HTTP. Security controls are calibrated accordingly:
+
+- **Credentials** are stored in the OS keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service) — never in the SQLite database or config files
+- **OAuth flows** use PKCE with S256 challenge method; non-HTTPS token endpoints emit warnings but are not blocked (for local dev servers)
+- **CSP** restricts the WebView to `wss:`/`https:` for remote origins; `ws:`/`http:` are scoped to localhost only
+- **Shell execution** is restricted to absolute paths without shell metacharacters
+- **Rate limiting** is enforced per-server (default: 100 req/60s) with configurable thresholds
+- **LLM sampling** supports human-in-the-loop approval to prevent unauthorized LLM invocations from MCP servers
+
+To report a security issue, please open a [GitHub Issue](https://github.com/Epistates/turbomcpstudio/issues) with the `security` label.
+
 ## Documentation
 
 - **[CHANGELOG.md](CHANGELOG.md)**: Release history and version notes
-- **[RELEASE.md](RELEASE.md)**: Release process and versioning guide
-- **[CLAUDE.md](CLAUDE.md)**: Development guidelines and project overview
-- **[REFACTORING.md](REFACTORING.md)**: Comprehensive refactoring tracking and architecture decisions
+- **[CONTRIBUTING.md](CONTRIBUTING.md)**: Contribution guidelines
 
 ## Contributing
 
@@ -429,17 +486,20 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 ### Code Quality
 
 Before submitting:
-- Run `pnpm run check` (TypeScript type checking)
-- Run `cargo test` (Rust tests)
-- Run `cargo clippy` (Rust linting)
-- Run `cargo fmt` (Rust formatting)
+```bash
+pnpm run check                                        # TypeScript type checking
+cd src-tauri && cargo fmt --check                      # Rust formatting
+cd src-tauri && cargo clippy --all-features -- -D warnings  # Rust linting
+cd src-tauri && cargo test --all-features              # Rust tests
+cd src-tauri && cargo audit                            # Dependency vulnerabilities
+```
 
 ## Troubleshooting
 
 ### Build Errors
 
-**Error**: "could not find `turbomcp` in the crate root"
-- **Solution**: Run `cargo clean` and rebuild. TurboMCP v2.0.4 is automatically fetched from crates.io during build.
+**Error**: "could not find `turbomcp` crates"
+- **Solution**: Run `cargo clean` and rebuild. TurboMCP v3.0.4 is automatically fetched from crates.io during build.
 
 **Error**: "webkit2gtk not found" (Linux)
 - **Solution**: Install required system dependencies:
@@ -506,20 +566,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 <img src="static/Turbomcp-logo.png" alt="TurboMCP" width="120"/>
 </div>
 
-TurboMCP Studio is powered by **[TurboMCP](https://github.com/Epistates/turbomcp)**, an enterprise-grade Rust implementation of the Model Context Protocol.
-
-### Why TurboMCP?
-
-- ** SIMD-Accelerated JSON**: 2-3x faster protocol operations with SIMD optimization
-- ** Enterprise Security**: OAuth 2.1, CORS, TLS, rate limiting, and circuit breakers built-in
-- ** Multi-Transport Native**: Full support for STDIO, HTTP, WebSocket, TCP, and Unix sockets
-- ** Production Resilience**: Connection pooling, health monitoring, and automatic retry logic
-- ** 100% MCP Compliant**: Complete implementation of the MCP 2025-06-18 specification
-- ** Type Safety**: Comprehensive Rust types for all protocol operations
-
-TurboMCP enables TurboMCP Studio to deliver a production-ready, enterprise-grade developer experience for MCP server development and testing.
-
-**Learn More**: [TurboMCP Documentation](https://github.com/Epistates/turbomcp)
+TurboMCP Studio is powered by **[TurboMCP](https://github.com/Epistates/turbomcp)**, a Rust implementation of the Model Context Protocol with multi-transport support, OAuth 2.1, rate limiting, and health monitoring.
 
 ## Acknowledgments
 
@@ -530,5 +577,4 @@ TurboMCP enables TurboMCP Studio to deliver a production-ready, enterprise-grade
 
 ---
 
-**Status**: Phase 1 Complete (v0.1.0) - Foundation established
-**Next**: Phase 2 - Full MCP protocol integration
+**Status**: v0.1.0 — Foundation release with full MCP protocol support

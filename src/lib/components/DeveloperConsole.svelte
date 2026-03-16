@@ -23,7 +23,7 @@
   let autoScroll = $state(true);
 
   // Available log sources
-  const sources = $derived(() => {
+  const sources = $derived.by(() => {
     const sourceSet = new Set<string>();
     logState.logs.forEach((log) => sourceSet.add(log.source));
     return Array.from(sourceSet).sort();
@@ -233,10 +233,10 @@
         </div>
 
         <!-- Source Filters -->
-        {#if sources().length > 0}
+        {#if sources.length > 0}
           <div class="flex items-center gap-2">
             <span class="text-xs text-gray-400">Sources:</span>
-            {#each sources() as source}
+            {#each sources as source}
               <button
                 onclick={() => toggleSource(source)}
                 class="px-2 py-0.5 text-xs rounded transition-colors {selectedSources.has(source)

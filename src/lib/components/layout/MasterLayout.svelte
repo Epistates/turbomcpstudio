@@ -123,7 +123,7 @@
       class="mcp-sidebar"
       class:mcp-sidebar--collapsed={isSidebarCollapsed}
       class:mcp-sidebar--mobile-open={isMobileMenuOpen}
-      style:width={isSidebarCollapsed ? '0px' : `${sidebarWidth}px`}
+      style:width={isSidebarCollapsed ? undefined : `${sidebarWidth}px`}
     >
       <Sidebar {isMobile} {isSidebarCollapsed} />
     </aside>
@@ -197,7 +197,7 @@
   }
 
   .mcp-sidebar--collapsed {
-    width: 0 !important;
+    width: 0;
     border-right: none;
   }
 
@@ -207,7 +207,7 @@
       position: fixed;
       top: var(--header-height);
       left: 0;
-      width: 280px !important;
+      width: 280px;
       height: calc(100vh - var(--header-height));
       transform: translateX(-100%);
       z-index: 50;
@@ -244,6 +244,7 @@
 
   .mcp-resize-handle:focus {
     outline: none;
+    box-shadow: 0 0 0 2px var(--mcp-primary-500);
   }
 
   /* Add visual indicator */

@@ -24,12 +24,12 @@
   const totalCount = $derived(servers.length);
 
   // Status color based on health
-  const statusColor = $derived(() => {
-    if (errorCount > 0) return 'text-red-600 dark:text-red-400';
-    if (connectingCount > 0) return 'text-yellow-600 dark:text-yellow-400';
-    if (connectedCount > 0) return 'text-green-600 dark:text-green-400';
-    return 'text-gray-400 dark:text-gray-500';
-  });
+  const statusColor = $derived(
+    errorCount > 0 ? 'text-red-600 dark:text-red-400' :
+    connectingCount > 0 ? 'text-yellow-600 dark:text-yellow-400' :
+    connectedCount > 0 ? 'text-green-600 dark:text-green-400' :
+    'text-gray-400 dark:text-gray-500'
+  );
 </script>
 
 <div
@@ -38,7 +38,7 @@
   <!-- Left: Server Status -->
   <div class="flex items-center gap-4">
     <div class="flex items-center gap-2" title="Server Status">
-      <Server size={14} class={statusColor()} />
+      <Server size={14} class={statusColor} />
       <span class="font-mono">
         {connectedCount}/{totalCount}
       </span>

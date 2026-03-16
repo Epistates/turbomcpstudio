@@ -47,7 +47,7 @@
   let showCopyDropdown = $state(false);
 
   // Computed values - only count servers that will actually be installed (supported transports)
-  const serverSelectionCount = $derived(() => {
+  const serverSelectionCount = $derived.by(() => {
     if (serverSelectionMode === 'all') {
       const supported = servers.filter((s) => isSupportedTransport(s)).length;
       logger.debug(`[serverSelectionCount] all mode: ${supported} supported of ${servers.length} total`);
@@ -237,14 +237,10 @@
   }
 
   // Get total count of selected servers (for UI display)
-  const totalSelectedCount = $derived(() => {
-    return getAllSelectedServers().length;
-  });
+  const totalSelectedCount = $derived(getAllSelectedServers().length);
 
   // Get count of supported servers only (for client install)
-  const supportedSelectedCount = $derived(() => {
-    return getServersToInstall().length;
-  });
+  const supportedSelectedCount = $derived(getServersToInstall().length);
 
   // Check if there are ANY supported servers available in current mode
   function hasAnySupportedServersAvailable(): boolean {
@@ -590,13 +586,13 @@
               {/if}
             </div>
 
-            {#if totalSelectedCount() > 0}
+            {#if totalSelectedCount > 0}
               <div class="mt-6 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <p class="text-sm text-blue-900 dark:text-blue-200">
-                  <span class="font-medium">📋 Selected:</span> {totalSelectedCount()} server{totalSelectedCount() !== 1 ? 's' : ''}
-                  {#if supportedSelectedCount() < totalSelectedCount()}
+                  <span class="font-medium">📋 Selected:</span> {totalSelectedCount} server{totalSelectedCount !== 1 ? 's' : ''}
+                  {#if supportedSelectedCount < totalSelectedCount}
                     <span class="text-xs text-yellow-700 dark:text-yellow-300">
-                      ({supportedSelectedCount()} client-compatible, {getUnsupportedServers().length} clipboard-only)
+                      ({supportedSelectedCount} client-compatible, {getUnsupportedServers().length} clipboard-only)
                     </span>
                   {:else}
                     <span class="text-xs text-green-700 dark:text-green-300">
@@ -769,9 +765,9 @@
                 <div class="flex">
                   <button
                     onclick={() => handleCopyToClipboard('full')}
-                    disabled={totalSelectedCount() === 0}
+                    disabled={totalSelectedCount === 0}
                     class="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-l-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    title={totalSelectedCount() === 0 ? 'No servers selected' : `Copy ${totalSelectedCount()} server${totalSelectedCount() !== 1 ? 's' : ''} (full format with mcpServers wrapper)`}
+                    title={totalSelectedCount === 0 ? 'No servers selected' : `Copy ${totalSelectedCount} server${totalSelectedCount !== 1 ? 's' : ''} (full format with mcpServers wrapper)`}
                   >
                     <Copy size={16} />
                     Copy to Clipboard
@@ -781,7 +777,7 @@
                       e.stopPropagation();
                       showCopyDropdown = !showCopyDropdown;
                     }}
-                    disabled={totalSelectedCount() === 0}
+                    disabled={totalSelectedCount === 0}
                     class="px-2 py-2 text-gray-700 dark:text-gray-300 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Copy format options"
                   >
@@ -821,22 +817,22 @@
 
               <button
                 onclick={() => {
-                  if (supportedSelectedCount() === 0) {
+                  if (supportedSelectedCount === 0) {
                     uiStore.showError('No client-compatible servers selected');
                     return;
                   }
                   step = 2 as any;
                 }}
-                disabled={supportedSelectedCount() === 0}
+                disabled={supportedSelectedCount === 0}
                 class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                title={supportedSelectedCount() === 0
-                  ? (totalSelectedCount() > 0
+                title={supportedSelectedCount === 0
+                  ? (totalSelectedCount > 0
                     ? `Cannot install: ${getUnsupportedServers().map(s => `${s.config.name} (${s.config.transport_config?.type})`).join(', ')} - non-standard transport${getUnsupportedServers().length !== 1 ? 's' : ''} not supported by MCP clients`
                     : 'No servers selected')
-                  : `Install ${supportedSelectedCount()} client-compatible server${supportedSelectedCount() !== 1 ? 's' : ''}`}
+                  : `Install ${supportedSelectedCount} client-compatible server${supportedSelectedCount !== 1 ? 's' : ''}`}
               >
-                {#if totalSelectedCount() > supportedSelectedCount()}
-                  Add to Client ({supportedSelectedCount()}/{totalSelectedCount()})
+                {#if totalSelectedCount > supportedSelectedCount}
+                  Add to Client ({supportedSelectedCount}/{totalSelectedCount})
                 {:else}
                   Add to Client
                 {/if}

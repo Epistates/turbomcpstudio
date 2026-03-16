@@ -31,7 +31,7 @@
   );
 
   // Derived state for active profile display
-  const activeProfileDisplay = $derived(() => {
+  const activeProfileDisplay = $derived.by(() => {
     if (!activeProfile?.profile) return null;
 
     const profileServers = activeProfile.servers || [];
@@ -111,22 +111,20 @@
   }
 
   // Connection status text
-  const connectionStatusText = $derived(() => {
-    if (!activeProfileDisplay()) return '';
-    const display = activeProfileDisplay();
-    if (!display) return '';
+  const connectionStatusText = $derived.by(() => {
+    if (!activeProfileDisplay) return '';
 
-    if (display.isActivating) {
+    if (activeProfileDisplay.isActivating) {
       return 'Activating...';
     }
 
-    return `${display.connectedCount}/${display.totalCount} servers ${display.connectedCount === display.totalCount ? 'connected' : 'connecting'}`;
+    return `${activeProfileDisplay.connectedCount}/${activeProfileDisplay.totalCount} servers ${activeProfileDisplay.connectedCount === activeProfileDisplay.totalCount ? 'connected' : 'connecting'}`;
   });
 </script>
 
-{#if activeProfileDisplay()}
+{#if activeProfileDisplay}
   <!-- Active Profile State -->
-  {@const display = activeProfileDisplay()}
+  {@const display = activeProfileDisplay}
   {#if display}
     <div class="profile-context-bar active" bind:this={dropdownRef}>
       <div class="profile-info">
@@ -137,7 +135,7 @@
           <span class="profile-name">{display.profile.name}</span>
           {#if !isMobile}
             <span class="profile-status">
-              {connectionStatusText()}
+              {connectionStatusText}
               {#if display.activatedAt}
                 • Activated {display.activatedAt}
               {/if}

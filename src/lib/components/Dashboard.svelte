@@ -40,35 +40,35 @@
   // Profile-aware filtering
   const shouldShowProfileView = $derived(activeProfile?.profile != null);
 
-  const displayServers = $derived(() => {
-    if (shouldShowProfileView && activeProfile) {
-      const profileServerIds = new Set(activeProfile.servers.map(ps => ps.server_id));
-      return servers.filter(s => profileServerIds.has(s.id));
-    } else {
-      return servers;
-    }
-  });
+  const displayServers = $derived(
+    shouldShowProfileView && activeProfile
+      ? (() => {
+          const profileServerIds = new Set(activeProfile.servers.map(ps => ps.server_id));
+          return servers.filter(s => profileServerIds.has(s.id));
+        })()
+      : servers
+  );
 
   const selectedServer = $derived(
     servers.find(s => s.id === selectedServerId)
   );
 
   const connectedServers = $derived(
-    displayServers().filter((s: ServerInfo) => getServerStatus(s) === 'connected')
+    displayServers.filter((s: ServerInfo) => getServerStatus(s) === 'connected')
   );
 
   const stats = $derived({
-    total: displayServers().length,
+    total: displayServers.length,
     connected: connectedServers.length,
-    disconnected: displayServers().filter((s: ServerInfo) => getServerStatus(s) === 'disconnected').length,
-    error: displayServers().filter((s: ServerInfo) => getServerStatus(s) === 'error').length,
+    disconnected: displayServers.filter((s: ServerInfo) => getServerStatus(s) === 'disconnected').length,
+    error: displayServers.filter((s: ServerInfo) => getServerStatus(s) === 'error').length,
   });
 
   // Profile metrics when active
-  const profileMetrics = $derived(() => {
+  const profileMetrics = $derived.by(() => {
     if (!shouldShowProfileView || !activeProfile?.profile) return null;
 
-    const profileServers = displayServers();
+    const profileServers = displayServers;
     const connectedCount = profileServers.filter(s => s.status === 'connected').length;
 
     // Calculate aggregate metrics
@@ -133,22 +133,21 @@
   }
 
   // Recent servers (last 3 used/connected)
-  const recentServers = $derived(() => {
-    return servers
+  const recentServers = $derived(
+    servers
       .filter(s => s.last_seen)
       .sort((a, b) => {
         const aTime = a.last_seen ? new Date(a.last_seen).getTime() : 0;
         const bTime = b.last_seen ? new Date(b.last_seen).getTime() : 0;
         return bTime - aTime;
       })
-      .slice(0, 3);
-  });
+      .slice(0, 3)
+  );
 
   // Recent activity from tool executions
-  const recentActivity = $derived(() => {
-    const executions = serverState.toolExecutions || [];
-    return executions.slice(0, 5);
-  });
+  const recentActivity = $derived(
+    (serverState.toolExecutions || []).slice(0, 5)
+  );
 
   // Time ago helper
   function getTimeAgo(date: Date): string {
@@ -199,8 +198,8 @@
   <!-- Dashboard View -->
   <div class="h-full p-6 overflow-y-auto">
       <!-- Profile Banner (when active) -->
-      {#if shouldShowProfileView && activeProfile?.profile && profileMetrics()}
-        {@const metrics = profileMetrics()}
+      {#if shouldShowProfileView && activeProfile?.profile && profileMetrics}
+        {@const metrics = profileMetrics}
         {@const activatedAt = activeProfile.activation?.activated_at ? new Date(activeProfile.activation.activated_at) : null}
         {#if metrics && activeProfile.profile}
           <div class="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
@@ -447,7 +446,7 @@
                 {/if}
               </h2>
               <div class="flex items-center gap-3">
-                {#if !shouldShowProfileView && recentServers().length > 0}
+                {#if !shouldShowProfileView && recentServers.length > 0}
                   <button
                     onclick={() => uiStore.setView('servers')}
                     class="text-sm text-mcp-primary-600 hover:text-mcp-primary-700"
@@ -466,7 +465,7 @@
               </div>
             </div>
 
-            {#if (!shouldShowProfileView && recentServers().length === 0) || (shouldShowProfileView && displayServers().length === 0)}
+            {#if (!shouldShowProfileView && recentServers.length === 0) || (shouldShowProfileView && displayServers.length === 0)}
               {#if shouldShowProfileView}
                 <div class="text-center py-12">
                   <Database size={48} class="mx-auto text-gray-400 mb-4" />
@@ -496,7 +495,7 @@
               {/if}
             {:else}
               <div class="space-y-3">
-                {#each (shouldShowProfileView ? displayServers() : recentServers()) as server}
+                {#each (shouldShowProfileView ? displayServers : recentServers) as server}
                   <ServerOverview {server} />
                 {/each}
               </div>
@@ -554,7 +553,7 @@
       </div>
 
       <!-- Recent Activity (Full Width) -->
-      {#if recentActivity().length > 0}
+      {#if recentActivity.length > 0}
         <div class="card">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-primary">Recent Activity</h2>
@@ -566,7 +565,7 @@
             </button>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {#each recentActivity() as activity}
+            {#each recentActivity as activity}
               <div class="flex items-start gap-2 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                 <div class="activity-status-indicator {activity.status}">
                   {activity.status === 'success' ? '✓' : '✗'}

@@ -190,46 +190,32 @@
   // Profile-aware server display logic
   const shouldShowProfileView = $derived(activeProfile?.profile != null);
 
-  const displayServers = $derived(() => {
-    if (shouldShowProfileView && activeProfile) {
-      // Show only active profile servers
-      const profileServerIds = new Set(activeProfile.servers.map((ps: any) => ps.server_id));
-      return servers.filter(s => profileServerIds.has(s.id));
-    } else {
-      // Show all servers
-      return servers || [];
-    }
-  });
+  const displayServers = $derived(
+    shouldShowProfileView && activeProfile
+      ? (() => {
+          const profileServerIds = new Set(activeProfile.servers.map((ps: any) => ps.server_id));
+          return servers.filter(s => profileServerIds.has(s.id));
+        })()
+      : servers
+  );
 
   // Group servers when no profile is active
-  const groupedServers = $derived(() => {
-    if (shouldShowProfileView) return { grouped: [], ungrouped: [] };
+  const groupedServers = $derived.by(() => {
+    if (shouldShowProfileView) return { grouped: [] as ServerInfo[], ungrouped: [] as ServerInfo[] };
 
-    const grouped: ServerInfo[] = [];
-    const ungrouped: ServerInfo[] = [];
-
-    servers.forEach(server => {
-      // Check if server is in any profile
-      const isInProfile = profileState.profiles.some(profile =>
-        profile.server_count > 0 // Simplified check - would need to query profile servers
-      );
-      // For now, show all as ungrouped since we don't have profile membership info here
-      ungrouped.push(server);
-    });
-
-    return { grouped, ungrouped };
+    const ungrouped: ServerInfo[] = [...servers];
+    return { grouped: [] as ServerInfo[], ungrouped };
   });
 
   // Connection count for active profile
-  const profileConnectionStatus = $derived(() => {
+  const profileConnectionStatus = $derived.by(() => {
     if (!shouldShowProfileView || !activeProfile) return null;
 
-    const profileServers = displayServers();
-    const connectedCount = profileServers.filter(s => s.status === 'connected').length;
+    const connectedCount = displayServers.filter(s => s.status === 'connected').length;
 
     return {
       connected: connectedCount,
-      total: profileServers.length
+      total: displayServers.length
     };
   });
 </script>
@@ -285,8 +271,8 @@
       {/if}
       <span>{shouldShowProfileView && activeProfile?.profile ? `⚡ ${activeProfile.profile.name}` : 'Servers'}</span>
       <div class="mcp-sidebar__section-actions">
-        {#if shouldShowProfileView && profileConnectionStatus()}
-          {@const status = profileConnectionStatus()}
+        {#if shouldShowProfileView && profileConnectionStatus}
+          {@const status = profileConnectionStatus}
           {#if status}
             <span class="mcp-sidebar__server-count text-green-600 dark:text-green-400">
               {status.connected}/{status.total}
@@ -311,7 +297,7 @@
 
     {#if expandedSections.has('servers')}
       <div class="mcp-sidebar__servers">
-        {#if displayServers().length === 0}
+        {#if displayServers.length === 0}
           <div class="mcp-sidebar__empty-state">
             <Database size={32} class="mcp-sidebar__empty-icon" />
             <p class="mcp-sidebar__empty-text">No servers configured</p>
@@ -324,7 +310,7 @@
           </div>
         {:else}
           <div class="mcp-sidebar__server-list">
-            {#each displayServers() as server (server.id)}
+            {#each displayServers as server (server.id)}
               <div class="mcp-sidebar__server-item {selectedServerId === server.id ? 'mcp-sidebar__server-item--selected border-mcp-primary-300 bg-mcp-primary-50 ring-2 ring-mcp-primary-200 dark:border-mcp-primary-600 dark:bg-mcp-primary-900/30 dark:ring-mcp-primary-700' : ''}">
                 <button
                   class="mcp-sidebar__server-main"
@@ -387,6 +373,7 @@
                     class="mcp-sidebar__action-button {server.status?.toLowerCase() === 'connected' ? 'mcp-sidebar__action-button--disconnect' : 'mcp-sidebar__action-button--connect'}"
                     onclick={(e) => toggleConnection(server, e)}
                     title={server.status?.toLowerCase() === 'connected' ? 'Disconnect' : 'Connect'}
+                    aria-label={server.status?.toLowerCase() === 'connected' ? `Disconnect ${server.config.name}` : `Connect ${server.config.name}`}
                   >
                     {#if server.status?.toLowerCase() === 'connected'}
                       <Square size={14} />
@@ -399,6 +386,7 @@
                     class="mcp-sidebar__action-button mcp-sidebar__action-button--settings"
                     onclick={(e) => openServerConfig(server, e)}
                     title="Settings"
+                    aria-label={`Settings for ${server.config.name}`}
                   >
                     <Settings size={14} />
                   </button>

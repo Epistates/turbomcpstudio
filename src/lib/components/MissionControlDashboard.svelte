@@ -23,7 +23,7 @@
   const toolExecutions = $derived(serverState.toolExecutions || []);
 
   // System Health Metrics
-  const health = $derived(() => {
+  const health = $derived.by(() => {
     const connected = servers.filter(s => s.status === 'connected');
     const errors = servers.filter(s => s.status === 'error');
     const avgResponseTime = connected.length > 0
@@ -42,8 +42,8 @@
   });
 
   // Capability Matrix Data
-  const capabilityMatrix = $derived(() => {
-    return servers.map(s => ({
+  const capabilityMatrix = $derived(
+    servers.map(s => ({
       name: s.config.name,
       id: s.id,
       status: s.status,
@@ -55,18 +55,18 @@
       toolCount: 0, // TODO: Add to ServerInfo
       resourceCount: 0,
       promptCount: 0
-    }));
-  });
+    }))
+  );
 
   // Recent Activity
-  const recentActivity = $derived(() => {
-    return toolExecutions
+  const recentActivity = $derived(
+    toolExecutions
       .slice(0, 10)
       .map(exec => ({
         ...exec,
         timeAgo: getTimeAgo(new Date(exec.timestamp))
-      }));
-  });
+      }))
+  );
 
   function getTimeAgo(date: Date): string {
     const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -77,16 +77,14 @@
   }
 
   function getHealthIcon() {
-    const h = health();
-    if (h.status === 'healthy') return CheckCircle;
-    if (h.status === 'warning') return AlertCircle;
+    if (health.status === 'healthy') return CheckCircle;
+    if (health.status === 'warning') return AlertCircle;
     return Activity;
   }
 
   function getHealthColor() {
-    const h = health();
-    if (h.status === 'healthy') return 'text-green-600';
-    if (h.status === 'warning') return 'text-red-600';
+    if (health.status === 'healthy') return 'text-green-600';
+    if (health.status === 'warning') return 'text-red-600';
     return 'text-yellow-600';
   }
 
@@ -111,10 +109,10 @@
       <HealthIcon size={24} class={getHealthColor()} />
       <div class="health-text">
         <span class="health-count">
-          {health().connected}/{health().total} connected
+          {health.connected}/{health.total} connected
         </span>
-        {#if health().errors > 0}
-          <span class="health-warning">⚠️ {health().errors} error{health().errors > 1 ? 's' : ''}</span>
+        {#if health.errors > 0}
+          <span class="health-warning">⚠️ {health.errors} error{health.errors > 1 ? 's' : ''}</span>
         {/if}
       </div>
     </div>
@@ -125,10 +123,10 @@
           <span>Last activity: {getTimeAgo(new Date(toolExecutions[0].timestamp))}</span>
         </div>
       {/if}
-      {#if health().connected > 0}
+      {#if health.connected > 0}
         <div class="metric">
           <Zap size={16} />
-          <span>Avg response: {health().avgResponseTime}ms</span>
+          <span>Avg response: {health.avgResponseTime}ms</span>
         </div>
       {/if}
     </div>
@@ -141,7 +139,7 @@
         <Database size={20} />
         <h2>Server Capabilities</h2>
       </div>
-      {#if capabilityMatrix().length > 0}
+      {#if capabilityMatrix.length > 0}
         <div class="matrix-table">
           <table>
             <thead>
@@ -154,7 +152,7 @@
               </tr>
             </thead>
             <tbody>
-              {#each capabilityMatrix() as server}
+              {#each capabilityMatrix as server}
                 <tr class:disconnected={server.status !== 'connected'}>
                   <td class="server-name">
                     <span class="status-dot status-{server.status}"></span>
@@ -233,15 +231,15 @@
       <div class="card-header">
         <Activity size={20} />
         <h2>Recent Activity</h2>
-        {#if recentActivity().length > 0}
+        {#if recentActivity.length > 0}
           <button class="header-link" onclick={() => uiStore.setView('protocol')}>
             View All
           </button>
         {/if}
       </div>
-      {#if recentActivity().length > 0}
+      {#if recentActivity.length > 0}
         <div class="activity-list">
-          {#each recentActivity() as activity}
+          {#each recentActivity as activity}
             <div class="activity-item">
               <div class="activity-status {activity.status}">
                 {activity.status === 'success' ? '✓' : '✗'}

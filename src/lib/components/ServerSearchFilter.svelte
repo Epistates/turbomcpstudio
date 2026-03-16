@@ -31,7 +31,7 @@
   }
 
   // Filtered and sorted servers
-  const filteredServers = $derived(() => {
+  const filteredServers = $derived.by(() => {
     let result = servers;
 
     // Search filter (fuzzy)
@@ -89,7 +89,7 @@
   // Notify parent of filter changes
   $effect(() => {
     if (onFilterChange) {
-      onFilterChange(filteredServers());
+      onFilterChange(filteredServers);
     }
   });
 
@@ -254,7 +254,7 @@
   <!-- Results Summary -->
   <div class="results-summary">
     <span class="result-count">
-      {filteredServers().length} of {servers.length} servers
+      {filteredServers.length} of {servers.length} servers
       {#if hasActiveFilters}
         <span class="filtered-note">(filtered)</span>
       {/if}

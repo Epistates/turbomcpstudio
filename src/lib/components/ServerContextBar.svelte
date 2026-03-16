@@ -86,8 +86,7 @@
   );
 
   // Group servers by profile
-  const serverGroups = $derived(() => {
-    // Get current filtered servers
+  const serverGroups = $derived.by(() => {
     const currentFilteredServers = filteredServers;
     const currentActiveProfile = activeProfile;
 
@@ -124,7 +123,7 @@
   });
 
   // Connection status styling
-  const statusConfig = $derived(() => {
+  const statusConfig = $derived((() => {
     switch (context.connectionStatus) {
       case 'connected':
         return { color: 'status-connected', icon: CheckCircle, text: 'Connected' };
@@ -135,9 +134,9 @@
       default:
         return { color: 'status-disconnected', icon: Server, text: 'Disconnected' };
     }
-  });
+  })());
 
-  const StatusIcon = $derived(statusConfig().icon);
+  const StatusIcon = $derived(statusConfig.icon);
 
   // Actions
   function toggleDropdown() {
@@ -203,7 +202,7 @@
       <span class="server-label" class:compact>{label}</span>
 
       <button class="server-selector" onclick={toggleDropdown}>
-        <span class="server-status {statusConfig().color}">
+        <span class="server-status {statusConfig.color}">
           <StatusIcon size={14} />
         </span>
         <span class="server-name">{selectedServer.config.name}</span>
@@ -283,7 +282,7 @@
             </button>
           </div>
         {:else}
-          {#each serverGroups() as group}
+          {#each serverGroups as group}
             <div class="server-group">
               <div class="group-header">
                 {#if group.isProfile}

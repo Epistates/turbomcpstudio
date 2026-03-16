@@ -167,12 +167,11 @@
     return { valid: errors.length === 0, errors };
   }
 
-  const validation = $derived(() => {
-    if (!hasStructuredContent || !hasSchema || !result) {
-      return null;
-    }
-    return validateAgainstSchema(result.structuredContent, result.outputSchema);
-  });
+  const validation = $derived(
+    (hasStructuredContent && hasSchema && result)
+      ? validateAgainstSchema(result.structuredContent, result.outputSchema)
+      : null
+  );
 </script>
 
 {#if !result}
@@ -239,7 +238,7 @@
 
         <!-- Schema Validation Status (if present) -->
         {#if hasStructuredContent && hasSchema && validation}
-          {@const v = validation()}
+          {@const v = validation}
           {#if v}
             <div class="flex items-center gap-1 text-xs {v.valid ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}">
               {#if v.valid}
@@ -368,7 +367,7 @@
 
     <!-- Validation Errors -->
     {#if hasStructuredContent && hasSchema && validation}
-      {@const v = validation()}
+      {@const v = validation}
       {#if v && !v.valid}
         <div class="px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
           <div class="text-xs">

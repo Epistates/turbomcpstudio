@@ -29,8 +29,8 @@
   const toolExecutions = $derived(serverState.toolExecutions || []);
 
   // Recent Activity (last 10 operations)
-  const recentActivity = $derived(() => {
-    return toolExecutions
+  const recentActivity = $derived(
+    toolExecutions
       .slice(0, 10)
       .map(exec => {
         const timestampDate = typeof exec.timestamp === 'string'
@@ -42,11 +42,11 @@
           timestamp: timestampStr,
           timeAgo: getTimeAgo(timestampDate)
         };
-      });
-  });
+      })
+  );
 
   // Most Used Tools (by frequency)
-  const mostUsedTools = $derived(() => {
+  const mostUsedTools = $derived.by(() => {
     const toolCounts = new Map<string, { count: number; serverName: string; lastUsed: string }>();
 
     toolExecutions.forEach(exec => {
@@ -81,7 +81,7 @@
   );
 
   // Performance Insights
-  const performanceInsights = $derived(() => {
+  const performanceInsights = $derived.by(() => {
     const insights: Array<{ type: 'warning' | 'info' | 'success'; message: string }> = [];
 
     // Slow servers
@@ -127,12 +127,12 @@
   });
 
   // Quick Actions based on recent activity
-  const suggestedActions = $derived(() => {
+  const suggestedActions = $derived.by(() => {
     const actions: Array<{ icon: any; label: string; action: () => void; description: string }> = [];
 
     // Resume last tool
-    if (recentActivity().length > 0) {
-      const lastExec = recentActivity()[0];
+    if (recentActivity.length > 0) {
+      const lastExec = recentActivity[0];
       actions.push({
         icon: Play,
         label: `Replay: ${lastExec.tool}`,
@@ -233,9 +233,9 @@
         <Sparkles size={20} />
         <h2>Quick Actions</h2>
       </div>
-      {#if suggestedActions().length > 0}
+      {#if suggestedActions.length > 0}
         <div class="action-list">
-          {#each suggestedActions() as action}
+          {#each suggestedActions as action}
             <button class="action-item" onclick={action.action}>
               <div class="action-icon">
                 <action.icon size={20} />
@@ -257,14 +257,14 @@
     </div>
 
     <!-- Performance Insights -->
-    {#if performanceInsights().length > 0}
+    {#if performanceInsights.length > 0}
       <div class="dashboard-card insights-card">
         <div class="card-header">
           <TrendingUp size={20} />
           <h2>Insights</h2>
         </div>
         <div class="insights-list">
-          {#each performanceInsights() as insight}
+          {#each performanceInsights as insight}
             <div class="insight-item insight-{insight.type}">
               {#if insight.type === 'warning'}
                 <AlertTriangle size={16} />
@@ -285,7 +285,7 @@
       <div class="card-header">
         <Clock size={20} />
         <h2>Recent Activity</h2>
-        {#if recentActivity().length > 0}
+        {#if recentActivity.length > 0}
           <button
             class="header-action"
             onclick={() => uiStore.setView('protocol')}
@@ -294,9 +294,9 @@
           </button>
         {/if}
       </div>
-      {#if recentActivity().length > 0}
+      {#if recentActivity.length > 0}
         <div class="activity-list">
-          {#each recentActivity() as activity}
+          {#each recentActivity as activity}
             <button class="activity-item" onclick={() => navigateToExecution(activity)}>
               <div class="activity-status {getStatusColor(activity.status)}">
                 {getStatusIcon(activity.status)}
@@ -330,14 +330,14 @@
     </div>
 
     <!-- Most Used Tools -->
-    {#if mostUsedTools().length > 0}
+    {#if mostUsedTools.length > 0}
       <div class="dashboard-card favorites-card">
         <div class="card-header">
           <Star size={20} />
           <h2>Most Used Tools</h2>
         </div>
         <div class="favorites-list">
-          {#each mostUsedTools() as tool}
+          {#each mostUsedTools as tool}
             <button
               class="favorite-item"
               onclick={() => {

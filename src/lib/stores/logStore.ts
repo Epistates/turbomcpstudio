@@ -137,7 +137,10 @@ function createLogStore() {
 
 export const logStore = createLogStore();
 
-// Hook into console methods to capture logs
+// Hook into console methods to capture logs.
+// The isCapturing guard prevents recursive store mutations: if logStore.log()
+// internally triggers a console call (e.g. via Svelte reactivity warnings),
+// without this guard we'd get infinite recursion and a stack overflow.
 if (typeof window !== 'undefined') {
   const originalConsole = {
     log: console.log,
@@ -147,28 +150,45 @@ if (typeof window !== 'undefined') {
     debug: console.debug,
   };
 
+  let isCapturing = false;
+
   console.log = (...args: any[]) => {
     originalConsole.log(...args);
-    logStore.info('console', args.map(String).join(' '));
+    if (isCapturing) return;
+    isCapturing = true;
+    try { logStore.info('console', args.map(String).join(' ')); }
+    finally { isCapturing = false; }
   };
 
   console.info = (...args: any[]) => {
     originalConsole.info(...args);
-    logStore.info('console', args.map(String).join(' '));
+    if (isCapturing) return;
+    isCapturing = true;
+    try { logStore.info('console', args.map(String).join(' ')); }
+    finally { isCapturing = false; }
   };
 
   console.warn = (...args: any[]) => {
     originalConsole.warn(...args);
-    logStore.warn('console', args.map(String).join(' '));
+    if (isCapturing) return;
+    isCapturing = true;
+    try { logStore.warn('console', args.map(String).join(' ')); }
+    finally { isCapturing = false; }
   };
 
   console.error = (...args: any[]) => {
     originalConsole.error(...args);
-    logStore.error('console', args.map(String).join(' '));
+    if (isCapturing) return;
+    isCapturing = true;
+    try { logStore.error('console', args.map(String).join(' ')); }
+    finally { isCapturing = false; }
   };
 
   console.debug = (...args: any[]) => {
     originalConsole.debug(...args);
-    logStore.debug('console', args.map(String).join(' '));
+    if (isCapturing) return;
+    isCapturing = true;
+    try { logStore.debug('console', args.map(String).join(' ')); }
+    finally { isCapturing = false; }
   };
 }

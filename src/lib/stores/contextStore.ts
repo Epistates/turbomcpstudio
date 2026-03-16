@@ -71,28 +71,13 @@ function createContextStore() {
         ? Array.from($servers.servers.values())
         : [];
 
-      const connectingServersDebug = servers.filter(s => s.status === 'connecting');
-      const connectedServersDebug = servers.filter(s => s.status === 'connected');
-      const serversWithCapabilities = servers.filter(s => s.capabilities);
-      const serversWithoutCapabilities = servers.filter(s => !s.capabilities);
-
-      logger.debug('[ContextStore] Derived recomputing:', {
-        totalServers: servers.length,
-        connecting: connectingServersDebug.length,
-        connected: connectedServersDebug.length,
-        withCapabilities: serversWithCapabilities.length,
-        withoutCapabilities: serversWithoutCapabilities.length,
-        connectingServers: connectingServersDebug.map(s => ({
-          name: s.config.name,
-          status: s.status,
-          hasCapabilities: !!s.capabilities
-        })),
-        connectedServers: connectedServersDebug.map(s => ({
-          name: s.config.name,
-          status: s.status,
-          hasCapabilities: !!s.capabilities
-        }))
-      });
+      if (import.meta.env.DEV) {
+        logger.debug('[ContextStore] Derived recomputing:', {
+          totalServers: servers.length,
+          connecting: servers.filter(s => s.status === 'connecting').length,
+          connected: servers.filter(s => s.status === 'connected').length,
+        });
+      }
 
       // Include both connected and connecting servers (important for profile activation)
       // This ensures servers appear in the dropdown immediately when connecting

@@ -39,8 +39,10 @@ const loadingSteps = writable<LoadingStep[]>([
 ]);
 
 // Export individual stores for Svelte 5 runes mode compatibility
-export const appStoreState = derived(appState, $appState => $appState);
-export const appStoreLoadingSteps = derived(loadingSteps, $steps => $steps);
+// Identity derived stores eliminated — export the writables directly to avoid
+// an unnecessary subscription layer with no transformation benefit.
+export const appStoreState = appState;
+export const appStoreLoadingSteps = loadingSteps;
 export const appStoreIsReady = derived(appState, $state =>
   !$state.isInitializing &&
   $state.databaseReady &&

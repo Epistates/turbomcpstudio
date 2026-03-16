@@ -47,7 +47,7 @@
   );
 
   // ✅ NEW: Get required capability for current view (for filtering servers)
-  const requiredCapability = $derived(() => {
+  const requiredCapability = $derived((() => {
     switch (currentView) {
       case 'tools': return 'tools';
       case 'resources': return 'resources';
@@ -56,18 +56,12 @@
       case 'elicitation': return 'elicitation';
       default: return null;
     }
-  });
+  })());
 
   // ✅ NEW: Get ServerContextBar mode based on current view
-  const contextBarMode = $derived(() => {
-    switch (currentView) {
-      case 'sampling':
-      case 'elicitation':
-        return 'filter';  // Optional filter mode for monitoring tabs
-      default:
-        return 'selector';  // Required selection mode for operational tabs
-    }
-  });
+  const contextBarMode = $derived(
+    (currentView === 'sampling' || currentView === 'elicitation') ? 'filter' : 'selector'
+  );
 
   // ✅ NEW: Auto-select server when context bar is shown
   // Pass mode to respect filter vs selector behavior
@@ -91,7 +85,7 @@
       // 2. Servers become available (0 -> N transition, important for profile activation)
       // 3. First server connects when none were connected before
       if (serverCount > 0 && (previousServerCount === 0 || !contextState.selectedServer)) {
-        contextStore.autoSelectServer(contextBarMode());
+        contextStore.autoSelectServer(contextBarMode);
       }
     }
 
@@ -130,7 +124,7 @@
 
   <!-- ✅ NEW: Server Context Bar for Operational Views -->
   {#if showContextBar}
-    <ServerContextBar requiredCapability={requiredCapability()} mode={contextBarMode()} />
+    <ServerContextBar requiredCapability={requiredCapability} mode={contextBarMode} />
   {/if}
 
   <!-- Dynamic Content Area -->
@@ -224,8 +218,13 @@
     background: var(--mcp-border-secondary);
   }
 
-  /* Focus management */
+  /* Focus management - suppress default but provide visible ring for keyboard users */
   .mcp-content-viewport:focus {
     outline: none;
+  }
+
+  .mcp-content-viewport:focus-visible {
+    outline: 2px solid var(--mcp-primary-500);
+    outline-offset: -2px;
   }
 </style>

@@ -50,16 +50,16 @@
 
   // Derived
   const displayName = $derived(name || uri.split('/').pop() || uri);
-  const resourceType = $derived(() => {
-    if (mimeType?.startsWith('image/')) return 'image';
-    if (mimeType?.startsWith('text/')) return 'text';
-    if (uri.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i)) return 'image';
-    if (uri.match(/\.(txt|md|json|xml|html|css|js|ts)$/i)) return 'text';
-    return 'file';
-  });
+  const resourceType = $derived(
+    mimeType?.startsWith('image/') ? 'image' :
+    mimeType?.startsWith('text/') ? 'text' :
+    uri.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i) ? 'image' :
+    uri.match(/\.(txt|md|json|xml|html|css|js|ts)$/i) ? 'text' :
+    'file'
+  );
 
   function getIcon() {
-    const type = resourceType();
+    const type = resourceType;
     switch (type) {
       case 'image': return Image;
       case 'text': return FileText;
@@ -175,7 +175,7 @@
       {/if}
 
       <div class="resource-link__content">
-        {#if resourceType() === 'image'}
+        {#if resourceType === 'image'}
           {#if content.blob}
             <img
               src={`data:${content.mimeType || 'image/png'};base64,${content.blob}`}
@@ -185,7 +185,7 @@
           {:else}
             <p class="text-sm text-gray-500">Image data not available</p>
           {/if}
-        {:else if resourceType() === 'text'}
+        {:else if resourceType === 'text'}
           {#if content.text}
             <pre class="resource-link__text">{content.text}</pre>
           {:else}

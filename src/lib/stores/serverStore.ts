@@ -3,6 +3,9 @@ import { invoke } from '@tauri-apps/api/core';
 import { withTimeout, globalRequestManager } from '$lib/utils/asyncHelpers';
 import { createLogger } from '$lib/utils/logger';
 import type { Prompt, Resource } from '$lib/types/mcp';
+import type { ConnectionMetrics, ProcessInfo, ServerCapabilities } from '$lib/types/system';
+// Re-export canonical types for consumers that import from serverStore
+export type { ConnectionMetrics, ProcessInfo, ServerCapabilities } from '$lib/types/system';
 
 export interface ServerConfig {
   id: string;
@@ -33,35 +36,8 @@ export interface ServerInfo {
   last_seen?: string;
 }
 
-export interface ServerCapabilities {
-  tools?: { list_changed?: boolean };
-  resources?: { subscribe?: boolean; list_changed?: boolean };
-  prompts?: { list_changed?: boolean };
-  sampling?: {};
-  elicitation?: {};
-}
-
-export interface ProcessInfo {
-  pid: number;
-  command: string;
-  args: string[];
-  started_at: string;
-  cpu_usage: number;
-  memory_usage: number;
-  status: 'running' | 'stopped' | 'crashed';
-}
-
-export interface ConnectionMetrics {
-  connected_at?: string;
-  requests_sent: number;
-  responses_received: number;
-  avg_response_time_ms: number;
-  error_count: number;
-  last_error?: string;
-  bytes_sent: number;
-  bytes_received: number;
-  uptime_seconds: number;
-}
+// ConnectionMetrics, ProcessInfo, ServerCapabilities are now imported from
+// '$lib/types/system' (the canonical source) and re-exported above.
 
 export interface ToolDefinition {
   name: string;

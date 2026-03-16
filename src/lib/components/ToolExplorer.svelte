@@ -58,7 +58,7 @@
 
   // ✅ Subscribe to stores for execution history and persisted selection
   const serverStoreState = $derived($serverStore);
-  const executionHistory = $derived(() => {
+  const executionHistory = $derived.by(() => {
     const toolName = selectedTool?.name;
     if (toolName) {
       // Filter by specific tool when one is selected
@@ -605,7 +605,7 @@
         </div>
 
         <!-- Execution History -->
-        {#if executionHistory().length > 0}
+        {#if executionHistory.length > 0}
           <div class="border-t border-gray-200">
             <div class="p-4">
               <div class="flex items-center justify-between mb-3">
@@ -613,11 +613,11 @@
                   <History size={16} class="mr-2" />
                   Recent Executions
                 </h3>
-                <span class="text-xs text-gray-500">{executionHistory().length} executions</span>
+                <span class="text-xs text-gray-500">{executionHistory.length} executions</span>
               </div>
 
               <div class="space-y-2 max-h-48 overflow-y-auto">
-                {#each executionHistory().slice(0, 5) as item}
+                {#each executionHistory.slice(0, 5) as item}
                   <button
                     onclick={() => rerunFromHistory(item)}
                     class="w-full p-3 text-left bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded border border-gray-200 dark:border-gray-700 transition-colors"

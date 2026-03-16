@@ -248,9 +248,10 @@
 
 			// Only add messages for the currently selected server
 			if (selectedServerId && interceptedMsg.serverId === selectedServerId) {
-				// Convert and prepend to messages array (newest first)
+				// Convert and prepend to messages array (newest first), capped to prevent unbounded growth
+				const MAX_MESSAGES = 500;
 				const newMessage = convertInterceptedMessage(interceptedMsg);
-				messages = [newMessage, ...messages];
+				messages = [newMessage, ...messages].slice(0, MAX_MESSAGES);
 
 				// Log for debugging
 				logger.debug('Intercepted protocol message:', {

@@ -11,7 +11,9 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",
-    "tauri:build": "tauri build --bundles app"
+    "tauri:build": "tauri build --bundles app",
+    "test": "echo 'No frontend tests configured yet — see CONTRIBUTING.md for setup instructions'",
+    "test:unit": "echo 'TODO: Configure vitest for unit testing'"
   },
   "license": "MIT",
   "dependencies": {

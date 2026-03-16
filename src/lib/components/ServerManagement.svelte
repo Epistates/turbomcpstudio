@@ -123,7 +123,7 @@
 
   // Compute server-to-profile mapping
   // TODO: This needs backend support to load full profile with server details
-  const serverProfileMap = $derived(() => {
+  const serverProfileMap = $derived.by(() => {
     // Build map using Array.map to avoid .set() calls inside $derived
     const entries: [string, string | null][] = servers.map(server => {
       // Check if server is in active profile
@@ -155,8 +155,8 @@
   }
 
   // Get servers not in ANY profile (checks ALL profiles)
-  const unassignedServers = $derived(() => {
-    return servers.filter(server => {
+  const unassignedServers = $derived(
+    servers.filter(server => {
       // Check if server is in ANY profile in localProfileServerMap
       for (const serverIds of localProfileServerMap.values()) {
         if (serverIds.has(server.id)) {
@@ -164,8 +164,8 @@
         }
       }
       return true; // Server not in any profile
-    });
-  });
+    })
+  );
 
   // Check if server should be highlighted (checks ALL profiles)
   function isServerHighlighted(serverId: string): boolean {
@@ -533,7 +533,7 @@
     }
 
     // Fall back to serverProfileMap (active profile only)
-    const profileId2 = serverProfileMap().get(serverId);
+    const profileId2 = serverProfileMap.get(serverId);
     if (profileId2 === profileId) return true;
 
     // Also check if this profile is active and has the server
@@ -658,11 +658,11 @@
   }
 
   // Filtered profiles for search
-  const filteredProfilesForDropdown = $derived(() => {
-    if (!profileSearchQuery.trim()) return profiles;
-    const query = profileSearchQuery.toLowerCase();
-    return profiles.filter(p => p.name.toLowerCase().includes(query));
-  });
+  const filteredProfilesForDropdown = $derived(
+    !profileSearchQuery.trim()
+      ? profiles
+      : profiles.filter(p => p.name.toLowerCase().includes(profileSearchQuery.toLowerCase()))
+  );
 
   function handleSelectProfile(profileId: string) {
     selectedProfileId = selectedProfileId === profileId ? null : profileId;
@@ -959,9 +959,9 @@
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               All Servers ({servers.length})
             </h2>
-            {#if unassignedServers().length > 0}
+            {#if unassignedServers.length > 0}
               <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                💡 {unassignedServers().length} server{unassignedServers().length !== 1 ? 's' : ''} not in any profile
+                💡 {unassignedServers.length} server{unassignedServers.length !== 1 ? 's' : ''} not in any profile
               </p>
             {/if}
           </div>
@@ -1194,12 +1194,12 @@
 
                           <!-- Profile Checkboxes -->
                           <div class="max-h-64 overflow-y-auto">
-                            {#if filteredProfilesForDropdown().length === 0}
+                            {#if filteredProfilesForDropdown.length === 0}
                               <div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
                                 No profiles match your search
                               </div>
                             {:else}
-                              {#each filteredProfilesForDropdown() as prof}
+                              {#each filteredProfilesForDropdown as prof}
                                 {@const inProfile = isServerInProfile(server.id, prof.id)}
                                 {@const isToggling = togglingProfile === prof.id}
                                 <label
@@ -1364,7 +1364,7 @@
 
                         <!-- Profile Checkboxes -->
                         <div class="max-h-64 overflow-y-auto">
-                          {#each filteredProfilesForDropdown() as prof}
+                          {#each filteredProfilesForDropdown as prof}
                             {@const inProfile = isServerInProfile(server.id, prof.id)}
                             {@const isToggling = togglingProfile === prof.id}
                             <label class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer {isToggling ? 'opacity-50' : ''}">

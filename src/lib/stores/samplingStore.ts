@@ -5,7 +5,7 @@
  * pending sampling requests that need user approval before being forwarded to LLMs.
  */
 
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { createLogger } from '$lib/utils/logger';
@@ -142,10 +142,11 @@ function saveReplayTemplates(templates: ReplayTemplate[]): void {
 }
 
 function createSamplingStore() {
-	const { subscribe, set, update } = writable<SamplingStoreState>({
+	const store = writable<SamplingStoreState>({
 		...initialState,
 		replayTemplates: loadReplayTemplates()
 	});
+	const { subscribe, set, update } = store;
 	const logger = createLogger('SamplingStore');
 
 	// Initialize event listener immediately
@@ -169,7 +170,12 @@ function createSamplingStore() {
 					error: null
 				}));
 
-				// Auto-show modal via dynamic import (avoid circular dependency)
+				// Auto-show modal via dynamic import to avoid circular dependency:
+				// samplingStore -> uiStore -> samplingStore (uiStore imports samplingStore for
+				// pendingSamplingRequests). A proper fix would require an event bus or moving
+				// the sampling approval modal trigger to a higher-level coordinator.
+				// This setTimeout(0) defers the import until after the current module
+				// evaluation cycle, breaking the circular reference at runtime.
 				setTimeout(() => {
 					import('./uiStore').then(({ uiStore }) => {
 						logger.info('🔔 [DEBUG] Showing sampling modal for request:', request.requestId);
@@ -199,10 +205,7 @@ function createSamplingStore() {
 
 			try {
 				// Find the original request
-				const state = await new Promise<SamplingStoreState>((resolve) => {
-					const unsub = subscribe(resolve);
-					unsub();
-				});
+				const state = get(store);
 
 				const request = state.pending.find((r) => r.requestId === requestId);
 				if (!request) {
@@ -252,10 +255,7 @@ function createSamplingStore() {
 
 			try {
 				// Find the original request
-				const state = await new Promise<SamplingStoreState>((resolve) => {
-					const unsub = subscribe(resolve);
-					unsub();
-				});
+				const state = get(store);
 
 				const request = state.pending.find((r) => r.requestId === requestId);
 				if (!request) {
@@ -335,10 +335,7 @@ function createSamplingStore() {
 
 			try {
 				// Find the original request
-				const state = await new Promise<SamplingStoreState>((resolve) => {
-					const unsub = subscribe(resolve);
-					unsub();
-				});
+				const state = get(store);
 
 				const request = state.pending.find((r) => r.requestId === requestId);
 				if (!request) {
@@ -443,10 +440,7 @@ function createSamplingStore() {
 		 * @param templateId - The template to use
 		 */
 		async useReplayTemplate(requestId: string, templateId: string): Promise<void> {
-			const state = await new Promise<SamplingStoreState>((resolve) => {
-				const unsub = subscribe(resolve);
-				unsub();
-			});
+			const state = get(store);
 
 			const template = state.replayTemplates.find((t) => t.id === templateId);
 			if (!template) {
