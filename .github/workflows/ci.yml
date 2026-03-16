@@ -60,30 +60,9 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
         working-directory: src-tauri
 
-  security-audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
-
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
-
-      - name: Run cargo audit
-        # RUSTSEC-2024-0370: proc-macro-error is unmaintained — transitive dep via
-        # tauri → wry → gtk → gtk3-macros. Cannot be fixed until upstream updates.
-        run: cargo audit --ignore RUSTSEC-2024-0370
-        working-directory: src-tauri
-
-  # TODO: Add cargo-llvm-cov for code coverage measurement
+  # TODO: Re-enable cargo audit once Tauri migrates to GTK4 (tauri-apps/tauri#7335)
+  # Currently 20 unfixable transitive advisories from Tauri's GTK3 stack.
+  # See src-tauri/audit.toml for the full list and rationale.
 
   test:
     name: Test

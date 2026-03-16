@@ -39,7 +39,6 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid", "macros"] }
 reqwest = { version = "0.13", features = ["json"] }
-async-openai = "0.30"
 async-trait = "0.1"
 keyring = "3.0"
 url = { version = "2.5", features = ["serde"] }

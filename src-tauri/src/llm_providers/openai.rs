@@ -1,12 +1,5 @@
-use async_openai::{
-    config::OpenAIConfig,
-    types::{
-        ChatCompletionRequestAssistantMessageArgs, ChatCompletionRequestMessage,
-        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
-        CreateChatCompletionRequestArgs,
-    },
-    Client as OpenAIClientSDK,
-};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::pin::Pin;
 use turbomcp_client::sampling::{LLMServerClient, ServerInfo};
@@ -16,18 +9,57 @@ use turbomcp_protocol::types::{CreateMessageRequest, CreateMessageResult, Role};
 type BoxSamplingFuture<'a, T> =
     Pin<Box<dyn Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send + 'a>>;
 
+// ── OpenAI Chat Completions request/response types ──────────────────────────
+
+#[derive(Debug, Serialize)]
+struct ChatMessage {
+    role: &'static str,
+    content: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ChatCompletionRequest {
+    model: String,
+    messages: Vec<ChatMessage>,
+    max_tokens: u32,
+    temperature: f32,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatCompletionResponse {
+    model: String,
+    choices: Vec<ChatChoice>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatChoice {
+    message: ResponseMessage,
+    finish_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResponseMessage {
+    content: Option<String>,
+}
+
+// ── Client ───────────────────────────────────────────────────────────────────
+
 #[derive(Clone, Debug)]
 pub struct OpenAIClient {
-    sdk: OpenAIClientSDK<OpenAIConfig>,
+    http: Client,
+    api_key: String,
     model: String,
 }
 
 impl OpenAIClient {
     pub fn new(api_key: String, model: Option<String>) -> Self {
-        let config = OpenAIConfig::new().with_api_key(api_key);
-        let sdk = OpenAIClientSDK::with_config(config);
+        let http = Client::new();
         let model = model.unwrap_or_else(|| "gpt-4o".to_string());
-        Self { sdk, model }
+        Self {
+            http,
+            api_key,
+            model,
+        }
     }
 }
 
@@ -36,25 +68,23 @@ impl LLMServerClient for OpenAIClient {
         &self,
         request: CreateMessageRequest,
     ) -> BoxSamplingFuture<'_, CreateMessageResult> {
-        let sdk = self.sdk.clone();
+        let http = self.http.clone();
+        let api_key = self.api_key.clone();
         let model = self.model.clone();
 
         Box::pin(async move {
-            let mut messages: Vec<ChatCompletionRequestMessage> = Vec::new();
+            let mut messages: Vec<ChatMessage> = Vec::new();
 
             // Add system prompt if provided
             if let Some(system_prompt) = request.system_prompt {
-                messages.push(
-                    ChatCompletionRequestSystemMessageArgs::default()
-                        .content(system_prompt)
-                        .build()?
-                        .into(),
-                );
+                messages.push(ChatMessage {
+                    role: "system",
+                    content: system_prompt,
+                });
             }
 
             // Convert MCP messages to OpenAI messages
             for msg in request.messages {
-                // Using JSON fallback to avoid complex type mismatch issues with SamplingContentBlock
                 let msg_json = serde_json::to_value(&msg)?;
                 let content = &msg_json["content"];
 
@@ -76,47 +106,53 @@ impl LLMServerClient for OpenAIClient {
                     return Err("Unsupported content type".into());
                 };
 
-                let openai_msg: ChatCompletionRequestMessage = match msg.role {
-                    Role::User => ChatCompletionRequestUserMessageArgs::default()
-                        .content(text)
-                        .build()?
-                        .into(),
-                    Role::Assistant => ChatCompletionRequestAssistantMessageArgs::default()
-                        .content(text)
-                        .build()?
-                        .into(),
+                let role = match msg.role {
+                    Role::User => "user",
+                    Role::Assistant => "assistant",
                 };
-                messages.push(openai_msg);
+                messages.push(ChatMessage {
+                    role,
+                    content: text,
+                });
             }
 
-            let response = sdk
-                .chat()
-                .create(
-                    CreateChatCompletionRequestArgs::default()
-                        .model(model)
-                        .messages(messages)
-                        .max_tokens(request.max_tokens)
-                        .temperature(request.temperature.unwrap_or(0.7) as f32)
-                        .build()?,
-                )
+            let body = ChatCompletionRequest {
+                model: model.clone(),
+                messages,
+                max_tokens: request.max_tokens,
+                temperature: request.temperature.unwrap_or(0.7) as f32,
+            };
+
+            let resp = http
+                .post("https://api.openai.com/v1/chat/completions")
+                .bearer_auth(&api_key)
+                .json(&body)
+                .send()
                 .await?;
 
-            let choice = response
+            let status = resp.status();
+            if !status.is_success() {
+                let err_text = resp.text().await.unwrap_or_default();
+                return Err(format!("OpenAI API error {status}: {err_text}").into());
+            }
+
+            let completion: ChatCompletionResponse = resp.json().await?;
+
+            let choice = completion
                 .choices
                 .first()
                 .ok_or("No completion choices returned")?;
 
             let content = choice.message.content.clone().unwrap_or_default();
 
-            // Convert to JSON and back to CreateMessageResult to bypass strict type construction
             let result_json = serde_json::json!({
                 "role": "assistant",
                 "content": {
                     "type": "text",
                     "text": content
                 },
-                "model": response.model,
-                "stopReason": choice.finish_reason.as_ref().map(|r| format!("{:?}", r))
+                "model": completion.model,
+                "stopReason": choice.finish_reason.as_deref().unwrap_or("end_turn")
             });
 
             let result: CreateMessageResult = serde_json::from_value(result_json)?;

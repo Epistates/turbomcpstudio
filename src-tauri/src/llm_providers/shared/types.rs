@@ -13,46 +13,33 @@ pub struct TokenUsage {
     pub thinking_tokens: Option<u64>,
 }
 
+/// A plain OpenAI-compatible chat message for use with the reqwest-based providers.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAIChatMessage {
+    pub role: String,
+    pub content: String,
+}
+
 /// Message conversion utilities for MCP ↔ Provider formats
 pub struct MessageConverter;
 
 impl MessageConverter {
-    /// Convert MCP SamplingMessage to OpenAI format messages
-    pub fn to_openai_messages(
-        messages: &[SamplingMessage],
-    ) -> Vec<async_openai::types::ChatCompletionRequestMessage> {
-        use async_openai::types::{
-            ChatCompletionRequestAssistantMessage, ChatCompletionRequestAssistantMessageContent,
-            ChatCompletionRequestMessage, ChatCompletionRequestUserMessage,
-            ChatCompletionRequestUserMessageContent,
-        };
-
+    /// Convert MCP SamplingMessage to OpenAI-compatible chat messages.
+    ///
+    /// Returns plain structs that can be serialised directly by the reqwest-based
+    /// OpenAI and OpenAI-compatible providers without requiring async-openai types.
+    pub fn to_openai_messages(messages: &[SamplingMessage]) -> Vec<OpenAIChatMessage> {
         messages
             .iter()
             .map(|msg| {
-                let content_text = Self::extract_text_from_content(&msg.content);
-
-                // Note: MCP Role enum only has User and Assistant (no System)
-                // System-like messages should be prepended to user messages
-                match msg.role {
-                    Role::User => {
-                        ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
-                            content: ChatCompletionRequestUserMessageContent::Text(content_text),
-                            name: None,
-                        })
-                    }
-                    Role::Assistant => {
-                        // Create assistant message with proper type
-                        ChatCompletionRequestMessage::Assistant(
-                            ChatCompletionRequestAssistantMessage {
-                                content: Some(ChatCompletionRequestAssistantMessageContent::Text(
-                                    content_text,
-                                )),
-                                ..Default::default()
-                            },
-                        )
-                    }
-                }
+                let content = Self::extract_text_from_content(&msg.content);
+                // Note: MCP Role enum only has User and Assistant (no System).
+                // System-like messages should be prepended to user messages by the caller.
+                let role = match msg.role {
+                    Role::User => "user".to_string(),
+                    Role::Assistant => "assistant".to_string(),
+                };
+                OpenAIChatMessage { role, content }
             })
             .collect()
     }
