@@ -76,9 +76,9 @@ A native desktop application for developing, testing, and debugging Model Contex
 
 ## Installation
 
-### Download Pre-built Binaries
+### Pre-built Binaries
 
-Pre-built binaries are COMING SOON!
+Pre-built binaries for macOS, Windows, and Linux are planned. For now, build from source (see below).
 
 ## Building from Source
 
@@ -90,7 +90,7 @@ Pre-built binaries are COMING SOON!
   ```bash
   npm install -g pnpm
   ```
-- **Rust**: 1.70 or later ([rustup.rs](https://rustup.rs/))
+- **Rust**: 1.80 or later ([rustup.rs](https://rustup.rs/)) — Tauri 2.0 requires 1.77.2+
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   ```
@@ -577,4 +577,4 @@ TurboMCP Studio is powered by **[TurboMCP](https://github.com/Epistates/turbomcp
 
 ---
 
-**Status**: v0.1.0 — Foundation release with full MCP protocol support
+**Status**: v0.1.0 — Active development. Contributions welcome.

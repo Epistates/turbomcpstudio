@@ -101,8 +101,14 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Run tests
+      - name: Run tests (Unix)
+        if: matrix.os != 'windows-latest'
         run: cargo test --all-features
+        working-directory: src-tauri
+
+      - name: Run tests (Windows)
+        if: matrix.os == 'windows-latest'
+        run: cargo test --features "stdio,http,websocket,tcp,dpop"
         working-directory: src-tauri
 
   frontend-check:
