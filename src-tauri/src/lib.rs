@@ -13,7 +13,7 @@ pub mod testing;
 mod types;
 mod workflow_engine;
 use database::Database;
-use error::McpStudioError;
+use error::{McpResult, McpStudioError};
 use hitl_sampling::HITLSamplingManager;
 use llm_config::LLMConfigManager;
 use mcp_client::McpClientManager;
@@ -38,6 +38,18 @@ pub struct AppState {
     pub proxy_manager: Arc<ProxyManager>,
     /// OAuth flow manager for OAuth 2.1 visual debugger
     pub oauth_flow_manager: Arc<oauth::OAuthFlowManager>,
+}
+
+impl AppState {
+    /// Convenience accessor for the database, returning an error if not yet initialized.
+    pub async fn get_database(&self) -> McpResult<Arc<Database>> {
+        self.database
+            .read()
+            .await
+            .as_ref()
+            .cloned()
+            .ok_or_else(|| McpStudioError::ConfigError("Database not initialized".to_string()))
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -412,16 +424,15 @@ pub fn run() {
                 // Get app state and shutdown background tasks
                 let app_handle = window.app_handle();
                 if let Some(state) = app_handle.try_state::<AppState>() {
-                    tauri::async_runtime::block_on(async {
+                    // Fire-and-forget cleanup to avoid blocking the main thread.
+                    // block_on in a window event handler risks deadlocking the event loop.
+                    let monitoring_handle = state.monitoring_handle.clone();
+                    tokio::spawn(async move {
                         // Stop monitoring loop by aborting the task
-                        if let Some(handle) = state.monitoring_handle.lock().await.take() {
+                        if let Some(handle) = monitoring_handle.lock().await.take() {
                             handle.abort();
                             tracing::info!("Monitoring loop stopped");
                         }
-
-                        // Give tasks time to clean up gracefully
-                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
                         tracing::info!("Background tasks shutdown complete");
                     });
                 }

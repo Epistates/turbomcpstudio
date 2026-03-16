@@ -210,10 +210,14 @@ impl WorkflowEngine {
                     };
 
                     // Calculate total duration
-                    let duration = context
-                        .execution
-                        .completed_at
-                        .expect("completed_at must be set before calculating duration")
+                    let completed_at = context.execution.completed_at.unwrap_or_else(|| {
+                        tracing::error!(
+                            "completed_at was None when calculating duration for execution {}",
+                            execution_id
+                        );
+                        chrono::Utc::now()
+                    });
+                    let duration = completed_at
                         .signed_duration_since(context.execution.started_at)
                         .num_milliseconds() as u64;
                     context.execution.summary.total_duration_ms = duration as u32;
@@ -945,8 +949,10 @@ impl VariableStore {
 
     /// Advanced variable interpolation with security
     pub fn interpolate_string(&self, input: &str) -> McpResult<String> {
-        let re =
-            Regex::new(r"\$\{([^}]+)\}").expect("variable interpolation regex pattern is valid");
+        static VARIABLE_REGEX: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+        let re = VARIABLE_REGEX.get_or_init(|| {
+            Regex::new(r"\$\{([^}]+)\}").expect("variable interpolation regex is valid")
+        });
         let mut result = input.to_string();
 
         for captures in re.captures_iter(input) {

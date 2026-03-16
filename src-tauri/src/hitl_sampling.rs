@@ -264,11 +264,16 @@ impl HITLSamplingManager {
             conversation_context,
         };
 
-        // Store in history
-        self.request_history
-            .write()
-            .await
-            .push(pending_request.clone());
+        // Store in history, capped at 500 entries
+        {
+            let mut history = self.request_history.write().await;
+            history.push(pending_request.clone());
+            const MAX_HISTORY: usize = 500;
+            if history.len() > MAX_HISTORY {
+                let excess = history.len() - MAX_HISTORY;
+                history.drain(..excess);
+            }
+        }
 
         // Process based on current mode
         let mode = self.get_mode().await;
@@ -304,7 +309,15 @@ impl HITLSamplingManager {
             request: pending_request.clone(),
         });
 
-        // For now, return a placeholder - in real implementation this would wait for human input
+        // PLACEHOLDER: This implementation queues the request for UI display but does not
+        // actually block until a human approves it. The caller receives an immediate
+        // "pending" result rather than waiting for human input.
+        // TODO: Implement proper blocking wait for human approval via oneshot channel.
+        tracing::warn!(
+            "HITL manual mode is using placeholder implementation — \
+             requests are not truly blocking for human approval"
+        );
+
         let result = SamplingResult {
             request_id: pending_request.id.clone(),
             response: CreateMessageResult {
@@ -392,9 +405,24 @@ impl HITLSamplingManager {
             processing_mode: ProcessingMode::AutomaticLLM,
         };
 
-        // Store completed result
+        // Store completed result with size-based eviction (cap at 1000 entries)
         self.completed_requests
             .insert(pending_request.id.clone(), result.clone());
+        const MAX_COMPLETED: usize = 1000;
+        if self.completed_requests.len() > MAX_COMPLETED {
+            // Remove oldest entries until we're back at the limit.
+            // DashMap does not guarantee order; we remove arbitrary entries as a
+            // simple size cap rather than a strict LRU eviction.
+            let to_remove: Vec<String> = self
+                .completed_requests
+                .iter()
+                .take(self.completed_requests.len() - MAX_COMPLETED)
+                .map(|e| e.key().clone())
+                .collect();
+            for key in to_remove {
+                self.completed_requests.remove(&key);
+            }
+        }
 
         // Notify UI
         let _ = self.event_sender.send(HITLSamplingEvent::RequestCompleted {

@@ -730,7 +730,7 @@ impl Database {
                 config_id TEXT NOT NULL,
                 flow_type TEXT NOT NULL,
                 state_param TEXT,
-                pkce_verifier TEXT,
+                pkce_used BOOLEAN DEFAULT 0,
                 status TEXT NOT NULL,
                 error_code TEXT,
                 error_description TEXT,

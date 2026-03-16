@@ -430,8 +430,11 @@ impl LLMConfigManager {
 
         info!("Created LLM client for local provider: {}", provider_id);
 
-        // Create user interaction handler (auto-approving for now)
-        // TODO: Replace with actual HITL handler from sampling store
+        // TODO: Route through HITLSamplingManager for proper human-in-the-loop approval
+        warn!(
+            "Sampling requests are being auto-approved without human review. \
+             Configure HITL sampling mode for production use."
+        );
         let user_handler = Arc::new(AutoApprovingUserHandler);
 
         Ok(DelegatingSamplingHandler::new(
@@ -489,8 +492,11 @@ impl LLMConfigManager {
 
         info!("Created LLM client for provider: {}", provider_id);
 
-        // Create user interaction handler (auto-approving for now)
-        // TODO: Replace with actual HITL handler from sampling store
+        // TODO: Route through HITLSamplingManager for proper human-in-the-loop approval
+        warn!(
+            "Sampling requests are being auto-approved without human review. \
+             Configure HITL sampling mode for production use."
+        );
         let user_handler = Arc::new(AutoApprovingUserHandler);
 
         Ok(DelegatingSamplingHandler::new(

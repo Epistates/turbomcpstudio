@@ -100,6 +100,44 @@ impl serde::Serialize for McpStudioError {
     where
         S: serde::ser::Serializer,
     {
-        serializer.serialize_str(self.to_string().as_ref())
+        #[derive(serde::Serialize)]
+        struct ErrorPayload<'a> {
+            error_type: &'a str,
+            message: String,
+        }
+
+        let error_type = match self {
+            Self::ConnectionFailed(_) => "ConnectionFailed",
+            Self::ProcessError(_) => "ProcessError",
+            Self::ProcessSpawn(_) => "ProcessSpawn",
+            Self::ToolCallFailed(_) => "ToolCallFailed",
+            Self::UnsupportedTransport(_) => "UnsupportedTransport",
+            Self::DatabaseError(_) => "DatabaseError",
+            Self::SerializationError(_) => "SerializationError",
+            Self::TurboMcpError(_) => "TurboMcpError",
+            Self::McpError(_) => "McpError",
+            Self::IoError(_) => "IoError",
+            Self::TauriError(_) => "TauriError",
+            Self::ConfigError(_) => "ConfigError",
+            Self::ServerNotFound(_) => "ServerNotFound",
+            Self::CollectionNotFound(_) => "CollectionNotFound",
+            Self::ScenarioError(_) => "ScenarioError",
+            Self::WorkflowError(_) => "WorkflowError",
+            Self::ProtocolError(_) => "ProtocolError",
+            Self::AuthError(_) => "AuthError",
+            Self::PermissionDenied(_) => "PermissionDenied",
+            Self::ResourceUnavailable(_) => "ResourceUnavailable",
+            Self::TimeoutError(_) => "TimeoutError",
+            Self::RateLimitExceeded(_) => "RateLimitExceeded",
+            Self::ValidationError(_) => "ValidationError",
+            Self::ProxyError(_) => "ProxyError",
+            Self::Unknown(_) => "Unknown",
+        };
+
+        ErrorPayload {
+            error_type,
+            message: self.to_string(),
+        }
+        .serialize(serializer)
     }
 }
