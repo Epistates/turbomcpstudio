@@ -221,7 +221,9 @@ pub async fn test_sampling_request(
     _app_state: State<'_, AppState>,
 ) -> Result<Value, String> {
     // Convert JSON messages to MCP protocol format
-    use turbomcp_protocol::types::{ContentBlock, IncludeContext, Role, SamplingMessage, TextContent};
+    use turbomcp_protocol::types::{
+        ContentBlock, IncludeContext, Role, SamplingMessage, TextContent,
+    };
 
     let sampling_messages: Result<Vec<SamplingMessage>, String> = messages
         .into_iter()

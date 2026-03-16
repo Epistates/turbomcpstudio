@@ -15,7 +15,12 @@ pub async fn generate_test_suite(
     model_id: Option<String>,
     app_state: State<'_, AppState>,
 ) -> Result<String, String> {
-    tracing::info!("Generating test suite for server: {} with provider: {:?}, model: {:?}", server_id, provider_id, model_id);
+    tracing::info!(
+        "Generating test suite for server: {} with provider: {:?}, model: {:?}",
+        server_id,
+        provider_id,
+        model_id
+    );
 
     // Get database
     let db_lock = app_state.database.read().await;
@@ -104,10 +109,7 @@ pub async fn get_tests(
 
 /// Update a test
 #[tauri::command]
-pub async fn update_test(
-    test: Test,
-    app_state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn update_test(test: Test, app_state: State<'_, AppState>) -> Result<(), String> {
     let db_lock = app_state.database.read().await;
     let Some(db) = db_lock.as_ref() else {
         return Err("Database not initialized".to_string());
@@ -119,17 +121,17 @@ pub async fn update_test(
 
 /// Delete a test
 #[tauri::command]
-pub async fn delete_test(
-    test_id: String,
-    app_state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn delete_test(test_id: String, app_state: State<'_, AppState>) -> Result<(), String> {
     let db_lock = app_state.database.read().await;
     let Some(db) = db_lock.as_ref() else {
         return Err("Database not initialized".to_string());
     };
 
     let test_db = TestDatabase::new(db.pool().clone());
-    test_db.delete_test(&test_id).await.map_err(|e| e.to_string())
+    test_db
+        .delete_test(&test_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Delete a test suite
@@ -171,20 +173,14 @@ pub async fn get_test_runs(
 
 /// Delete a test run
 #[tauri::command]
-pub async fn delete_test_run(
-    run_id: String,
-    app_state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn delete_test_run(run_id: String, app_state: State<'_, AppState>) -> Result<(), String> {
     let db_lock = app_state.database.read().await;
     let Some(db) = db_lock.as_ref() else {
         return Err("Database not initialized".to_string());
     };
 
     let test_db = TestDatabase::new(db.pool().clone());
-    test_db
-        .delete_run(&run_id)
-        .await
-        .map_err(|e| e.to_string())
+    test_db.delete_run(&run_id).await.map_err(|e| e.to_string())
 }
 
 // =============================================================================
@@ -288,8 +284,6 @@ pub async fn compare_test_runs(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_test_generation_commands_compile() {
         // Smoke test - ensures module compiles

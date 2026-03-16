@@ -247,8 +247,7 @@ pub async fn export_collection_to_file(
         export_collection(collection_id, include_execution_history, app_state).await?;
 
     // Write to file using the validated, canonical path
-    std::fs::write(&safe_path, export_json)
-        .map_err(|e| format!("Failed to write file: {}", e))?;
+    std::fs::write(&safe_path, export_json).map_err(|e| format!("Failed to write file: {}", e))?;
 
     Ok(safe_path.to_string_lossy().into_owned())
 }
@@ -271,8 +270,8 @@ pub async fn import_collection_from_file(
     }
 
     // Read file using the resolved, canonical path
-    let json_data = std::fs::read_to_string(&canonical)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+    let json_data =
+        std::fs::read_to_string(&canonical).map_err(|e| format!("Failed to read file: {}", e))?;
 
     // Import the collection
     import_collection(json_data, overwrite_existing, app_state).await

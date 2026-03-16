@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 /// - Plain `http://` to non-localhost hosts emits a warning but is ALLOWED (developer tool)
 /// - `http://localhost` and `http://127.0.0.1` are always allowed silently
 fn validate_llm_url(base_url: &str) -> Result<(), String> {
-    let parsed = url::Url::parse(base_url)
-        .map_err(|e| format!("Invalid URL '{}': {}", base_url, e))?;
+    let parsed =
+        url::Url::parse(base_url).map_err(|e| format!("Invalid URL '{}': {}", base_url, e))?;
 
     let scheme = parsed.scheme();
 

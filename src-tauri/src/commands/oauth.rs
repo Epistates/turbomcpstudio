@@ -5,11 +5,12 @@
 /// - Authorization flow management
 /// - Token inspection and management
 /// - Configuration persistence and import/export
-
 use crate::error::{McpResult, McpStudioError};
 use crate::oauth::flow_manager::{OAuthConfig, OAuthFlow};
 use crate::oauth::metadata_discovery::OAuthMetadata;
-use crate::oauth::provider_templates::{get_provider_template, get_provider_templates, validate_manual_config, OAuthProviderTemplate};
+use crate::oauth::provider_templates::{
+    get_provider_template, get_provider_templates, validate_manual_config, OAuthProviderTemplate,
+};
 use crate::AppState;
 use serde_json::Value;
 use tauri::State;
@@ -97,10 +98,7 @@ pub async fn get_oauth_flow_status(
 /// # Arguments
 /// * `flow_id` - Unique flow identifier
 #[tauri::command]
-pub async fn cancel_oauth_flow(
-    flow_id: String,
-    state: State<'_, OAuthState>,
-) -> McpResult<()> {
+pub async fn cancel_oauth_flow(flow_id: String, state: State<'_, OAuthState>) -> McpResult<()> {
     tracing::info!("Cancelling OAuth flow: {}", flow_id);
 
     state
@@ -168,10 +166,7 @@ pub async fn refresh_oauth_token(
 /// # Arguments
 /// * `server_id` - Server to revoke token for
 #[tauri::command]
-pub async fn revoke_oauth_token(
-    server_id: i64,
-    state: State<'_, OAuthState>,
-) -> McpResult<()> {
+pub async fn revoke_oauth_token(server_id: i64, state: State<'_, OAuthState>) -> McpResult<()> {
     tracing::info!("Revoking OAuth token for server {}", server_id);
 
     state
@@ -205,9 +200,14 @@ pub async fn export_oauth_config(
         let config = database
             .get_oauth_config(&server_id)
             .await
-            .map_err(|e| McpStudioError::ConfigError(format!("Failed to load OAuth config: {}", e)))?
+            .map_err(|e| {
+                McpStudioError::ConfigError(format!("Failed to load OAuth config: {}", e))
+            })?
             .ok_or_else(|| {
-                McpStudioError::ConfigError(format!("No OAuth config found for server {}", server_id))
+                McpStudioError::ConfigError(format!(
+                    "No OAuth config found for server {}",
+                    server_id
+                ))
             })?;
 
         // Create export format (Claude Desktop compatible).
@@ -311,7 +311,7 @@ pub async fn import_oauth_config(
                     .map(|s| s.to_string())
                     .collect()
             })
-            .unwrap_or_else(Vec::new),
+            .unwrap_or_default(),
         resource_uri: oauth_data
             .get("resource_uri")
             .or_else(|| oauth_data.get("resource"))
@@ -332,12 +332,14 @@ pub async fn import_oauth_config(
     // Save to database
     let db_lock = app_state.database.read().await;
     if let Some(database) = db_lock.as_ref() {
-        database
-            .save_oauth_config(&config)
-            .await
-            .map_err(|e| McpStudioError::ConfigError(format!("Failed to save OAuth config: {}", e)))?;
+        database.save_oauth_config(&config).await.map_err(|e| {
+            McpStudioError::ConfigError(format!("Failed to save OAuth config: {}", e))
+        })?;
 
-        tracing::info!("Successfully imported OAuth config for server {}", server_id);
+        tracing::info!(
+            "Successfully imported OAuth config for server {}",
+            server_id
+        );
         Ok(server_id)
     } else {
         Err(McpStudioError::ConfigError(
@@ -405,8 +407,9 @@ pub async fn get_oauth_provider_templates() -> McpResult<Vec<OAuthProviderTempla
 pub async fn get_oauth_provider_template(provider_id: String) -> McpResult<OAuthProviderTemplate> {
     tracing::info!("Getting OAuth provider template: {}", provider_id);
 
-    get_provider_template(&provider_id)
-        .ok_or_else(|| McpStudioError::ConfigError(format!("Provider template not found: {}", provider_id)))
+    get_provider_template(&provider_id).ok_or_else(|| {
+        McpStudioError::ConfigError(format!("Provider template not found: {}", provider_id))
+    })
 }
 
 /// Validate manual OAuth configuration
@@ -427,7 +430,7 @@ pub async fn validate_oauth_manual_config(
     tracing::info!("Validating manual OAuth configuration");
 
     validate_manual_config(&authorization_endpoint, &token_endpoint)
-        .map_err(|e| McpStudioError::ConfigError(e))
+        .map_err(McpStudioError::ConfigError)
 }
 
 // =============================================================================
@@ -506,7 +509,9 @@ pub async fn update_oauth_config(
         database
             .update_oauth_config(&server_id, &config)
             .await
-            .map_err(|e| McpStudioError::ConfigError(format!("Failed to update OAuth config: {}", e)))
+            .map_err(|e| {
+                McpStudioError::ConfigError(format!("Failed to update OAuth config: {}", e))
+            })
     } else {
         Err(McpStudioError::ConfigError(
             "Database not yet initialized".to_string(),
@@ -527,10 +532,9 @@ pub async fn delete_oauth_config(
 
     let db_lock = app_state.database.read().await;
     if let Some(database) = db_lock.as_ref() {
-        database
-            .delete_oauth_config(&server_id)
-            .await
-            .map_err(|e| McpStudioError::ConfigError(format!("Failed to delete OAuth config: {}", e)))
+        database.delete_oauth_config(&server_id).await.map_err(|e| {
+            McpStudioError::ConfigError(format!("Failed to delete OAuth config: {}", e))
+        })
     } else {
         Err(McpStudioError::ConfigError(
             "Database not yet initialized".to_string(),
@@ -543,17 +547,14 @@ pub async fn delete_oauth_config(
 /// # Returns
 /// List of all OAuth configurations
 #[tauri::command]
-pub async fn list_oauth_configs(
-    app_state: State<'_, AppState>,
-) -> McpResult<Vec<OAuthConfig>> {
+pub async fn list_oauth_configs(app_state: State<'_, AppState>) -> McpResult<Vec<OAuthConfig>> {
     tracing::info!("Listing all OAuth configs");
 
     let db_lock = app_state.database.read().await;
     if let Some(database) = db_lock.as_ref() {
-        database
-            .list_oauth_configs()
-            .await
-            .map_err(|e| McpStudioError::ConfigError(format!("Failed to list OAuth configs: {}", e)))
+        database.list_oauth_configs().await.map_err(|e| {
+            McpStudioError::ConfigError(format!("Failed to list OAuth configs: {}", e))
+        })
     } else {
         Err(McpStudioError::ConfigError(
             "Database not yet initialized".to_string(),

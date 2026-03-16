@@ -82,10 +82,11 @@ impl std::fmt::Display for FrontendType {
 }
 
 /// Authentication configuration for backend
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum AuthConfig {
     /// No authentication
+    #[default]
     None,
     /// Bearer token
     Bearer { token: String },
@@ -100,12 +101,6 @@ pub enum AuthConfig {
     },
 }
 
-impl Default for AuthConfig {
-    fn default() -> Self {
-        Self::None
-    }
-}
-
 /// Proxy configuration (persisted to database)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProxyConfig {
@@ -114,7 +109,7 @@ pub struct ProxyConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
-    pub backend_type: String,  // Serialized backend config
+    pub backend_type: String, // Serialized backend config
     pub backend_config: serde_json::Value,
 
     pub frontend_type: FrontendType,

@@ -30,17 +30,13 @@ impl TestExecutor {
         Self {
             mcp_client,
             db,
-            concurrency: 5,                     // Run 5 tests concurrently
-            timeout: Duration::from_secs(30),   // 30s timeout per test
+            concurrency: 5,                   // Run 5 tests concurrently
+            timeout: Duration::from_secs(30), // 30s timeout per test
         }
     }
 
     /// Run all tests in a suite
-    pub async fn run_suite(
-        &self,
-        suite_id: &str,
-        server_id: Uuid,
-    ) -> McpResult<String> {
+    pub async fn run_suite(&self, suite_id: &str, server_id: Uuid) -> McpResult<String> {
         tracing::info!("Starting test run for suite: {}", suite_id);
 
         // Get all tests in suite
@@ -68,7 +64,9 @@ impl TestExecutor {
         let start = Instant::now();
 
         // Execute tests in parallel
-        let results = self.execute_tests_parallel(&tests, server_id, &run_id).await;
+        let results = self
+            .execute_tests_parallel(&tests, server_id, &run_id)
+            .await;
 
         let duration = start.elapsed();
 
@@ -98,11 +96,7 @@ impl TestExecutor {
     }
 
     /// Execute a single test
-    pub async fn run_single_test(
-        &self,
-        test_id: &str,
-        server_id: Uuid,
-    ) -> McpResult<TestResult> {
+    pub async fn run_single_test(&self, test_id: &str, server_id: Uuid) -> McpResult<TestResult> {
         tracing::info!("Running single test: {}", test_id);
 
         let test = self.db.get_test(test_id).await?;
@@ -177,7 +171,6 @@ impl TestExecutor {
             .iter()
             .map(|test| {
                 let test = test.clone();
-                let server_id = server_id;
                 let run_id = run_id.to_string();
                 let sem = semaphore.clone();
                 let timeout = self.timeout;
@@ -202,7 +195,11 @@ impl TestExecutor {
                     let (passed, error_message, actual_result) = match result {
                         Ok(Ok(actual)) => (true, None, actual),
                         Ok(Err(e)) => (false, Some(e.to_string()), None),
-                        Err(_) => (false, Some(format!("Test timed out after {}s", timeout.as_secs())), None),
+                        Err(_) => (
+                            false,
+                            Some(format!("Test timed out after {}s", timeout.as_secs())),
+                            None,
+                        ),
                     };
 
                     // Create result
@@ -252,7 +249,10 @@ impl TestExecutor {
 
         // Execute based on test kind
         let actual_result = match &test.kind {
-            TestKind::ToolCall { tool_name, arguments } => {
+            TestKind::ToolCall {
+                tool_name,
+                arguments,
+            } => {
                 // Call the tool
                 let result = mcp_client
                     .call_tool(server_id, tool_name, arguments.clone())
@@ -262,9 +262,7 @@ impl TestExecutor {
             }
             TestKind::ResourceRead { uri } => {
                 // Read the resource
-                let result = mcp_client
-                    .read_resource(server_id, uri.clone())
-                    .await?;
+                let result = mcp_client.read_resource(server_id, uri.clone()).await?;
 
                 serde_json::to_value(result).ok()
             }
@@ -286,15 +284,16 @@ impl TestExecutor {
                     tracing::debug!("Executing workflow step {}: {:?}", step.order, step.action);
 
                     let step_result = match &step.action {
-                        WorkflowAction::CallTool { tool_name, arguments } => {
+                        WorkflowAction::CallTool {
+                            tool_name,
+                            arguments,
+                        } => {
                             mcp_client
                                 .call_tool(server_id, tool_name, arguments.clone())
                                 .await?
                         }
                         WorkflowAction::ReadResource { uri } => {
-                            mcp_client
-                                .read_resource(server_id, uri.clone())
-                                .await?
+                            mcp_client.read_resource(server_id, uri.clone()).await?
                         }
                         WorkflowAction::GetPrompt { name, arguments } => {
                             mcp_client
@@ -334,7 +333,11 @@ impl TestExecutor {
     }
 
     /// Execute a single test (instance method)
-    async fn execute_single_test(&self, test: &Test, server_id: Uuid) -> McpResult<Option<serde_json::Value>> {
+    async fn execute_single_test(
+        &self,
+        test: &Test,
+        server_id: Uuid,
+    ) -> McpResult<Option<serde_json::Value>> {
         Self::execute_test_static(test, server_id, &self.mcp_client).await
     }
 
@@ -410,7 +413,10 @@ impl TestExecutor {
                         }
                     }
                 }
-                Assertion::FieldEquals { field_path, expected } => {
+                Assertion::FieldEquals {
+                    field_path,
+                    expected,
+                } => {
                     // Navigate to field using JSON pointer syntax
                     let actual_value = actual.pointer(field_path);
                     if actual_value != Some(expected) {

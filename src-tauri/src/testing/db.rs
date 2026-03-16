@@ -4,7 +4,7 @@
 
 use crate::error::McpResult;
 use crate::types::{
-    NewTest, NewTestRun, NewTestResult, NewTestSuite, RunComparison, Test, TestResult, TestRun,
+    NewTest, NewTestResult, NewTestRun, NewTestSuite, RunComparison, Test, TestResult, TestRun,
     TestRunSummary, TestSuite,
 };
 use sqlx::{Pool, Row, Sqlite};
@@ -52,7 +52,11 @@ impl TestDatabase {
         .bind(1) // version starts at 1
         .bind(Self::system_time_to_unix(now).to_string())
         .bind(Self::system_time_to_unix(now).to_string())
-        .bind(suite.generated_at.map(|t| Self::system_time_to_unix(t).to_string()))
+        .bind(
+            suite
+                .generated_at
+                .map(|t| Self::system_time_to_unix(t).to_string()),
+        )
         .bind(&suite.schema_hash)
         .execute(&self.pool)
         .await?;
@@ -451,11 +455,7 @@ impl TestDatabase {
     }
 
     /// Compare two test runs
-    pub async fn compare_runs(
-        &self,
-        run_id_1: &str,
-        run_id_2: &str,
-    ) -> McpResult<RunComparison> {
+    pub async fn compare_runs(&self, run_id_1: &str, run_id_2: &str) -> McpResult<RunComparison> {
         // Get results for both runs
         let results1 = self.get_results_for_run(run_id_1).await?;
         let results2 = self.get_results_for_run(run_id_2).await?;
@@ -541,13 +541,12 @@ impl TestDatabase {
             suite_id: row.get("suite_id"),
             name: row.get("name"),
             description: row.get("description"),
-            kind: serde_json::from_value(serde_json::json!({ "type": kind_str }))
-                .unwrap_or_else(|_| {
-                    crate::types::TestKind::ToolCall {
-                        tool_name: "unknown".to_string(),
-                        arguments: serde_json::json!({}),
-                    }
-                }),
+            kind: serde_json::from_value(serde_json::json!({ "type": kind_str })).unwrap_or_else(
+                |_| crate::types::TestKind::ToolCall {
+                    tool_name: "unknown".to_string(),
+                    arguments: serde_json::json!({}),
+                },
+            ),
             test_data: serde_json::from_str(&test_data)?,
             assertions: serde_json::from_str(&assertions_str)?,
             category: serde_json::from_value(serde_json::json!(category_str))?,

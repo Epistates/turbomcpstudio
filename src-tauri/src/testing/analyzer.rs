@@ -3,10 +3,7 @@
 //! Analyzes MCP server capabilities to detect common patterns
 //! and determine appropriate test coverage.
 
-use crate::types::{
-    server_types::ServerInfo,
-    ComplexityScore, Pattern, SchemaAnalysis, TestArea,
-};
+use crate::types::{server_types::ServerInfo, ComplexityScore, Pattern, SchemaAnalysis, TestArea};
 use sha2::{Digest, Sha256};
 
 /// Information about a single tool for focused test generation
@@ -65,7 +62,10 @@ impl SchemaAnalyzer {
                 // This will be replaced with actual per-tool generation once
                 // we have access to the MCP manager's list_tools() method
                 return vec![ToolInfo {
-                    name: format!("{}_tools", server.config.name.to_lowercase().replace(" ", "_")),
+                    name: format!(
+                        "{}_tools",
+                        server.config.name.to_lowercase().replace(" ", "_")
+                    ),
                     description: Some(format!("All tools for {}", server.config.name)),
                 }];
             }
@@ -317,8 +317,6 @@ impl SchemaAnalyzer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // TODO: Update tests to work with new ServerInfo structure (with capabilities)
     // Commenting out for now to get compilation working
 

@@ -10,8 +10,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 // Import turbomcp-proxy introspection types
-use turbomcp_proxy::introspection::{McpBackend, McpIntrospector, StdioBackend};
 use turbomcp_proxy::introspection::spec::ServerSpec as TurboServerSpec;
+use turbomcp_proxy::introspection::{McpBackend, McpIntrospector, StdioBackend};
 
 /// Main proxy manager for creating, starting, stopping, and monitoring proxies
 pub struct ProxyManager {
@@ -280,7 +280,12 @@ impl ProxyManager {
         let timeout = std::time::Duration::from_secs(timeout_seconds.unwrap_or(30));
 
         match backend_config {
-            BackendConfig::Stdio { command, args, env: _, working_dir } => {
+            BackendConfig::Stdio {
+                command,
+                args,
+                env: _,
+                working_dir,
+            } => {
                 tracing::info!("Introspecting STDIO backend: {}", command);
 
                 // Create STDIO backend with turbomcp-proxy
@@ -293,28 +298,20 @@ impl ProxyManager {
                     .await
                     .map_err(|e| AppError::proxy(format!("Failed to start backend: {}", e)))?
                 } else {
-                    StdioBackend::new(
-                        command.clone(),
-                        args.clone().unwrap_or_default(),
-                    )
-                    .await
-                    .map_err(|e| AppError::proxy(format!("Failed to start backend: {}", e)))?
+                    StdioBackend::new(command.clone(), args.clone().unwrap_or_default())
+                        .await
+                        .map_err(|e| AppError::proxy(format!("Failed to start backend: {}", e)))?
                 };
 
                 // Create introspector
-                let introspector = McpIntrospector::with_client_info(
-                    "TurboMCP Studio",
-                    env!("CARGO_PKG_VERSION"),
-                );
+                let introspector =
+                    McpIntrospector::with_client_info("TurboMCP Studio", env!("CARGO_PKG_VERSION"));
 
                 // Perform introspection with timeout
-                let result = tokio::time::timeout(
-                    timeout,
-                    introspector.introspect(&mut backend),
-                )
-                .await
-                .map_err(|_| AppError::proxy("Introspection timed out"))?
-                .map_err(|e| AppError::proxy(format!("Introspection failed: {}", e)))?;
+                let result = tokio::time::timeout(timeout, introspector.introspect(&mut backend))
+                    .await
+                    .map_err(|_| AppError::proxy("Introspection timed out"))?
+                    .map_err(|e| AppError::proxy(format!("Introspection failed: {}", e)))?;
 
                 // Shutdown backend gracefully
                 let _ = backend.shutdown().await;
@@ -355,7 +352,9 @@ impl ProxyManager {
             }
             #[cfg(any(target_os = "linux", target_os = "macos"))]
             BackendConfig::Unix { path } => {
-                tracing::warn!("Unix socket introspection not yet available, returning placeholder");
+                tracing::warn!(
+                    "Unix socket introspection not yet available, returning placeholder"
+                );
                 Ok(ServerSpec {
                     name: format!("Unix Socket at {}", path),
                     version: None,
@@ -414,8 +413,6 @@ impl ProxyManager {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[tokio::test]
     async fn test_proxy_manager_lifecycle() {
         // TODO: Test proxy creation, start, stop, delete

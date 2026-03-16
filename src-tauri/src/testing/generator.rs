@@ -5,15 +5,18 @@
 
 use crate::error::{McpResult, McpStudioError};
 use crate::llm_config::LLMConfigManager;
-use crate::testing::{SchemaAnalyzer, TestDatabase};
 use crate::testing::analyzer::{ToolAnalysis, ToolInfo};
+use crate::testing::{SchemaAnalyzer, TestDatabase};
 use crate::types::{
     server_types::ServerInfo, GeneratedTest, GeneratedTestSuite, NewTest, NewTestSuite,
     TestCategory, TestKind,
 };
 use futures::future::join_all;
 use std::sync::Arc;
-use turbomcp_protocol::types::{ContentBlock, CreateMessageRequest, ModelHint, ModelPreferences, Role, SamplingMessage, TextContent};
+use turbomcp_protocol::types::{
+    ContentBlock, CreateMessageRequest, ModelHint, ModelPreferences, Role, SamplingMessage,
+    TextContent,
+};
 
 /// AI-powered test generator
 pub struct TestGenerator {
@@ -29,23 +32,38 @@ impl TestGenerator {
         db: TestDatabase,
         mcp_manager: Arc<crate::mcp_client::McpClientManager>,
     ) -> Self {
-        Self { llm, db, mcp_manager }
+        Self {
+            llm,
+            db,
+            mcp_manager,
+        }
     }
 
     /// Generate a complete test suite for a server using per-tool parallel calls
-    pub async fn generate_for_server(&self, server: &ServerInfo, provider_id: Option<String>, model_id: Option<String>) -> McpResult<String> {
-        tracing::info!("Starting per-tool parallel test generation for server: {:?}", server.id);
+    pub async fn generate_for_server(
+        &self,
+        server: &ServerInfo,
+        provider_id: Option<String>,
+        model_id: Option<String>,
+    ) -> McpResult<String> {
+        tracing::info!(
+            "Starting per-tool parallel test generation for server: {:?}",
+            server.id
+        );
 
         // 1. Analyze server schema
         let analysis = SchemaAnalyzer::analyze_server(server);
-        tracing::info!("Schema analysis complete: {} patterns detected", analysis.patterns.len());
+        tracing::info!(
+            "Schema analysis complete: {} patterns detected",
+            analysis.patterns.len()
+        );
 
         // 2. Extract actual tools from the server using MCP manager
         let tools = self.extract_actual_tools(server).await?;
         if tools.is_empty() {
             tracing::warn!("No tools found for server {}", server.id);
             return Err(McpStudioError::ConfigError(
-                "Server has no tools to generate tests for".to_string()
+                "Server has no tools to generate tests for".to_string(),
             ));
         }
 
@@ -66,7 +84,10 @@ impl TestGenerator {
         }
 
         // 4. Execute all tool generations in PARALLEL
-        tracing::info!("Executing {} parallel LLM calls for tool test generation", tasks.len());
+        tracing::info!(
+            "Executing {} parallel LLM calls for tool test generation",
+            tasks.len()
+        );
         let results = join_all(tasks).await;
 
         // 5. Aggregate results
@@ -76,7 +97,11 @@ impl TestGenerator {
         for (idx, result) in results.into_iter().enumerate() {
             match result {
                 Ok(tool_tests) => {
-                    tracing::info!("Tool {} test generation succeeded: {} tests generated", idx, tool_tests.len());
+                    tracing::info!(
+                        "Tool {} test generation succeeded: {} tests generated",
+                        idx,
+                        tool_tests.len()
+                    );
                     all_tests.extend(tool_tests);
                 }
                 Err(e) => {
@@ -87,9 +112,10 @@ impl TestGenerator {
         }
 
         if all_tests.is_empty() {
-            return Err(McpStudioError::ConfigError(
-                format!("All tool test generations failed ({} failures)", failures.len())
-            ));
+            return Err(McpStudioError::ConfigError(format!(
+                "All tool test generations failed ({} failures)",
+                failures.len()
+            )));
         }
 
         if !failures.is_empty() {
@@ -103,14 +129,19 @@ impl TestGenerator {
         // 6. Create aggregated suite
         let aggregated_suite = GeneratedTestSuite {
             suite_name: format!("{} - AI Generated Tests", server.config.name),
-            description: Some(format!("AI-generated test suite with {} total tests", all_tests.len())),
+            description: Some(format!(
+                "AI-generated test suite with {} total tests",
+                all_tests.len()
+            )),
             tests: all_tests,
         };
 
         // 7. Validate and save
         let test_count = aggregated_suite.tests.len();
         tracing::info!("Saving {} aggregated tests to database", test_count);
-        let suite_id = self.save_to_database(server, aggregated_suite, &analysis).await?;
+        let suite_id = self
+            .save_to_database(server, aggregated_suite, &analysis)
+            .await?;
 
         tracing::info!(
             "Test suite saved with ID: {} (total {} tests, {} tool failures)",
@@ -147,11 +178,15 @@ impl TestGenerator {
             Err(e) => {
                 tracing::warn!(
                     "Failed to list tools from server {}: {}. Falling back to synthetic tool.",
-                    server.id, e
+                    server.id,
+                    e
                 );
                 // Fallback: return a synthetic tool representing all tools
                 Ok(vec![ToolInfo {
-                    name: format!("{}_tools", server.config.name.to_lowercase().replace(" ", "_")),
+                    name: format!(
+                        "{}_tools",
+                        server.config.name.to_lowercase().replace(" ", "_")
+                    ),
                     description: Some(format!("All tools for {}", server.config.name)),
                 }])
             }
@@ -167,25 +202,29 @@ impl TestGenerator {
         provider_id: Option<String>,
         model_id: Option<String>,
     ) -> McpResult<Vec<GeneratedTest>> {
-        tracing::info!("Generating tests for tool: {} (complexity: {}) using per-category calls",
-            tool.name, tool_analysis.complexity_score);
+        tracing::info!(
+            "Generating tests for tool: {} (complexity: {}) using per-category calls",
+            tool.name,
+            tool_analysis.complexity_score
+        );
 
         // Define test categories with max_tokens (let LLM decide test count based on complexity)
         let categories = vec![
-            (TestCategory::HappyPath, 3000),     // Happy path tests (up to ~4 tests)
-            (TestCategory::EdgeCase, 2500),      // Edge case tests (up to ~3 tests)
-            (TestCategory::Error, 2500),         // Error handling tests (up to ~3 tests)
-            (TestCategory::Security, 2000),      // Security tests (up to ~2 tests)
+            (TestCategory::HappyPath, 3000), // Happy path tests (up to ~4 tests)
+            (TestCategory::EdgeCase, 2500),  // Edge case tests (up to ~3 tests)
+            (TestCategory::Error, 2500),     // Error handling tests (up to ~3 tests)
+            (TestCategory::Security, 2000),  // Security tests (up to ~2 tests)
         ];
 
         // Create parallel tasks for each category
         let mut tasks = Vec::new();
         for (category, max_tokens) in categories {
-            let prompt = self.build_category_test_prompt(server, &tool, category.clone(), &tool_analysis);
+            let prompt =
+                self.build_category_test_prompt(server, &tool, category.clone(), &tool_analysis);
             let task = self.call_llm_for_category_tests(
-                prompt,  // Pass owned String instead of reference
+                prompt, // Pass owned String instead of reference
                 tool.name.clone(),
-                category,  // Use the original category here
+                category, // Use the original category here
                 max_tokens,
                 provider_id.clone(),
                 model_id.clone(),
@@ -194,8 +233,12 @@ impl TestGenerator {
         }
 
         // Execute all category generations in parallel
-        let category_count = tasks.len();  // Get length before moving tasks
-        tracing::info!("Executing {} parallel category calls for tool: {}", category_count, tool.name);
+        let category_count = tasks.len(); // Get length before moving tasks
+        tracing::info!(
+            "Executing {} parallel category calls for tool: {}",
+            category_count,
+            tool.name
+        );
         let results = join_all(tasks).await;
 
         // Aggregate category results
@@ -213,13 +256,18 @@ impl TestGenerator {
         }
 
         if all_tests.is_empty() {
-            return Err(McpStudioError::ConfigError(
-                format!("Failed to generate any tests for tool: {}", tool.name)
-            ));
+            return Err(McpStudioError::ConfigError(format!(
+                "Failed to generate any tests for tool: {}",
+                tool.name
+            )));
         }
 
-        tracing::info!("Generated {} tests for tool: {} across {} categories",
-            all_tests.len(), tool.name, category_count);
+        tracing::info!(
+            "Generated {} tests for tool: {} across {} categories",
+            all_tests.len(),
+            tool.name,
+            category_count
+        );
         Ok(all_tests)
     }
 
@@ -242,8 +290,12 @@ impl TestGenerator {
 
         let category_description = match category {
             TestCategory::HappyPath => "normal scenarios with valid inputs that should succeed",
-            TestCategory::EdgeCase => "boundary conditions, special characters, empty values, optional parameters",
-            TestCategory::Error => "invalid inputs, missing required fields, wrong types that should fail gracefully",
+            TestCategory::EdgeCase => {
+                "boundary conditions, special characters, empty values, optional parameters"
+            }
+            TestCategory::Error => {
+                "invalid inputs, missing required fields, wrong types that should fail gracefully"
+            }
             TestCategory::Security => "injection attempts, validation bypass, potential exploits",
             TestCategory::Workflow => "multi-step sequences",
             TestCategory::Performance => "speed and load testing",
@@ -345,8 +397,12 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
             TestCategory::Performance => "performance",
         };
 
-        tracing::info!("Calling LLM for tool: {} category: {} (max_tokens: {})",
-            tool_name, category_name, max_tokens);
+        tracing::info!(
+            "Calling LLM for tool: {} category: {} (max_tokens: {})",
+            tool_name,
+            category_name,
+            max_tokens
+        );
 
         // Build request with controlled max_tokens
         let request = CreateMessageRequest {
@@ -389,8 +445,10 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
             .invoke_llm_directly(request, provider_id.clone())
             .await
             .map_err(|e| {
-                let error_msg = format!("LLM invocation failed for tool {} category {}: {}",
-                    tool_name, category_name, e);
+                let error_msg = format!(
+                    "LLM invocation failed for tool {} category {}: {}",
+                    tool_name, category_name, e
+                );
                 tracing::error!("{}", error_msg);
                 McpStudioError::ConfigError(error_msg)
             })?;
@@ -406,7 +464,12 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
             }
         };
 
-        tracing::debug!("LLM response for {} {}: {} chars", tool_name, category_name, response_text.len());
+        tracing::debug!(
+            "LLM response for {} {}: {} chars",
+            tool_name,
+            category_name,
+            response_text.len()
+        );
 
         // Extract JSON from response (strip markdown if present)
         let json_text = if let Some(start) = response_text.find('{') {
@@ -420,25 +483,40 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
         };
 
         // Parse response - with smaller max_tokens, truncation should not occur
-        let generated_suite: GeneratedTestSuite = serde_json::from_str(json_text)
-            .map_err(|e| {
-                tracing::error!("Failed to parse LLM response for tool {} category {}: {}",
-                    tool_name, category_name, e);
-                tracing::error!("Response JSON (first 500 chars): {}",
-                    if json_text.len() > 500 { &json_text[..500] } else { json_text });
-                McpStudioError::ConfigError(format!(
-                    "Failed to parse test JSON for tool {} category {}: {}",
-                    tool_name, category_name, e
-                ))
-            })?;
+        let generated_suite: GeneratedTestSuite = serde_json::from_str(json_text).map_err(|e| {
+            tracing::error!(
+                "Failed to parse LLM response for tool {} category {}: {}",
+                tool_name,
+                category_name,
+                e
+            );
+            tracing::error!(
+                "Response JSON (first 500 chars): {}",
+                if json_text.len() > 500 {
+                    &json_text[..500]
+                } else {
+                    json_text
+                }
+            );
+            McpStudioError::ConfigError(format!(
+                "Failed to parse test JSON for tool {} category {}: {}",
+                tool_name, category_name, e
+            ))
+        })?;
 
         // Validate tests are for the correct tool and category
         for test in &generated_suite.tests {
-            if let TestKind::ToolCall { tool_name: test_tool, .. } = &test.kind {
+            if let TestKind::ToolCall {
+                tool_name: test_tool,
+                ..
+            } = &test.kind
+            {
                 if test_tool != &tool_name {
                     tracing::warn!(
                         "Test '{}' targets wrong tool '{}' (expected '{}')",
-                        test.name, test_tool, tool_name
+                        test.name,
+                        test_tool,
+                        tool_name
                     );
                 }
             }
@@ -446,13 +524,19 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
             if test.category != category {
                 tracing::warn!(
                     "Test '{}' has wrong category '{:?}' (expected '{:?}')",
-                    test.name, test.category, category
+                    test.name,
+                    test.category,
+                    category
                 );
             }
         }
 
-        tracing::info!("Generated {} tests for tool {} category {}",
-            generated_suite.tests.len(), tool_name, category_name);
+        tracing::info!(
+            "Generated {} tests for tool {} category {}",
+            generated_suite.tests.len(),
+            tool_name,
+            category_name
+        );
         Ok(generated_suite.tests)
     }
 
@@ -492,9 +576,8 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
             if let Some(start_idx) = lines.iter().position(|l| l.starts_with("```")) {
                 let start = start_idx + 1;
                 if start < lines.len() {
-                    if let Some(end_offset) = lines[start..]
-                        .iter()
-                        .position(|l| l.starts_with("```"))
+                    if let Some(end_offset) =
+                        lines[start..].iter().position(|l| l.starts_with("```"))
                     {
                         let end = start + end_offset;
                         tracing::debug!("Extracted JSON from markdown code block");
@@ -612,15 +695,24 @@ mod parse_tests {
         // Test that assertions deserialize with "type" field
         let assertion_json = r#"{"type": "status_equals", "expected": "success"}"#;
         let result: Result<Assertion, _> = serde_json::from_str(assertion_json);
-        assert!(result.is_ok(), "Failed to deserialize assertion: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to deserialize assertion: {:?}",
+            result.err()
+        );
     }
 
     #[test]
     fn test_test_kind_json_format() {
         // Test that TestKind deserializes correctly
-        let kind_json = r#"{"tool_call": {"tool_name": "test_tool", "arguments": {"arg": "value"}}}"#;
+        let kind_json =
+            r#"{"tool_call": {"tool_name": "test_tool", "arguments": {"arg": "value"}}}"#;
         let result: Result<TestKind, _> = serde_json::from_str(kind_json);
-        assert!(result.is_ok(), "Failed to deserialize TestKind: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to deserialize TestKind: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -637,7 +729,11 @@ mod parse_tests {
         }"#;
 
         let result: Result<GeneratedTest, _> = serde_json::from_str(test_json);
-        assert!(result.is_ok(), "Failed to deserialize GeneratedTest: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to deserialize GeneratedTest: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -660,7 +756,11 @@ mod parse_tests {
         }"#;
 
         let result: Result<GeneratedTestSuite, _> = serde_json::from_str(suite_json);
-        assert!(result.is_ok(), "Failed to deserialize GeneratedTestSuite: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to deserialize GeneratedTestSuite: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -673,7 +773,11 @@ mod parse_tests {
         ]"#;
 
         let result: Result<Vec<Assertion>, _> = serde_json::from_str(assertions_json);
-        assert!(result.is_ok(), "Failed to deserialize assertions: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to deserialize assertions: {:?}",
+            result.err()
+        );
 
         if let Ok(assertions) = result {
             assert_eq!(assertions.len(), 3);
@@ -685,7 +789,10 @@ mod parse_tests {
         // Test that assertions without "type" field fail
         let assertion_json = r#"{"expected": "success"}"#;
         let result: Result<Assertion, _> = serde_json::from_str(assertion_json);
-        assert!(result.is_err(), "Should have failed to deserialize assertion without type");
+        assert!(
+            result.is_err(),
+            "Should have failed to deserialize assertion without type"
+        );
     }
 
     #[test]
@@ -696,8 +803,11 @@ mod parse_tests {
 
         if let Err(e) = result {
             let error_msg = e.to_string();
-            assert!(error_msg.contains("type") || error_msg.contains("unknown"),
-                   "Error should mention missing type field: {}", error_msg);
+            assert!(
+                error_msg.contains("type") || error_msg.contains("unknown"),
+                "Error should mention missing type field: {}",
+                error_msg
+            );
         } else {
             panic!("Should have failed");
         }

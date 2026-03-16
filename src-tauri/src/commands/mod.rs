@@ -20,11 +20,11 @@ pub mod mcp_tools;
 
 // Advanced Features
 pub mod elicitation;
-pub mod sampling;
 pub mod llm_playground;
-pub mod test_generation;
-pub mod proxy;
 pub mod oauth;
+pub mod proxy;
+pub mod sampling;
+pub mod test_generation;
 
 // Data Management
 pub mod collections;

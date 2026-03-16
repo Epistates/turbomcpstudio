@@ -1,6 +1,9 @@
 //! Proxy management commands for Tauri
 
-use crate::proxy::{AuthConfig, BackendConfig, FrontendType, ProxyId, ProxyInfo, ProxyMetrics, ProxyStatus, ServerSpec};
+use crate::proxy::{
+    AuthConfig, BackendConfig, FrontendType, ProxyId, ProxyInfo, ProxyMetrics, ProxyStatus,
+    ServerSpec,
+};
 use tauri::State;
 
 /// Create a new proxy configuration
@@ -50,10 +53,7 @@ pub async fn create_proxy(
                 .ok_or("Missing http url")?
                 .to_string();
 
-            BackendConfig::Http {
-                url,
-                headers: None,
-            }
+            BackendConfig::Http { url, headers: None }
         }
         "tcp" => {
             let host = backend_config
@@ -105,10 +105,7 @@ pub async fn start_proxy(
 
 /// Stop a proxy
 #[tauri::command]
-pub async fn stop_proxy(
-    proxy_id: String,
-    state: State<'_, crate::AppState>,
-) -> Result<(), String> {
+pub async fn stop_proxy(proxy_id: String, state: State<'_, crate::AppState>) -> Result<(), String> {
     let id = ProxyId(proxy_id);
     state
         .proxy_manager
@@ -147,9 +144,7 @@ pub async fn get_proxy_status(
 
 /// List all proxies
 #[tauri::command]
-pub async fn list_proxies(
-    state: State<'_, crate::AppState>,
-) -> Result<Vec<ProxyInfo>, String> {
+pub async fn list_proxies(state: State<'_, crate::AppState>) -> Result<Vec<ProxyInfo>, String> {
     state
         .proxy_manager
         .list_proxies()
@@ -209,10 +204,7 @@ pub async fn introspect_backend(
                 .ok_or("Missing http url")?
                 .to_string();
 
-            BackendConfig::Http {
-                url,
-                headers: None,
-            }
+            BackendConfig::Http { url, headers: None }
         }
         _ => return Err(format!("Unsupported backend type: {}", backend_type)),
     };

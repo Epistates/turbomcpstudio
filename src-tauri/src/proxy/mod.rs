@@ -8,8 +8,6 @@ pub use types::*;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_proxy_module_loads() {
         // Ensure module compiles

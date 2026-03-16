@@ -7,8 +7,8 @@
 //! Note: API key management commands (set_llm_api_key, remove_llm_api_key, set_active_llm_provider)
 //! are in sampling.rs since they're used by both sampling and playground features.
 
-use crate::AppState;
 use crate::types::LLMProviderStatus;
+use crate::AppState;
 use tauri::State;
 use turbomcp_protocol::types::{CreateMessageRequest, CreateMessageResult};
 
@@ -67,8 +67,6 @@ pub async fn get_active_llm_provider(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_llm_playground_commands_compile() {
         // Smoke test - ensure module compiles
