@@ -55,7 +55,9 @@ dirs = "5.0"
 log = "0.4"
 
 # TurboMCP integration - v3.0.4 (progress handler + pagination)
-turbomcp-client = "3.0.4"
+# default-features = false on client/proxy/transport to prevent turbomcp-unix from
+# being pulled in as a transitive dependency on Windows where Unix sockets don't exist.
+turbomcp-client = { version = "3.0.4", default-features = false }
 turbomcp-protocol = "3.0.4"
 turbomcp-types = "3.0.4"
 turbomcp-auth = { version = "3.0.4", features = ["oauth2", "jwt", "token-refresh"] }
