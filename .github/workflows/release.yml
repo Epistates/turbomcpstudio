@@ -198,7 +198,7 @@ jobs:
               --timeout 30m
 
             # Staple notarization ticket
-            xcrun stapler staple "$APP_PATH"
+            xcrun stapler staple "$APP_NAME"
 
             echo "✓ App signed, notarized, and stapled"
           else
@@ -222,7 +222,7 @@ jobs:
               --wait \
               --timeout 30m
 
-            xcrun stapler staple "$APP_PATH"
+            xcrun stapler staple "$APP_NAME"
             echo "✓ Manual signing, notarization, and stapling complete"
           fi
         shell: bash
