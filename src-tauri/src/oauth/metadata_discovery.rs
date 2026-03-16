@@ -11,7 +11,6 @@
 /// - Authorization Server: https://example.com/.well-known/oauth-authorization-server
 /// - Protected Resource: https://example.com/.well-known/oauth-protected-resource
 /// - OpenID Connect: https://example.com/.well-known/openid-configuration
-
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use turbomcp_protocol::{Error as McpError, ErrorKind, Result as McpResult};
@@ -131,8 +130,8 @@ impl MetadataDiscovery {
     /// # Returns
     /// Combined metadata from successful discovery attempts
     pub async fn discover(&self, server_url: &str) -> McpResult<OAuthMetadata> {
-        let base_url =
-            Url::parse(server_url).map_err(|e| McpError::invalid_params(format!("Invalid URL: {}", e)))?;
+        let base_url = Url::parse(server_url)
+            .map_err(|e| McpError::invalid_params(format!("Invalid URL: {}", e)))?;
 
         // Try RFC 9728 first (Protected Resource Metadata) - this is MCP-specific
         if let Ok(protected_resource) = self.discover_protected_resource(&base_url).await {
@@ -194,7 +193,9 @@ impl MetadataDiscovery {
     ) -> McpResult<ProtectedResourceMetadata> {
         let discovery_url = base_url
             .join("/.well-known/oauth-protected-resource")
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Invalid discovery URL: {}", e)))?;
+            .map_err(|e| {
+                McpError::new(ErrorKind::Internal, format!("Invalid discovery URL: {}", e))
+            })?;
 
         tracing::debug!("Discovering protected resource metadata: {}", discovery_url);
 
@@ -204,7 +205,12 @@ impl MetadataDiscovery {
             .header("Accept", "application/json")
             .send()
             .await
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Discovery request failed: {}", e)))?;
+            .map_err(|e| {
+                McpError::new(
+                    ErrorKind::Internal,
+                    format!("Discovery request failed: {}", e),
+                )
+            })?;
 
         if !response.status().is_success() {
             return Err(McpError::new(
@@ -228,9 +234,14 @@ impl MetadataDiscovery {
     async fn discover_auth_server(&self, base_url: &Url) -> McpResult<AuthServerMetadata> {
         let discovery_url = base_url
             .join("/.well-known/oauth-authorization-server")
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Invalid discovery URL: {}", e)))?;
+            .map_err(|e| {
+                McpError::new(ErrorKind::Internal, format!("Invalid discovery URL: {}", e))
+            })?;
 
-        tracing::debug!("Discovering authorization server metadata: {}", discovery_url);
+        tracing::debug!(
+            "Discovering authorization server metadata: {}",
+            discovery_url
+        );
 
         let response = self
             .client
@@ -238,7 +249,12 @@ impl MetadataDiscovery {
             .header("Accept", "application/json")
             .send()
             .await
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Discovery request failed: {}", e)))?;
+            .map_err(|e| {
+                McpError::new(
+                    ErrorKind::Internal,
+                    format!("Discovery request failed: {}", e),
+                )
+            })?;
 
         if !response.status().is_success() {
             return Err(McpError::new(
@@ -262,9 +278,14 @@ impl MetadataDiscovery {
     async fn discover_openid_connect(&self, base_url: &Url) -> McpResult<AuthServerMetadata> {
         let discovery_url = base_url
             .join("/.well-known/openid-configuration")
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Invalid discovery URL: {}", e)))?;
+            .map_err(|e| {
+                McpError::new(ErrorKind::Internal, format!("Invalid discovery URL: {}", e))
+            })?;
 
-        tracing::debug!("Discovering OpenID Connect configuration: {}", discovery_url);
+        tracing::debug!(
+            "Discovering OpenID Connect configuration: {}",
+            discovery_url
+        );
 
         let response = self
             .client
@@ -272,7 +293,12 @@ impl MetadataDiscovery {
             .header("Accept", "application/json")
             .send()
             .await
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Discovery request failed: {}", e)))?;
+            .map_err(|e| {
+                McpError::new(
+                    ErrorKind::Internal,
+                    format!("Discovery request failed: {}", e),
+                )
+            })?;
 
         if !response.status().is_success() {
             return Err(McpError::new(
@@ -312,7 +338,10 @@ impl MetadataDiscovery {
 
         // Check protected resource
         if let Some(protected_resource) = &metadata.protected_resource {
-            if !protected_resource.dpop_signing_alg_values_supported.is_empty() {
+            if !protected_resource
+                .dpop_signing_alg_values_supported
+                .is_empty()
+            {
                 return true;
             }
         }

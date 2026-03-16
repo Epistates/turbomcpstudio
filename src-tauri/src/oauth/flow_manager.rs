@@ -11,7 +11,6 @@
 ///
 /// The flow manager tracks state for multiple concurrent OAuth flows,
 /// each identified by a unique flow_id.
-
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use parking_lot::RwLock;
@@ -213,16 +212,27 @@ impl OAuthFlowManager {
         // building the authorization URL.  The server binds to 127.0.0.1:0
         // and the OS assigns a free ephemeral port.  We must do this before
         // constructing the redirect_uri that goes into the auth URL.
-        Self::add_step(&mut flow, "Start Callback Server", "Binding local callback server to obtain redirect URI");
+        Self::add_step(
+            &mut flow,
+            "Start Callback Server",
+            "Binding local callback server to obtain redirect URI",
+        );
         self.callback_server.start_server_internal().await?;
         // Override the redirect_uri in the config with the actual OS-assigned port.
         config.redirect_uri = self.callback_server.redirect_uri();
         flow.config.redirect_uri = config.redirect_uri.clone();
-        tracing::info!("OAuth callback server bound, redirect_uri = {}", config.redirect_uri);
+        tracing::info!(
+            "OAuth callback server bound, redirect_uri = {}",
+            config.redirect_uri
+        );
 
         // Step 2: Generate PKCE verifier (if enabled)
         let (_pkce_verifier, pkce_challenge) = if config.use_pkce {
-            Self::add_step(&mut flow, "Generate PKCE", "Generating PKCE code verifier and challenge");
+            Self::add_step(
+                &mut flow,
+                "Generate PKCE",
+                "Generating PKCE code verifier and challenge",
+            );
 
             let verifier = Self::generate_pkce_verifier();
             let challenge = Self::generate_pkce_challenge(&verifier);
@@ -234,26 +244,42 @@ impl OAuthFlowManager {
         };
 
         // Step 3: Generate state parameter (CSRF protection)
-        Self::add_step(&mut flow, "Generate State", "Generating state parameter for CSRF protection");
+        Self::add_step(
+            &mut flow,
+            "Generate State",
+            "Generating state parameter for CSRF protection",
+        );
         let state_param = Uuid::new_v4().to_string();
         flow.state_param = Some(state_param.clone());
 
         // Step 4: Build authorization URL
-        Self::add_step(&mut flow, "Build Authorization URL", "Building authorization URL with parameters");
+        Self::add_step(
+            &mut flow,
+            "Build Authorization URL",
+            "Building authorization URL with parameters",
+        );
 
         let auth_url = self.build_auth_url(&config, &state_param, pkce_challenge.as_deref())?;
         flow.auth_url = Some(auth_url.clone());
 
         // Step 5: Open browser
-        Self::add_step(&mut flow, "Open Browser", "Opening system browser for user authorization");
+        Self::add_step(
+            &mut flow,
+            "Open Browser",
+            "Opening system browser for user authorization",
+        );
         flow.state = FlowState::AwaitingAuthorization;
 
         // Store flow
         self.flows.write().insert(flow_id.clone(), flow.clone());
 
         // Open browser
-        open::that(&auth_url)
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to open browser: {}", e)))?;
+        open::that(&auth_url).map_err(|e| {
+            McpError::new(
+                ErrorKind::Internal,
+                format!("Failed to open browser: {}", e),
+            )
+        })?;
 
         // Start callback listener (the server is already bound; this just waits for the request)
         self.start_callback_listener(flow_id.clone()).await?;
@@ -313,12 +339,20 @@ impl OAuthFlowManager {
                         if let Some(flow) = flow_opt {
                             // Validate state
                             if flow.state_param.as_ref() != Some(&state) {
-                                Self::fail_flow_static(flow, "CSRF_ERROR", "State parameter mismatch - possible CSRF attack");
+                                Self::fail_flow_static(
+                                    flow,
+                                    "CSRF_ERROR",
+                                    "State parameter mismatch - possible CSRF attack",
+                                );
                                 return;
                             }
 
                             // Exchange code for token
-                            Self::add_step_static(flow, "Exchange Code", "Exchanging authorization code for access token");
+                            Self::add_step_static(
+                                flow,
+                                "Exchange Code",
+                                "Exchanging authorization code for access token",
+                            );
                             flow.state = FlowState::ExchangingCode;
 
                             // Extract data before dropping lock
@@ -332,41 +366,63 @@ impl OAuthFlowManager {
                         }
                     }; // Lock is dropped here
 
-                    match Self::exchange_code_for_token_static(&config, &code, pkce_verifier.as_deref()).await {
-                            Ok(token_info) => {
-                                // Update flow state
-                                {
-                                    let mut flows_guard = flows.write();
-                                    if let Some(flow) = flows_guard.get_mut(&flow_id) {
-                                        Self::add_step_static(flow, "Validate Token", "Validating token audience claim (RFC 8707)");
-                                        flow.state = FlowState::ValidatingToken;
-                                    }
-                                } // Lock is dropped here
-
-                                // Store token (without holding lock)
-                                match token_store.store_token(server_id, token_info).await {
-                                    Ok(_) => {
-                                        let mut flows_guard = flows.write();
-                                        if let Some(flow) = flows_guard.get_mut(&flow_id) {
-                                            flow.state = FlowState::Completed;
-                                            Self::add_step_static(flow, "Completed", "OAuth flow completed successfully");
-                                        }
-                                    }
-                                    Err(e) => {
-                                        let mut flows_guard = flows.write();
-                                        if let Some(flow) = flows_guard.get_mut(&flow_id) {
-                                            Self::fail_flow_static(flow, "TOKEN_STORAGE_ERROR", &e.to_string());
-                                        }
-                                    }
-                                }
-                            }
-                            Err(e) => {
+                    match Self::exchange_code_for_token_static(
+                        &config,
+                        &code,
+                        pkce_verifier.as_deref(),
+                    )
+                    .await
+                    {
+                        Ok(token_info) => {
+                            // Update flow state
+                            {
                                 let mut flows_guard = flows.write();
                                 if let Some(flow) = flows_guard.get_mut(&flow_id) {
-                                    Self::fail_flow_static(flow, "TOKEN_EXCHANGE_ERROR", &e.to_string());
+                                    Self::add_step_static(
+                                        flow,
+                                        "Validate Token",
+                                        "Validating token audience claim (RFC 8707)",
+                                    );
+                                    flow.state = FlowState::ValidatingToken;
+                                }
+                            } // Lock is dropped here
+
+                            // Store token (without holding lock)
+                            match token_store.store_token(server_id, token_info).await {
+                                Ok(_) => {
+                                    let mut flows_guard = flows.write();
+                                    if let Some(flow) = flows_guard.get_mut(&flow_id) {
+                                        flow.state = FlowState::Completed;
+                                        Self::add_step_static(
+                                            flow,
+                                            "Completed",
+                                            "OAuth flow completed successfully",
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    let mut flows_guard = flows.write();
+                                    if let Some(flow) = flows_guard.get_mut(&flow_id) {
+                                        Self::fail_flow_static(
+                                            flow,
+                                            "TOKEN_STORAGE_ERROR",
+                                            &e.to_string(),
+                                        );
+                                    }
                                 }
                             }
                         }
+                        Err(e) => {
+                            let mut flows_guard = flows.write();
+                            if let Some(flow) = flows_guard.get_mut(&flow_id) {
+                                Self::fail_flow_static(
+                                    flow,
+                                    "TOKEN_EXCHANGE_ERROR",
+                                    &e.to_string(),
+                                );
+                            }
+                        }
+                    }
                 }
                 Err(e) => {
                     let mut flows_guard = flows.write();
@@ -431,17 +487,19 @@ impl OAuthFlowManager {
             .form(&params)
             .send()
             .await
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Token request failed: {}", e)))?;
+            .map_err(|e| {
+                McpError::new(ErrorKind::Internal, format!("Token request failed: {}", e))
+            })?;
 
         if !response.status().is_success() {
             let error_text = response
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(McpError::new(ErrorKind::Internal, format!(
-                "Token exchange failed: {}",
-                error_text
-            )));
+            return Err(McpError::new(
+                ErrorKind::Internal,
+                format!("Token exchange failed: {}", error_text),
+            ));
         }
 
         #[derive(Deserialize)]
@@ -557,7 +615,12 @@ impl OAuthFlowManager {
             .form(&params)
             .send()
             .await
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Token refresh request failed: {}", e)))?;
+            .map_err(|e| {
+                McpError::new(
+                    ErrorKind::Internal,
+                    format!("Token refresh request failed: {}", e),
+                )
+            })?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -567,19 +630,19 @@ impl OAuthFlowManager {
                 .unwrap_or_else(|_| "Unknown error".to_string());
 
             // Check for common refresh errors
-            if status == reqwest::StatusCode::BAD_REQUEST {
-                if error_text.contains("invalid_grant") || error_text.contains("expired") {
-                    // Refresh token is invalid or expired - user needs to re-authenticate
-                    return Err(McpError::authentication(
-                        "Refresh token expired - please re-authenticate"
-                    ));
-                }
+            if status == reqwest::StatusCode::BAD_REQUEST
+                && (error_text.contains("invalid_grant") || error_text.contains("expired"))
+            {
+                // Refresh token is invalid or expired - user needs to re-authenticate
+                return Err(McpError::authentication(
+                    "Refresh token expired - please re-authenticate",
+                ));
             }
 
-            return Err(McpError::new(ErrorKind::Internal, format!(
-                "Token refresh failed ({}): {}",
-                status, error_text
-            )));
+            return Err(McpError::new(
+                ErrorKind::Internal,
+                format!("Token refresh failed ({}): {}", status, error_text),
+            ));
         }
 
         // Parse response
@@ -614,7 +677,10 @@ impl OAuthFlowManager {
         // Store new tokens
         self.token_store.store_token(server_id, token_info).await?;
 
-        tracing::info!("Successfully refreshed OAuth token for server {}", server_id);
+        tracing::info!(
+            "Successfully refreshed OAuth token for server {}",
+            server_id
+        );
 
         Ok(())
     }
@@ -660,7 +726,7 @@ impl OAuthFlowManager {
         let mut hasher = Sha256::new();
         hasher.update(verifier.as_bytes());
         let hash = hasher.finalize();
-        URL_SAFE_NO_PAD.encode(&hash)
+        URL_SAFE_NO_PAD.encode(hash)
     }
 }
 

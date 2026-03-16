@@ -9,7 +9,6 @@
 /// - Microsoft
 /// - GitLab
 /// - And other common providers
-
 use serde::{Deserialize, Serialize};
 
 /// OAuth provider template

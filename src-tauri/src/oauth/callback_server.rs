@@ -10,7 +10,6 @@
 /// 3. This server captures the code and state
 /// 4. Returns success page to user
 /// 5. Notifies waiting OAuth flow via oneshot channel
-
 use axum::{extract::Query, response::Html, routing::get, Router};
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -45,6 +44,7 @@ pub struct CallbackServer {
     /// Actual port chosen by the OS after binding (0 until the server starts).
     port: Arc<Mutex<u16>>,
     /// Pending callback sender (only one flow can be active at a time)
+    #[allow(clippy::type_complexity)]
     pending_callback:
         Arc<Mutex<Option<oneshot::Sender<Result<(String, String), (String, String)>>>>>,
     /// Flag to track if server is running
@@ -83,7 +83,12 @@ impl CallbackServer {
 
         // Wait for callback
         rx.await
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Callback receive failed: {}", e)))?
+            .map_err(|e| {
+                McpError::new(
+                    ErrorKind::Internal,
+                    format!("Callback receive failed: {}", e),
+                )
+            })?
             .map_err(|(error, description)| {
                 McpError::authentication(format!("OAuth error: {} - {}", error, description))
             })
@@ -269,9 +274,14 @@ impl CallbackServer {
 
         // Bind to port 0 so the OS assigns a free port, eliminating the fixed
         // port 8080 conflict risk.
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.map_err(|e| {
-            McpError::new(ErrorKind::Internal, format!("Failed to bind OAuth callback server: {}", e))
-        })?;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .map_err(|e| {
+                McpError::new(
+                    ErrorKind::Internal,
+                    format!("Failed to bind OAuth callback server: {}", e),
+                )
+            })?;
 
         // Bind succeeded — mark the server as running only now to avoid TOCTOU
         // (is_running stayed false while bind was in progress; if bind had
@@ -282,11 +292,19 @@ impl CallbackServer {
         // the correct value before the browser redirect happens.
         let actual_port = listener
             .local_addr()
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to get local address: {}", e)))?
+            .map_err(|e| {
+                McpError::new(
+                    ErrorKind::Internal,
+                    format!("Failed to get local address: {}", e),
+                )
+            })?
             .port();
         *self.port.lock() = actual_port;
 
-        tracing::info!("OAuth callback server listening on 127.0.0.1:{}", actual_port);
+        tracing::info!(
+            "OAuth callback server listening on 127.0.0.1:{}",
+            actual_port
+        );
 
         // Spawn server in background with a 5-minute hard timeout.
         // If no callback arrives within 300 seconds the listener is dropped

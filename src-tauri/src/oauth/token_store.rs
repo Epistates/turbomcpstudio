@@ -8,7 +8,6 @@
 /// - Automatic token refresh before expiry
 /// - Secure token deletion on revocation
 /// - DPoP key binding support
-
 use keyring::Entry;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -225,29 +224,41 @@ impl TokenStore {
             )
         })?;
 
-        let refresh_key = metadata.refresh_token_key.as_ref().ok_or_else(|| {
-            McpError::new(ErrorKind::Internal, "No refresh token available")
-        })?;
+        let refresh_key = metadata
+            .refresh_token_key
+            .as_ref()
+            .ok_or_else(|| McpError::new(ErrorKind::Internal, "No refresh token available"))?;
 
         self.retrieve_from_keyring(refresh_key)
     }
 
     /// Store value in OS keyring
     fn store_in_keyring(&self, key: &str, value: &str) -> McpResult<()> {
-        let entry = Entry::new(&self.service_name, key)
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to create keyring entry: {}", e)))?;
+        let entry = Entry::new(&self.service_name, key).map_err(|e| {
+            McpError::new(
+                ErrorKind::Internal,
+                format!("Failed to create keyring entry: {}", e),
+            )
+        })?;
 
-        entry
-            .set_password(value)
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to store in keyring: {}", e)))?;
+        entry.set_password(value).map_err(|e| {
+            McpError::new(
+                ErrorKind::Internal,
+                format!("Failed to store in keyring: {}", e),
+            )
+        })?;
 
         Ok(())
     }
 
     /// Retrieve value from OS keyring
     fn retrieve_from_keyring(&self, key: &str) -> McpResult<String> {
-        let entry = Entry::new(&self.service_name, key)
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to create keyring entry: {}", e)))?;
+        let entry = Entry::new(&self.service_name, key).map_err(|e| {
+            McpError::new(
+                ErrorKind::Internal,
+                format!("Failed to create keyring entry: {}", e),
+            )
+        })?;
 
         entry.get_password().map_err(|e| {
             McpError::new(
@@ -259,12 +270,19 @@ impl TokenStore {
 
     /// Delete value from OS keyring
     fn delete_from_keyring(&self, key: &str) -> McpResult<()> {
-        let entry = Entry::new(&self.service_name, key)
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to create keyring entry: {}", e)))?;
+        let entry = Entry::new(&self.service_name, key).map_err(|e| {
+            McpError::new(
+                ErrorKind::Internal,
+                format!("Failed to create keyring entry: {}", e),
+            )
+        })?;
 
-        entry
-            .delete_credential()
-            .map_err(|e| McpError::new(ErrorKind::Internal, format!("Failed to delete from keyring: {}", e)))?;
+        entry.delete_credential().map_err(|e| {
+            McpError::new(
+                ErrorKind::Internal,
+                format!("Failed to delete from keyring: {}", e),
+            )
+        })?;
 
         Ok(())
     }
@@ -276,7 +294,10 @@ impl TokenStore {
 
     /// Get token expiry information
     pub fn get_token_expiry(&self, server_id: i64) -> Option<i64> {
-        self.token_cache.read().get(&server_id).and_then(|m| m.expires_at)
+        self.token_cache
+            .read()
+            .get(&server_id)
+            .and_then(|m| m.expires_at)
     }
 }
 
@@ -335,6 +356,6 @@ mod tests {
 
         let seconds = token_info.seconds_until_expiry().unwrap();
         // Should be approximately 3600 seconds (allowing for test execution time)
-        assert!(seconds >= 3595 && seconds <= 3600);
+        assert!((3595..=3600).contains(&seconds));
     }
 }

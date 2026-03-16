@@ -18,7 +18,6 @@
 ///
 /// Note: This module is WIP - some helper functions are implemented but not yet
 /// integrated with the main OAuth flow.
-
 #[allow(dead_code)]
 pub mod callback_server;
 #[allow(dead_code)]
@@ -32,4 +31,3 @@ pub mod token_store;
 
 // Re-export key types for convenience
 pub use flow_manager::{OAuthConfig, OAuthFlowManager};
-
