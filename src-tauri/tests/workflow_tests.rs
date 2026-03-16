@@ -385,5 +385,3 @@ async fn test_persistence_concept() {
     // In real system: verify database.save_workflow_execution() was called
     // For now, we're testing the state management pattern is correct
 }
-
-

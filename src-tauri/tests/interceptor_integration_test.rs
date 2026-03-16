@@ -21,8 +21,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
 use turbomcp_client::Client;
-use turbomcp_transport::{ChildProcessTransport, Transport, child_process::ChildProcessConfig};
-use turbomcpstudio_lib::interceptor::{InterceptedTransport, Direction};
+use turbomcp_transport::{child_process::ChildProcessConfig, ChildProcessTransport};
+use turbomcpstudio_lib::interceptor::{Direction, InterceptedTransport};
 
 /// Resolve the path to the turbomcp-demo binary.
 ///
@@ -41,8 +41,8 @@ fn resolve_demo_path() -> Option<String> {
 
     // 2. Heuristic: look two levels above the crate manifest
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let heuristic = std::path::PathBuf::from(manifest_dir)
-        .join("../../turbomcp/target/release/turbomcp-demo");
+    let heuristic =
+        std::path::PathBuf::from(manifest_dir).join("../../turbomcp/target/release/turbomcp-demo");
 
     if heuristic.exists() {
         return Some(heuristic.to_string_lossy().into_owned());
@@ -105,7 +105,11 @@ async fn test_interceptor_captures_stdio_messages() {
 
     // Initialize the MCP connection (this triggers the protocol handshake)
     let init_result = client.initialize().await;
-    assert!(init_result.is_ok(), "Failed to initialize: {:?}", init_result);
+    assert!(
+        init_result.is_ok(),
+        "Failed to initialize: {:?}",
+        init_result
+    );
 
     println!("MCP handshake completed");
 
@@ -148,11 +152,21 @@ async fn test_interceptor_captures_stdio_messages() {
     );
 
     // Verify we have both outgoing and incoming messages
-    let has_outgoing = captured.iter().any(|(dir, _)| matches!(dir, Direction::Outgoing));
-    let has_incoming = captured.iter().any(|(dir, _)| matches!(dir, Direction::Incoming));
+    let has_outgoing = captured
+        .iter()
+        .any(|(dir, _)| matches!(dir, Direction::Outgoing));
+    let has_incoming = captured
+        .iter()
+        .any(|(dir, _)| matches!(dir, Direction::Incoming));
 
-    assert!(has_outgoing, "Should have captured at least one outgoing message");
-    assert!(has_incoming, "Should have captured at least one incoming message");
+    assert!(
+        has_outgoing,
+        "Should have captured at least one outgoing message"
+    );
+    assert!(
+        has_incoming,
+        "Should have captured at least one incoming message"
+    );
 
     println!("Interceptor successfully captured bidirectional MCP protocol messages!");
 
@@ -198,11 +212,18 @@ async fn test_interceptor_zero_copy_verification() {
     // Receive one intercepted message
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    if let Some(msg) = timeout(Duration::from_secs(2), rx.recv()).await.ok().flatten() {
+    if let Some(msg) = timeout(Duration::from_secs(2), rx.recv())
+        .await
+        .ok()
+        .flatten()
+    {
         // Verify Arc is being used (small overhead)
         let arc_size = std::mem::size_of::<Arc<turbomcp_transport::TransportMessage>>();
         println!("Arc<TransportMessage> size: {} bytes", arc_size);
-        assert_eq!(arc_size, 8, "Arc should be a single pointer (8 bytes on 64-bit)");
+        assert_eq!(
+            arc_size, 8,
+            "Arc should be a single pointer (8 bytes on 64-bit)"
+        );
 
         // The message payload uses Bytes which is already zero-copy
         println!("Message payload size: {} bytes", msg.message.payload.len());

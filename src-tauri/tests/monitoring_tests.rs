@@ -407,5 +407,3 @@ fn test_empty_monitoring_initialization() {
         "Should see connection added after monitoring started"
     );
 }
-
-
