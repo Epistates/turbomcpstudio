@@ -7,8 +7,13 @@
 //! - Enables protocol analysis and performance monitoring
 
 use crate::error::{McpResult, McpStudioError};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use uuid::Uuid;
+
+/// Global message counter used to gate `maybe_prune` checks.
+/// Incremented on every saved message; prune check runs when counter % 100 == 0.
+static SAVE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Maximum messages to keep per server in the Protocol Inspector history.
 /// Older messages are pruned after this threshold is exceeded.
@@ -135,10 +140,13 @@ impl MessageHistory {
         // Save to database
         database.save_message(&message).await?;
 
-        // Periodically prune old messages to keep history bounded
-        // Only prune every ~100 messages to avoid overhead
-        // (Using a simple modular check on the message count)
-        Self::maybe_prune(server_id, database).await;
+        // Periodically prune old messages to keep history bounded.
+        // The AtomicU64 counter eliminates 99% of COUNT(*) queries —
+        // we only hit the database every 100 saves.
+        let count = SAVE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        if count % 100 == 0 {
+            Self::maybe_prune(server_id, database).await;
+        }
 
         tracing::debug!(
             "Saved message to history: server={}, direction={:?}, size={}",

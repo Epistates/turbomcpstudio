@@ -212,7 +212,9 @@ impl MonitoringLoop {
             None => return Ok(false), // No client means not healthy
         };
 
-        // Try to list tools as a health check (lightweight operation)
+        // TODO: Replace list_tools() health probe with MCP ping operation when available.
+        // list_tools() works but causes unnecessary protocol traffic and may trigger
+        // server-side processing. A dedicated ping/keepalive would be more appropriate.
         match client.list_tools().await {
             Ok(_) => {
                 tracing::debug!(

@@ -76,12 +76,12 @@ pub struct ServerContext {
     pub server_name: String,
 
     /// Optional server description for UI display
-    /// Currently stored but not used - reserved for future Protocol Inspector enhancements
+    /// Reserved for future Protocol Inspector enhancements
     #[allow(dead_code)]
     pub server_description: Option<String>,
 
     /// Timestamp when connection was established
-    /// Currently stored but not used - reserved for future session duration tracking
+    /// Reserved for future session duration tracking
     #[allow(dead_code)]
     pub connected_at: DateTime<Utc>,
 }

@@ -94,32 +94,24 @@ impl SamplingLogic {
                         e
                     );
 
-                    let response = serde_json::json!({
-                        "status": "error",
-                        "message": format!("Sampling failed: {}", e),
-                        "server": connection.config.name
-                    });
-
-                    Ok(response)
+                    Err(McpStudioError::TurboMcpError(format!(
+                        "Sampling failed for server '{}': {}",
+                        connection.config.name, e
+                    )))
                 }
             }
         } else {
-            // Fallback response when no LLM provider is configured
+            // No LLM provider configured — return a proper error so callers can distinguish
+            // this condition from a successful (but empty) response.
             tracing::warn!(
-                "No LLM provider configured - using fallback response for server: {}",
+                "No LLM provider configured - cannot process sampling request for server: {}",
                 connection.config.name
             );
 
-            let response = serde_json::json!({
-                "status": "no_provider",
-                "message": "No LLM provider configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable.",
-                "received_messages": messages.len(),
-                "max_tokens": max_tokens,
-                "temperature": temperature,
-                "note": "Configure an LLM provider to enable real sampling functionality"
-            });
-
-            Ok(response)
+            Err(McpStudioError::ConfigError(
+                "No LLM provider configured. Please add an API key in Settings to enable sampling."
+                    .to_string(),
+            ))
         }
     }
 

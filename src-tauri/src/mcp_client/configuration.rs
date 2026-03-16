@@ -23,7 +23,9 @@ impl Configuration {
     /// - **Circuit Breaker**: Prevents cascade failures with configurable thresholds
     /// - **Health Checks**: Periodic connection health monitoring
     ///
-    /// Note: Currently unused - available for production deployments requiring enhanced reliability.
+    /// Reserved for future production deployments requiring enhanced reliability.
+    /// When TurboMCP's resilience configuration stabilizes, call this from
+    /// `build_resilient_client` and from `establish_mcp_connection` in transport_layer.
     #[allow(dead_code)]
     pub fn configure_resilience(builder: ClientBuilder) -> ClientBuilder {
         use std::time::Duration;
@@ -104,7 +106,8 @@ impl Configuration {
     /// # Returns
     /// Resilient MCP client with all capabilities
     ///
-    /// Note: Currently unused - available for production deployments requiring enhanced reliability.
+    /// Reserved for future production deployments requiring TurboTransport resilience wrapping.
+    /// Integrate with `establish_mcp_connection` once the resilience API stabilizes.
     #[allow(dead_code)]
     pub async fn build_resilient_client<T: Transport + 'static>(
         transport: T,

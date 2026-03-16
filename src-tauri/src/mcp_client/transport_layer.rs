@@ -108,14 +108,28 @@ impl TransportLayer {
         app_handle: tauri::AppHandle,
         server_id: uuid::Uuid,
         server_name: String,
-    ) {
+    ) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
             // Track request timestamps for latency calculation
             // Key: message_id, Value: timestamp when request was sent
             let request_timestamps: Arc<DashMap<String, Instant>> = Arc::new(DashMap::new());
+            let mut messages_processed: u64 = 0;
 
             while let Some(internal_msg) = interceptor_rx.recv().await {
                 let frontend_msg = InterceptedMessage::from(&*internal_msg);
+                messages_processed += 1;
+
+                // Periodic eviction of stale request_timestamps (every 1000 messages).
+                // Entries older than 5 minutes are considered stale (response never arrived).
+                if messages_processed % 1000 == 0 && request_timestamps.len() > 10_000 {
+                    let cutoff = std::time::Duration::from_secs(5 * 60);
+                    request_timestamps.retain(|_, ts: &mut Instant| ts.elapsed() < cutoff);
+                    tracing::debug!(
+                        "Evicted stale request timestamps for server {}; {} remaining",
+                        server_id,
+                        request_timestamps.len()
+                    );
+                }
 
                 // Calculate latency for request→response pairs
                 let latency_ms = match internal_msg.direction {
@@ -150,12 +164,12 @@ impl TransportLayer {
                     "messageId": frontend_msg.message_id,
                     "payload": frontend_msg.payload,
                     "size": frontend_msg.size,
-                    "latencyMs": latency_ms, // NEW: Optional latency for responses
+                    "latencyMs": latency_ms,
                 }));
             }
 
             tracing::debug!("Protocol interceptor task ended for server: {}", server_name);
-        });
+        })
     }
 
     /// Establish MCP connection with enterprise-grade reliability and monitoring

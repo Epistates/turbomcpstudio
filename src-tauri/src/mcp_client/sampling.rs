@@ -107,6 +107,10 @@ pub struct PendingSamplingRequest {
     pub created_at: String,
 }
 
+/// Maximum number of concurrent LLM calls spawned by `submit_approved_request`.
+/// Prevents unbounded task spawning when many sampling approvals arrive simultaneously.
+const MAX_CONCURRENT_LLM_REQUESTS: usize = 5;
+
 /// Studio sampling handler with human-in-the-loop
 ///
 /// This handler intercepts server-initiated sampling requests and presents them
@@ -128,6 +132,9 @@ pub struct StudioSamplingHandler {
 
     /// Database for protocol message logging (initialized async)
     db: Arc<tokio::sync::RwLock<Option<Arc<Database>>>>,
+
+    /// Semaphore limiting concurrent LLM request tasks to prevent unbounded spawning
+    llm_semaphore: Arc<tokio::sync::Semaphore>,
 }
 
 impl StudioSamplingHandler {
@@ -145,6 +152,7 @@ impl StudioSamplingHandler {
             response_channels: Arc::new(DashMap::new()),
             llm_config,
             db,
+            llm_semaphore: Arc::new(tokio::sync::Semaphore::new(MAX_CONCURRENT_LLM_REQUESTS)),
         }
     }
 
@@ -220,10 +228,27 @@ impl StudioSamplingHandler {
             .ok_or_else(|| format!("No pending channel for request: {}", request_id))?
             .1;
 
-        // Spawn task to call LLM (async operation)
+        // Spawn task to call LLM (async operation), gated by semaphore to cap concurrency
         let llm_config = self.llm_config.clone();
+        let semaphore = self.llm_semaphore.clone();
         tokio::spawn(async move {
-            tracing::info!("🚀 Calling LLM for approved request: {}", request_id);
+            // Acquire semaphore permit before calling LLM.
+            // If MAX_CONCURRENT_LLM_REQUESTS are already in-flight, this will wait.
+            let _permit = match semaphore.acquire().await {
+                Ok(permit) => permit,
+                Err(_) => {
+                    tracing::error!(
+                        "LLM semaphore closed for request {}, cannot proceed",
+                        request_id
+                    );
+                    let err: Box<dyn std::error::Error + Send + Sync> =
+                        "LLM semaphore closed".into();
+                    let _ = tx.send(Err(err));
+                    return;
+                }
+            };
+
+            tracing::info!("Calling LLM for approved request: {}", request_id);
 
             // Use the new invoke_llm_directly method to bypass the DelegatingSamplingHandler
             // and directly call the configured LLM provider

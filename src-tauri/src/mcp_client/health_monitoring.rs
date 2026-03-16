@@ -38,16 +38,14 @@ impl HealthMonitoring {
             .get(&server_id)
             .ok_or_else(|| McpStudioError::ServerNotFound(server_id.to_string()))?;
 
+        // Acquire a single consistent snapshot instead of taking individual locks
+        let snap = connection.snapshot();
         let mut metrics = connection.metrics.read().clone();
 
-        // Update real-time metrics
-        metrics.requests_sent = *connection.request_count.lock();
-        metrics.error_count = *connection.error_count.lock();
-
-        // Calculate uptime
-        if let Some(connected_at) = *connection.connected_at.read() {
-            metrics.uptime_seconds = connected_at.elapsed().as_secs();
-        }
+        // Overlay real-time values from the snapshot
+        metrics.requests_sent = snap.request_count;
+        metrics.error_count = snap.error_count;
+        metrics.uptime_seconds = snap.uptime_seconds;
 
         Ok(metrics)
     }

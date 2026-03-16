@@ -159,8 +159,10 @@ impl McpOperations {
             )));
         }
 
-        // Validate parameter size
-        let param_str = parameters.to_string();
+        // Validate parameter size by serializing once and reusing the result.
+        // Avoids double-serialization: we serialize here only for the size check.
+        let param_str = serde_json::to_string(parameters)
+            .unwrap_or_else(|_| String::new());
         if param_str.len() > MAX_PARAM_SIZE_BYTES {
             return Err(McpStudioError::ValidationError(format!(
                 "Tool parameters exceed maximum size of {}KB: {}KB",
@@ -289,22 +291,24 @@ impl McpOperations {
                     }
 
                     // Check if we should retry (only for transient errors)
+                    let err_display = last_error
+                        .as_ref()
+                        .map(|e| e.to_string())
+                        .unwrap_or_else(|| "unknown error".to_string());
                     if attempt < max_retries {
                         tracing::warn!(
                             "Tool call '{}' failed (attempt {}/{}), retrying: {}",
                             tool_name,
                             attempt + 1,
                             max_retries + 1,
-                            last_error.as_ref().expect("last_error is Some after error")
+                            err_display
                         );
                     } else {
                         tracing::error!(
                             "Tool call '{}' failed after {} attempts: {}",
                             tool_name,
                             max_retries + 1,
-                            last_error
-                                .as_ref()
-                                .expect("last_error is Some after all retries")
+                            err_display
                         );
                     }
                 }
@@ -316,7 +320,13 @@ impl McpOperations {
             "Tool call '{}' failed after {} attempts: {}",
             tool_name,
             max_retries + 1,
-            last_error.expect("last_error is Some after retry loop")
+            last_error.unwrap_or_else(|| {
+                tracing::error!("last_error was None after retry loop for tool '{}'", tool_name);
+                turbomcp_protocol::McpError::new(
+                    turbomcp_protocol::ErrorKind::Internal,
+                    "unknown error after retry loop",
+                )
+            })
         )))
     }
 

@@ -149,7 +149,9 @@ impl McpClientManager {
 
         let manager = Self {
             connections: Arc::new(DashMap::new()),
-            system: Arc::new(RwLock::new(System::new_all())),
+            // Use System::new() (no data loaded) — the monitoring loop performs targeted refreshes.
+            // System::new_all() loads all processes upfront (~50-100ms) and is unnecessary here.
+            system: Arc::new(RwLock::new(System::new())),
             event_sender,
             sampling_handler,
             elicitation_handler,
@@ -229,33 +231,16 @@ impl McpClientManager {
     }
 
     /// Update sampling handler using runtime configuration
+    ///
+    /// NOTE: This method is not yet implemented. Updating the sampling handler on
+    /// live connections requires a `set_sampling_handler` method on McpTransportClient
+    /// which is not currently available in TurboMCP.
     pub async fn update_sampling_handler(
         &self,
         _llm_config: &crate::llm_config::LLMConfigManager,
     ) -> McpResult<bool> {
-        // Get the active sampling handler from LLM config
-        if let Some(_handler) = _llm_config.get_active_sampling_handler().await {
-            // Update the sampling handler for all managed clients
-            let connections = &self.connections;
-
-            for connection_ref in connections.iter() {
-                let connection = connection_ref.value();
-                if let Some(_client) = connection.client.read().as_ref() {
-                    // Update the client's sampling handler
-                    // Note: This would require adding a method to McpTransportClient
-                    tracing::info!(
-                        "Updated sampling handler for connection: {}",
-                        connection.config.id
-                    );
-                }
-            }
-
-            tracing::info!("Sampling handler updated successfully");
-            Ok(true)
-        } else {
-            tracing::warn!("No active LLM provider configured");
-            Ok(false)
-        }
+        tracing::warn!("update_sampling_handler is not yet implemented — sampling handler changes will not take effect on existing connections");
+        Ok(false)
     }
 
     /// Check if sampling is available
