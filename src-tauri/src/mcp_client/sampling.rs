@@ -88,7 +88,9 @@ impl SamplingHandler for ContextAwareSamplingHandler {
         Box::pin(async move {
             CURRENT_SERVER_CONTEXT
                 .scope(context, async move {
-                    inner.handle_create_message_internal(request_id, request).await
+                    inner
+                        .handle_create_message_internal(request_id, request)
+                        .await
                 })
                 .await
         })
@@ -566,6 +568,9 @@ impl SamplingHandler for StudioSamplingHandler {
         >,
     > {
         let this = self.clone();
-        Box::pin(async move { this.handle_create_message_internal(request_id, request).await })
+        Box::pin(async move {
+            this.handle_create_message_internal(request_id, request)
+                .await
+        })
     }
 }

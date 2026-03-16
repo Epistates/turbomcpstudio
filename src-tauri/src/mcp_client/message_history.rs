@@ -144,7 +144,7 @@ impl MessageHistory {
         // The AtomicU64 counter eliminates 99% of COUNT(*) queries —
         // we only hit the database every 100 saves.
         let count = SAVE_COUNTER.fetch_add(1, Ordering::Relaxed);
-        if count % 100 == 0 {
+        if count.is_multiple_of(100) {
             Self::maybe_prune(server_id, database).await;
         }
 
@@ -162,10 +162,7 @@ impl MessageHistory {
     ///
     /// Uses a lightweight check to avoid pruning on every insert.
     /// Prunes when total exceeds threshold by 10% to batch deletions.
-    async fn maybe_prune(
-        server_id: Uuid,
-        database: &Arc<crate::database::Database>,
-    ) {
+    async fn maybe_prune(server_id: Uuid, database: &Arc<crate::database::Database>) {
         // Only prune when significantly over limit (10% buffer)
         let prune_threshold = MAX_MESSAGES_PER_SERVER + (MAX_MESSAGES_PER_SERVER / 10);
 
@@ -173,18 +170,24 @@ impl MessageHistory {
         match database.pool().acquire().await {
             Ok(mut conn) => {
                 use sqlx::Row;
-                let count_result = sqlx::query(
-                    "SELECT COUNT(*) as cnt FROM message_history WHERE server_id = ?"
-                )
-                .bind(server_id.to_string())
-                .fetch_one(&mut *conn)
-                .await;
+                let count_result =
+                    sqlx::query("SELECT COUNT(*) as cnt FROM message_history WHERE server_id = ?")
+                        .bind(server_id.to_string())
+                        .fetch_one(&mut *conn)
+                        .await;
 
                 if let Ok(row) = count_result {
                     let count: i64 = row.get("cnt");
                     if count > prune_threshold {
-                        if let Err(e) = database.prune_messages(server_id, MAX_MESSAGES_PER_SERVER).await {
-                            tracing::warn!("Failed to prune messages for server {}: {}", server_id, e);
+                        if let Err(e) = database
+                            .prune_messages(server_id, MAX_MESSAGES_PER_SERVER)
+                            .await
+                        {
+                            tracing::warn!(
+                                "Failed to prune messages for server {}: {}",
+                                server_id,
+                                e
+                            );
                         }
                     }
                 }

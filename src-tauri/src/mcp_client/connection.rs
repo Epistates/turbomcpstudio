@@ -68,8 +68,7 @@ impl ManagedConnection {
         let (connected_at, uptime_seconds) = match connected_instant {
             Some(instant) => {
                 let uptime = instant.elapsed().as_secs();
-                let wall_clock =
-                    chrono::Utc::now() - chrono::Duration::seconds(uptime as i64);
+                let wall_clock = chrono::Utc::now() - chrono::Duration::seconds(uptime as i64);
                 (Some(wall_clock), uptime)
             }
             None => (None, 0),

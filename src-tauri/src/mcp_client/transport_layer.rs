@@ -11,13 +11,12 @@
 //! bidirectional features (sampling + elicitation).
 
 use crate::error::{McpResult, McpStudioError};
-use crate::interceptor::{Direction, InterceptedTransport, InterceptedMessage};
+use crate::interceptor::{Direction, InterceptedMessage, InterceptedTransport};
 use crate::mcp_client::connection::ManagedConnection;
 use crate::mcp_client::elicitation::StudioElicitationHandler;
 use crate::mcp_client::notification_handlers::{
     StudioLogHandler, StudioProgressHandler, StudioPromptListChangedHandler,
-    StudioResourceListChangedHandler, StudioResourceUpdateHandler,
-    StudioToolListChangedHandler,
+    StudioResourceListChangedHandler, StudioResourceUpdateHandler, StudioToolListChangedHandler,
 };
 use crate::mcp_client::sampling::StudioSamplingHandler;
 use crate::mcp_client::transport_client::McpTransportClient;
@@ -104,7 +103,9 @@ impl TransportLayer {
     /// - Calculates latency for request→response pairs
     /// - Emits events to the Tauri frontend
     fn spawn_protocol_inspector_task(
-        mut interceptor_rx: tokio::sync::mpsc::UnboundedReceiver<Arc<crate::interceptor::InternalInterceptedMessage>>,
+        mut interceptor_rx: tokio::sync::mpsc::UnboundedReceiver<
+            Arc<crate::interceptor::InternalInterceptedMessage>,
+        >,
         app_handle: tauri::AppHandle,
         server_id: uuid::Uuid,
         server_name: String,
@@ -121,7 +122,7 @@ impl TransportLayer {
 
                 // Periodic eviction of stale request_timestamps (every 1000 messages).
                 // Entries older than 5 minutes are considered stale (response never arrived).
-                if messages_processed % 1000 == 0 && request_timestamps.len() > 10_000 {
+                if messages_processed.is_multiple_of(1000) && request_timestamps.len() > 10_000 {
                     let cutoff = std::time::Duration::from_secs(5 * 60);
                     request_timestamps.retain(|_, ts: &mut Instant| ts.elapsed() < cutoff);
                     tracing::debug!(
@@ -135,20 +136,20 @@ impl TransportLayer {
                 let latency_ms = match internal_msg.direction {
                     Direction::Outgoing => {
                         // Store timestamp for outgoing requests (that have IDs)
-                        if !frontend_msg.message_id.is_empty() && frontend_msg.message_id != "null" {
-                            request_timestamps.insert(
-                                frontend_msg.message_id.clone(),
-                                Instant::now(),
-                            );
+                        if !frontend_msg.message_id.is_empty() && frontend_msg.message_id != "null"
+                        {
+                            request_timestamps
+                                .insert(frontend_msg.message_id.clone(), Instant::now());
                         }
                         None // No latency for outgoing messages
                     }
                     Direction::Incoming => {
                         // Look up request timestamp and calculate latency
-                        if !frontend_msg.message_id.is_empty() && frontend_msg.message_id != "null" {
-                            request_timestamps.remove(&frontend_msg.message_id).map(|(_, request_time)| {
-                                request_time.elapsed().as_millis() as u64
-                            })
+                        if !frontend_msg.message_id.is_empty() && frontend_msg.message_id != "null"
+                        {
+                            request_timestamps
+                                .remove(&frontend_msg.message_id)
+                                .map(|(_, request_time)| request_time.elapsed().as_millis() as u64)
                         } else {
                             None // Notifications don't have IDs
                         }
@@ -156,23 +157,30 @@ impl TransportLayer {
                 };
 
                 // Emit to frontend via Tauri event
-                let _ = app_handle.emit("protocol-message", serde_json::json!({
-                    "serverId": server_id.to_string(),
-                    "serverName": server_name,
-                    "direction": frontend_msg.direction,
-                    "timestamp": frontend_msg.timestamp.elapsed().as_millis(),
-                    "messageId": frontend_msg.message_id,
-                    "payload": frontend_msg.payload,
-                    "size": frontend_msg.size,
-                    "latencyMs": latency_ms,
-                }));
+                let _ = app_handle.emit(
+                    "protocol-message",
+                    serde_json::json!({
+                        "serverId": server_id.to_string(),
+                        "serverName": server_name,
+                        "direction": frontend_msg.direction,
+                        "timestamp": frontend_msg.timestamp.elapsed().as_millis(),
+                        "messageId": frontend_msg.message_id,
+                        "payload": frontend_msg.payload,
+                        "size": frontend_msg.size,
+                        "latencyMs": latency_ms,
+                    }),
+                );
             }
 
-            tracing::debug!("Protocol interceptor task ended for server: {}", server_name);
+            tracing::debug!(
+                "Protocol interceptor task ended for server: {}",
+                server_name
+            );
         })
     }
 
     /// Establish MCP connection with enterprise-grade reliability and monitoring
+    #[allow(clippy::too_many_arguments)]
     pub async fn establish_mcp_connection(
         connection: Arc<ManagedConnection>,
         sampling_handler: Arc<StudioSamplingHandler>,
@@ -306,6 +314,7 @@ impl TransportLayer {
     }
 
     /// Connect to STDIO MCP server using TurboMCP ChildProcessTransport
+    #[allow(clippy::too_many_arguments)]
     async fn connect_stdio(
         connection: Arc<ManagedConnection>,
         command: &str,
@@ -366,6 +375,7 @@ impl TransportLayer {
 
     /// Connect to HTTP/SSE MCP server
     #[cfg(feature = "http")]
+    #[allow(clippy::too_many_arguments)]
     async fn connect_http(
         connection: Arc<ManagedConnection>,
         url: &str,
@@ -381,12 +391,18 @@ impl TransportLayer {
     ) -> McpResult<()> {
         // Initialize TurboMCP HTTP/SSE transport and client (DOGFOODING)
         match Self::initialize_http_client(
-            &connection, url, sampling_handler, elicitation_handler,
-            log_handler, resource_update_handler,
-            progress_handler, tool_list_changed_handler,
-            prompt_list_changed_handler, resource_list_changed_handler,
+            &connection,
+            url,
+            sampling_handler,
+            elicitation_handler,
+            log_handler,
+            resource_update_handler,
+            progress_handler,
+            tool_list_changed_handler,
+            prompt_list_changed_handler,
+            resource_list_changed_handler,
         )
-            .await
+        .await
         {
             Ok(client) => {
                 // Wrap TurboMCP client with Protocol Inspector support
@@ -412,6 +428,7 @@ impl TransportLayer {
 
     /// Connect to WebSocket MCP server using TurboMCP v3
     #[cfg(feature = "websocket")]
+    #[allow(clippy::too_many_arguments)]
     async fn connect_websocket(
         connection: Arc<ManagedConnection>,
         url: &str,
@@ -486,6 +503,7 @@ impl TransportLayer {
 
     /// Connect to TCP MCP server using TurboMCP v3
     #[cfg(feature = "tcp")]
+    #[allow(clippy::too_many_arguments)]
     async fn connect_tcp(
         connection: Arc<ManagedConnection>,
         host: &str,
@@ -562,6 +580,7 @@ impl TransportLayer {
 
     /// Connect to Unix socket MCP server using TurboMCP v3
     #[cfg(unix)]
+    #[allow(clippy::too_many_arguments)]
     async fn connect_unix(
         connection: Arc<ManagedConnection>,
         path: &str,
@@ -578,12 +597,18 @@ impl TransportLayer {
 
         // Initialize Unix socket transport and client
         match Self::initialize_unix_client(
-            &connection, path, sampling_handler, elicitation_handler,
-            log_handler, resource_update_handler,
-            progress_handler, tool_list_changed_handler,
-            prompt_list_changed_handler, resource_list_changed_handler,
+            &connection,
+            path,
+            sampling_handler,
+            elicitation_handler,
+            log_handler,
+            resource_update_handler,
+            progress_handler,
+            tool_list_changed_handler,
+            prompt_list_changed_handler,
+            resource_list_changed_handler,
         )
-            .await
+        .await
         {
             Ok(client) => {
                 *connection.client.write() = Some(McpTransportClient::InterceptedUnix(client));
@@ -629,6 +654,7 @@ impl TransportLayer {
     }
 
     /// Initialize TurboMCP client for ChildProcess transport - World-class implementation
+    #[allow(clippy::too_many_arguments)]
     async fn initialize_child_process_client(
         connection: &Arc<ManagedConnection>,
         command: &str,
@@ -696,7 +722,8 @@ impl TransportLayer {
         // Build TurboMCP client with enterprise connection config
         let connection_config = Configuration::create_enterprise_connection_config();
         Configuration::configure_client_capabilities();
-        let client = Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
+        let client =
+            Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
 
         // Initialize with custom error handling for ChildProcess-specific issues
         let init_result = client.initialize().await.map_err(|e| {
@@ -758,6 +785,7 @@ impl TransportLayer {
 
     /// Initialize TurboMCP HTTP/SSE client transport (TurboMCP v3 DOGFOODING)
     #[cfg(feature = "http")]
+    #[allow(clippy::too_many_arguments)]
     async fn initialize_http_client(
         connection: &Arc<ManagedConnection>,
         url: &str,
@@ -845,7 +873,8 @@ impl TransportLayer {
         // Build client with enterprise connection config
         let connection_config = Configuration::create_enterprise_connection_config();
         Configuration::configure_client_capabilities();
-        let client = Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
+        let client =
+            Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
 
         // Finalize with init handshake and handler registration (DRY helper)
         Initialization::finalize_client_initialization(
@@ -866,6 +895,7 @@ impl TransportLayer {
 
     /// Initialize TurboMCP client for WebSocket bidirectional transport
     #[cfg(feature = "websocket")]
+    #[allow(clippy::too_many_arguments)]
     async fn initialize_websocket_client(
         connection: &Arc<ManagedConnection>,
         url: &str,
@@ -943,7 +973,8 @@ impl TransportLayer {
         // Build client with enterprise connection config
         let connection_config = Configuration::create_enterprise_connection_config();
         Configuration::configure_client_capabilities();
-        let client = Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
+        let client =
+            Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
 
         // Finalize with init handshake and handler registration (DRY helper)
         Initialization::finalize_client_initialization(
@@ -964,6 +995,7 @@ impl TransportLayer {
 
     /// Initialize TurboMCP client for TCP transport using TurboMCP v3
     #[cfg(feature = "tcp")]
+    #[allow(clippy::too_many_arguments)]
     async fn initialize_tcp_client(
         connection: &Arc<ManagedConnection>,
         host: &str,
@@ -1002,7 +1034,8 @@ impl TransportLayer {
         // Build client with enterprise connection config
         let connection_config = Configuration::create_enterprise_connection_config();
         Configuration::configure_client_capabilities();
-        let client = Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
+        let client =
+            Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
 
         // Finalize with init handshake and handler registration (DRY helper)
         Initialization::finalize_client_initialization(
@@ -1023,6 +1056,7 @@ impl TransportLayer {
 
     /// Initialize TurboMCP client for Unix socket transport using TurboMCP v3
     #[cfg(unix)]
+    #[allow(clippy::too_many_arguments)]
     async fn initialize_unix_client(
         connection: &Arc<ManagedConnection>,
         path: &str,
@@ -1055,7 +1089,8 @@ impl TransportLayer {
         // Build client with enterprise connection config
         let connection_config = Configuration::create_enterprise_connection_config();
         Configuration::configure_client_capabilities();
-        let client = Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
+        let client =
+            Configuration::build_client_with_capabilities(intercepted_transport, connection_config);
 
         // Finalize with init handshake and handler registration (DRY helper)
         Initialization::finalize_client_initialization(

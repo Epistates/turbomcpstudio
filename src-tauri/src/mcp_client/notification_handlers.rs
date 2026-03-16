@@ -239,7 +239,9 @@ impl ProgressHandler for StudioProgressHandler {
                 server_context.server_name,
                 notification.progress_token,
                 notification.progress,
-                notification.total.map_or("?".to_string(), |t| t.to_string()),
+                notification
+                    .total
+                    .map_or("?".to_string(), |t| t.to_string()),
             );
 
             let payload = serde_json::json!({
@@ -287,9 +289,10 @@ impl ProgressHandler for ContextAwareProgressHandler {
 
         Box::pin(async move {
             CURRENT_SERVER_CONTEXT
-                .scope(context, async move {
-                    inner.handle_progress(notification).await
-                })
+                .scope(
+                    context,
+                    async move { inner.handle_progress(notification).await },
+                )
                 .await
         })
     }
@@ -371,9 +374,10 @@ impl ToolListChangedHandler for ContextAwareToolListChangedHandler {
 
         Box::pin(async move {
             CURRENT_SERVER_CONTEXT
-                .scope(context, async move {
-                    inner.handle_tool_list_changed().await
-                })
+                .scope(
+                    context,
+                    async move { inner.handle_tool_list_changed().await },
+                )
                 .await
         })
     }
@@ -448,9 +452,10 @@ impl PromptListChangedHandler for ContextAwarePromptListChangedHandler {
 
         Box::pin(async move {
             CURRENT_SERVER_CONTEXT
-                .scope(context, async move {
-                    inner.handle_prompt_list_changed().await
-                })
+                .scope(
+                    context,
+                    async move { inner.handle_prompt_list_changed().await },
+                )
                 .await
         })
     }

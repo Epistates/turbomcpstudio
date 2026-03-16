@@ -126,18 +126,16 @@ fn json_depth(value: &Value, current: usize) -> usize {
         return current;
     }
     match value {
-        Value::Object(map) => {
-            map.values()
-                .map(|v| json_depth(v, current + 1))
-                .max()
-                .unwrap_or(current)
-        }
-        Value::Array(arr) => {
-            arr.iter()
-                .map(|v| json_depth(v, current + 1))
-                .max()
-                .unwrap_or(current)
-        }
+        Value::Object(map) => map
+            .values()
+            .map(|v| json_depth(v, current + 1))
+            .max()
+            .unwrap_or(current),
+        Value::Array(arr) => arr
+            .iter()
+            .map(|v| json_depth(v, current + 1))
+            .max()
+            .unwrap_or(current),
         _ => current,
     }
 }
@@ -161,8 +159,7 @@ impl McpOperations {
 
         // Validate parameter size by serializing once and reusing the result.
         // Avoids double-serialization: we serialize here only for the size check.
-        let param_str = serde_json::to_string(parameters)
-            .unwrap_or_else(|_| String::new());
+        let param_str = serde_json::to_string(parameters).unwrap_or_else(|_| String::new());
         if param_str.len() > MAX_PARAM_SIZE_BYTES {
             return Err(McpStudioError::ValidationError(format!(
                 "Tool parameters exceed maximum size of {}KB: {}KB",
@@ -321,7 +318,10 @@ impl McpOperations {
             tool_name,
             max_retries + 1,
             last_error.unwrap_or_else(|| {
-                tracing::error!("last_error was None after retry loop for tool '{}'", tool_name);
+                tracing::error!(
+                    "last_error was None after retry loop for tool '{}'",
+                    tool_name
+                );
                 turbomcp_protocol::McpError::new(
                     turbomcp_protocol::ErrorKind::Internal,
                     "unknown error after retry loop",
@@ -603,11 +603,7 @@ impl McpOperations {
         *connection.request_count.lock() += 1;
         *connection.last_seen.write() = Some(Utc::now());
 
-        tracing::info!(
-            "Subscribed to resource '{}' on server {}",
-            uri,
-            server_id
-        );
+        tracing::info!("Subscribed to resource '{}' on server {}", uri, server_id);
         Ok(())
     }
 
@@ -701,7 +697,7 @@ impl McpOperations {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use turbomcp_protocol::{McpError as Error, ErrorKind};
+    use turbomcp_protocol::{ErrorKind, McpError as Error};
 
     #[test]
     fn test_operations_module_exists() {

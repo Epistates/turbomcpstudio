@@ -17,8 +17,8 @@ use crate::mcp_client::notification_handlers::{
     ContextAwareLogHandler, ContextAwareProgressHandler, ContextAwarePromptListChangedHandler,
     ContextAwareResourceListChangedHandler, ContextAwareResourceUpdateHandler,
     ContextAwareToolListChangedHandler, StudioLogHandler, StudioProgressHandler,
-    StudioPromptListChangedHandler, StudioResourceListChangedHandler,
-    StudioResourceUpdateHandler, StudioToolListChangedHandler,
+    StudioPromptListChangedHandler, StudioResourceListChangedHandler, StudioResourceUpdateHandler,
+    StudioToolListChangedHandler,
 };
 use crate::mcp_client::sampling::{ContextAwareSamplingHandler, StudioSamplingHandler};
 use crate::mcp_client::ServerContext;
@@ -43,6 +43,7 @@ impl Initialization {
     /// - Server-initiated user input requests (elicitation)
     /// - Server log message forwarding (logging)
     /// - Resource change notifications (resource updates)
+    #[allow(clippy::too_many_arguments)]
     pub fn register_all_handlers<T: Transport>(
         client: &Client<T>,
         connection: &Arc<ManagedConnection>,
@@ -131,6 +132,7 @@ impl Initialization {
     /// 1. Map and store server capabilities
     /// 2. Register all handlers (sampling, elicitation, log, resource update)
     /// 3. Emit CapabilitiesUpdated event to frontend
+    #[allow(clippy::too_many_arguments)]
     pub fn register_capabilities_and_handlers<T: Transport>(
         client: &Client<T>,
         init_result: &turbomcp_client::InitializeResult,
@@ -162,10 +164,7 @@ impl Initialization {
                 capabilities: server_capabilities,
             }) {
             Ok(_) => {
-                tracing::info!(
-                    "Emitted CapabilitiesUpdated event for server {}",
-                    server_id
-                );
+                tracing::info!("Emitted CapabilitiesUpdated event for server {}", server_id);
             }
             Err(TrySendError::Full(_)) => {
                 tracing::warn!("Event channel full, dropping CapabilitiesUpdated event");
@@ -204,6 +203,7 @@ impl Initialization {
     ///
     /// Note: For transports needing custom error handling (like ChildProcess),
     /// use `register_capabilities_and_handlers` after manual initialize instead.
+    #[allow(clippy::too_many_arguments)]
     pub async fn finalize_client_initialization<T: Transport>(
         client: Client<T>,
         connection: &Arc<ManagedConnection>,

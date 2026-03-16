@@ -9,8 +9,10 @@ use turbomcp_client::handlers::{
     ResourceListChangedHandler, ResourceUpdateHandler, ToolListChangedHandler,
 };
 use turbomcp_client::Client;
-use turbomcp_protocol::types::{Prompt, PromptInput, Tool, ToolInputSchema, CallToolResult, GetPromptResult, ReadResourceResult};
-use turbomcp_protocol::{McpError, ErrorKind}; // v3.0: Unified error type
+use turbomcp_protocol::types::{
+    CallToolResult, GetPromptResult, Prompt, PromptInput, ReadResourceResult, Tool, ToolInputSchema,
+};
+use turbomcp_protocol::{ErrorKind, McpError}; // v3.0: Unified error type
 use turbomcp_stdio::StdioTransport;
 use turbomcp_transport::child_process::ChildProcessTransport;
 
@@ -115,7 +117,10 @@ impl McpTransportClient {
         // v3: call_tool returns CallToolResult, convert to JSON for backward compatibility
         let convert_result = |result: CallToolResult| -> Result<serde_json::Value, McpError> {
             serde_json::to_value(result).map_err(|e| {
-                McpError::new(ErrorKind::Internal, format!("Failed to serialize CallToolResult: {}", e))
+                McpError::new(
+                    ErrorKind::Internal,
+                    format!("Failed to serialize CallToolResult: {}", e),
+                )
             })
         };
 
@@ -135,15 +140,29 @@ impl McpTransportClient {
 
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => {
-                let result: CallToolResult = client.call_tool(tool_name, parameters, None).await
-                    .map_err(|e| Self::http_error(ErrorKind::Transport, format!("HTTP call_tool failed: {}", e)))?;
+                let result: CallToolResult = client
+                    .call_tool(tool_name, parameters, None)
+                    .await
+                    .map_err(|e| {
+                        Self::http_error(
+                            ErrorKind::Transport,
+                            format!("HTTP call_tool failed: {}", e),
+                        )
+                    })?;
                 convert_result(result)
             }
 
             #[cfg(feature = "http")]
             McpTransportClient::InterceptedHttp(client) => {
-                let result: CallToolResult = client.call_tool(tool_name, parameters, None).await
-                    .map_err(|e| Self::http_error(ErrorKind::Transport, format!("HTTP call_tool failed: {}", e)))?;
+                let result: CallToolResult = client
+                    .call_tool(tool_name, parameters, None)
+                    .await
+                    .map_err(|e| {
+                        Self::http_error(
+                            ErrorKind::Transport,
+                            format!("HTTP call_tool failed: {}", e),
+                        )
+                    })?;
                 convert_result(result)
             }
 
@@ -244,12 +263,14 @@ impl McpTransportClient {
             }),
 
             #[cfg(feature = "http")]
-            McpTransportClient::InterceptedHttp(client) => client.list_prompts().await.map_err(|e| {
-                Self::http_error(
-                    ErrorKind::Transport,
-                    format!("HTTP list_prompts failed: {}", e),
-                )
-            }),
+            McpTransportClient::InterceptedHttp(client) => {
+                client.list_prompts().await.map_err(|e| {
+                    Self::http_error(
+                        ErrorKind::Transport,
+                        format!("HTTP list_prompts failed: {}", e),
+                    )
+                })
+            }
 
             #[cfg(feature = "websocket")]
             McpTransportClient::WebSocket(client) => client.list_prompts().await,
@@ -293,23 +314,25 @@ impl McpTransportClient {
 
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => {
-                let result: GetPromptResult = client.get_prompt(name, arguments).await.map_err(|e| {
-                    Self::http_error(
-                        ErrorKind::Transport,
-                        format!("HTTP get_prompt failed: {}", e),
-                    )
-                })?;
+                let result: GetPromptResult =
+                    client.get_prompt(name, arguments).await.map_err(|e| {
+                        Self::http_error(
+                            ErrorKind::Transport,
+                            format!("HTTP get_prompt failed: {}", e),
+                        )
+                    })?;
                 Ok(serde_json::to_value(result)?)
             }
 
             #[cfg(feature = "http")]
             McpTransportClient::InterceptedHttp(client) => {
-                let result: GetPromptResult = client.get_prompt(name, arguments).await.map_err(|e| {
-                    Self::http_error(
-                        ErrorKind::Transport,
-                        format!("HTTP get_prompt failed: {}", e),
-                    )
-                })?;
+                let result: GetPromptResult =
+                    client.get_prompt(name, arguments).await.map_err(|e| {
+                        Self::http_error(
+                            ErrorKind::Transport,
+                            format!("HTTP get_prompt failed: {}", e),
+                        )
+                    })?;
                 Ok(serde_json::to_value(result)?)
             }
 
@@ -368,12 +391,14 @@ impl McpTransportClient {
             }),
 
             #[cfg(feature = "http")]
-            McpTransportClient::InterceptedHttp(client) => client.list_resources().await.map_err(|e| {
-                Self::http_error(
-                    ErrorKind::Transport,
-                    format!("HTTP list_resources failed: {}", e),
-                )
-            }),
+            McpTransportClient::InterceptedHttp(client) => {
+                client.list_resources().await.map_err(|e| {
+                    Self::http_error(
+                        ErrorKind::Transport,
+                        format!("HTTP list_resources failed: {}", e),
+                    )
+                })
+            }
 
             #[cfg(feature = "websocket")]
             McpTransportClient::WebSocket(client) => client.list_resources().await,
@@ -476,13 +501,16 @@ impl McpTransportClient {
     pub fn transport_type(&self) -> &'static str {
         match self {
             McpTransportClient::Stdio(_) => "stdio",
-            McpTransportClient::ChildProcess(_) | McpTransportClient::InterceptedChildProcess(_) => "child_process",
+            McpTransportClient::ChildProcess(_)
+            | McpTransportClient::InterceptedChildProcess(_) => "child_process",
 
             #[cfg(feature = "http")]
             McpTransportClient::Http(_) | McpTransportClient::InterceptedHttp(_) => "http",
 
             #[cfg(feature = "websocket")]
-            McpTransportClient::WebSocket(_) | McpTransportClient::InterceptedWebSocket(_) => "websocket",
+            McpTransportClient::WebSocket(_) | McpTransportClient::InterceptedWebSocket(_) => {
+                "websocket"
+            }
 
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(_) | McpTransportClient::InterceptedTcp(_) => "tcp",
@@ -570,7 +598,9 @@ impl McpTransportClient {
         match self {
             McpTransportClient::Stdio(client) => client.set_elicitation_handler(handler),
             McpTransportClient::ChildProcess(client) => client.set_elicitation_handler(handler),
-            McpTransportClient::InterceptedChildProcess(client) => client.set_elicitation_handler(handler),
+            McpTransportClient::InterceptedChildProcess(client) => {
+                client.set_elicitation_handler(handler)
+            }
 
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.set_elicitation_handler(handler),
@@ -579,7 +609,9 @@ impl McpTransportClient {
             #[cfg(feature = "websocket")]
             McpTransportClient::WebSocket(client) => client.set_elicitation_handler(handler),
             #[cfg(feature = "websocket")]
-            McpTransportClient::InterceptedWebSocket(client) => client.set_elicitation_handler(handler),
+            McpTransportClient::InterceptedWebSocket(client) => {
+                client.set_elicitation_handler(handler)
+            }
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.set_elicitation_handler(handler),
             #[cfg(feature = "tcp")]
@@ -622,28 +654,41 @@ impl McpTransportClient {
     /// Register a resource update handler for resource change notifications (TurboMCP 2.0)
     /// Receives notifications when subscribed resources change on the server
     #[allow(dead_code)]
-    pub fn register_resource_update_handler(&self, handler: std::sync::Arc<dyn ResourceUpdateHandler>) {
+    pub fn register_resource_update_handler(
+        &self,
+        handler: std::sync::Arc<dyn ResourceUpdateHandler>,
+    ) {
         match self {
             McpTransportClient::Stdio(client) => client.set_resource_update_handler(handler),
             McpTransportClient::ChildProcess(client) => client.set_resource_update_handler(handler),
-            McpTransportClient::InterceptedChildProcess(client) => client.set_resource_update_handler(handler),
+            McpTransportClient::InterceptedChildProcess(client) => {
+                client.set_resource_update_handler(handler)
+            }
 
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.set_resource_update_handler(handler),
             #[cfg(feature = "http")]
-            McpTransportClient::InterceptedHttp(client) => client.set_resource_update_handler(handler),
+            McpTransportClient::InterceptedHttp(client) => {
+                client.set_resource_update_handler(handler)
+            }
             #[cfg(feature = "websocket")]
             McpTransportClient::WebSocket(client) => client.set_resource_update_handler(handler),
             #[cfg(feature = "websocket")]
-            McpTransportClient::InterceptedWebSocket(client) => client.set_resource_update_handler(handler),
+            McpTransportClient::InterceptedWebSocket(client) => {
+                client.set_resource_update_handler(handler)
+            }
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.set_resource_update_handler(handler),
             #[cfg(feature = "tcp")]
-            McpTransportClient::InterceptedTcp(client) => client.set_resource_update_handler(handler),
+            McpTransportClient::InterceptedTcp(client) => {
+                client.set_resource_update_handler(handler)
+            }
             #[cfg(unix)]
             McpTransportClient::Unix(client) => client.set_resource_update_handler(handler),
             #[cfg(unix)]
-            McpTransportClient::InterceptedUnix(client) => client.set_resource_update_handler(handler),
+            McpTransportClient::InterceptedUnix(client) => {
+                client.set_resource_update_handler(handler)
+            }
         }
     }
 
@@ -704,7 +749,9 @@ impl McpTransportClient {
         match self {
             McpTransportClient::Stdio(client) => client.has_resource_update_handler(),
             McpTransportClient::ChildProcess(client) => client.has_resource_update_handler(),
-            McpTransportClient::InterceptedChildProcess(client) => client.has_resource_update_handler(),
+            McpTransportClient::InterceptedChildProcess(client) => {
+                client.has_resource_update_handler()
+            }
 
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.has_resource_update_handler(),
@@ -713,7 +760,9 @@ impl McpTransportClient {
             #[cfg(feature = "websocket")]
             McpTransportClient::WebSocket(client) => client.has_resource_update_handler(),
             #[cfg(feature = "websocket")]
-            McpTransportClient::InterceptedWebSocket(client) => client.has_resource_update_handler(),
+            McpTransportClient::InterceptedWebSocket(client) => {
+                client.has_resource_update_handler()
+            }
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.has_resource_update_handler(),
             #[cfg(feature = "tcp")]
@@ -728,58 +777,144 @@ impl McpTransportClient {
     /// Subscribe to resource updates (transport-agnostic)
     pub async fn subscribe(&self, uri: &str) -> Result<(), McpError> {
         match self {
-            McpTransportClient::Stdio(client) => { client.subscribe(uri).await?; Ok(()) }
-            McpTransportClient::ChildProcess(client) => { client.subscribe(uri).await?; Ok(()) }
-            McpTransportClient::InterceptedChildProcess(client) => { client.subscribe(uri).await?; Ok(()) }
+            McpTransportClient::Stdio(client) => {
+                client.subscribe(uri).await?;
+                Ok(())
+            }
+            McpTransportClient::ChildProcess(client) => {
+                client.subscribe(uri).await?;
+                Ok(())
+            }
+            McpTransportClient::InterceptedChildProcess(client) => {
+                client.subscribe(uri).await?;
+                Ok(())
+            }
 
             #[cfg(feature = "http")]
-            McpTransportClient::Http(client) => { client.subscribe(uri).await.map_err(|e| Self::http_error(ErrorKind::Transport, format!("HTTP subscribe failed: {}", e)))?; Ok(()) }
+            McpTransportClient::Http(client) => {
+                client.subscribe(uri).await.map_err(|e| {
+                    Self::http_error(
+                        ErrorKind::Transport,
+                        format!("HTTP subscribe failed: {}", e),
+                    )
+                })?;
+                Ok(())
+            }
             #[cfg(feature = "http")]
-            McpTransportClient::InterceptedHttp(client) => { client.subscribe(uri).await.map_err(|e| Self::http_error(ErrorKind::Transport, format!("HTTP subscribe failed: {}", e)))?; Ok(()) }
+            McpTransportClient::InterceptedHttp(client) => {
+                client.subscribe(uri).await.map_err(|e| {
+                    Self::http_error(
+                        ErrorKind::Transport,
+                        format!("HTTP subscribe failed: {}", e),
+                    )
+                })?;
+                Ok(())
+            }
 
             #[cfg(feature = "websocket")]
-            McpTransportClient::WebSocket(client) => { client.subscribe(uri).await?; Ok(()) }
+            McpTransportClient::WebSocket(client) => {
+                client.subscribe(uri).await?;
+                Ok(())
+            }
             #[cfg(feature = "websocket")]
-            McpTransportClient::InterceptedWebSocket(client) => { client.subscribe(uri).await?; Ok(()) }
+            McpTransportClient::InterceptedWebSocket(client) => {
+                client.subscribe(uri).await?;
+                Ok(())
+            }
 
             #[cfg(feature = "tcp")]
-            McpTransportClient::Tcp(client) => { client.subscribe(uri).await?; Ok(()) }
+            McpTransportClient::Tcp(client) => {
+                client.subscribe(uri).await?;
+                Ok(())
+            }
             #[cfg(feature = "tcp")]
-            McpTransportClient::InterceptedTcp(client) => { client.subscribe(uri).await?; Ok(()) }
+            McpTransportClient::InterceptedTcp(client) => {
+                client.subscribe(uri).await?;
+                Ok(())
+            }
 
             #[cfg(unix)]
-            McpTransportClient::Unix(client) => { client.subscribe(uri).await?; Ok(()) }
+            McpTransportClient::Unix(client) => {
+                client.subscribe(uri).await?;
+                Ok(())
+            }
             #[cfg(unix)]
-            McpTransportClient::InterceptedUnix(client) => { client.subscribe(uri).await?; Ok(()) }
+            McpTransportClient::InterceptedUnix(client) => {
+                client.subscribe(uri).await?;
+                Ok(())
+            }
         }
     }
 
     /// Unsubscribe from resource updates (transport-agnostic)
     pub async fn unsubscribe(&self, uri: &str) -> Result<(), McpError> {
         match self {
-            McpTransportClient::Stdio(client) => { client.unsubscribe(uri).await?; Ok(()) }
-            McpTransportClient::ChildProcess(client) => { client.unsubscribe(uri).await?; Ok(()) }
-            McpTransportClient::InterceptedChildProcess(client) => { client.unsubscribe(uri).await?; Ok(()) }
+            McpTransportClient::Stdio(client) => {
+                client.unsubscribe(uri).await?;
+                Ok(())
+            }
+            McpTransportClient::ChildProcess(client) => {
+                client.unsubscribe(uri).await?;
+                Ok(())
+            }
+            McpTransportClient::InterceptedChildProcess(client) => {
+                client.unsubscribe(uri).await?;
+                Ok(())
+            }
 
             #[cfg(feature = "http")]
-            McpTransportClient::Http(client) => { client.unsubscribe(uri).await.map_err(|e| Self::http_error(ErrorKind::Transport, format!("HTTP unsubscribe failed: {}", e)))?; Ok(()) }
+            McpTransportClient::Http(client) => {
+                client.unsubscribe(uri).await.map_err(|e| {
+                    Self::http_error(
+                        ErrorKind::Transport,
+                        format!("HTTP unsubscribe failed: {}", e),
+                    )
+                })?;
+                Ok(())
+            }
             #[cfg(feature = "http")]
-            McpTransportClient::InterceptedHttp(client) => { client.unsubscribe(uri).await.map_err(|e| Self::http_error(ErrorKind::Transport, format!("HTTP unsubscribe failed: {}", e)))?; Ok(()) }
+            McpTransportClient::InterceptedHttp(client) => {
+                client.unsubscribe(uri).await.map_err(|e| {
+                    Self::http_error(
+                        ErrorKind::Transport,
+                        format!("HTTP unsubscribe failed: {}", e),
+                    )
+                })?;
+                Ok(())
+            }
 
             #[cfg(feature = "websocket")]
-            McpTransportClient::WebSocket(client) => { client.unsubscribe(uri).await?; Ok(()) }
+            McpTransportClient::WebSocket(client) => {
+                client.unsubscribe(uri).await?;
+                Ok(())
+            }
             #[cfg(feature = "websocket")]
-            McpTransportClient::InterceptedWebSocket(client) => { client.unsubscribe(uri).await?; Ok(()) }
+            McpTransportClient::InterceptedWebSocket(client) => {
+                client.unsubscribe(uri).await?;
+                Ok(())
+            }
 
             #[cfg(feature = "tcp")]
-            McpTransportClient::Tcp(client) => { client.unsubscribe(uri).await?; Ok(()) }
+            McpTransportClient::Tcp(client) => {
+                client.unsubscribe(uri).await?;
+                Ok(())
+            }
             #[cfg(feature = "tcp")]
-            McpTransportClient::InterceptedTcp(client) => { client.unsubscribe(uri).await?; Ok(()) }
+            McpTransportClient::InterceptedTcp(client) => {
+                client.unsubscribe(uri).await?;
+                Ok(())
+            }
 
             #[cfg(unix)]
-            McpTransportClient::Unix(client) => { client.unsubscribe(uri).await?; Ok(()) }
+            McpTransportClient::Unix(client) => {
+                client.unsubscribe(uri).await?;
+                Ok(())
+            }
             #[cfg(unix)]
-            McpTransportClient::InterceptedUnix(client) => { client.unsubscribe(uri).await?; Ok(()) }
+            McpTransportClient::InterceptedUnix(client) => {
+                client.unsubscribe(uri).await?;
+                Ok(())
+            }
         }
     }
 
@@ -789,7 +924,9 @@ impl McpTransportClient {
         match self {
             McpTransportClient::Stdio(client) => client.set_progress_handler(handler),
             McpTransportClient::ChildProcess(client) => client.set_progress_handler(handler),
-            McpTransportClient::InterceptedChildProcess(client) => client.set_progress_handler(handler),
+            McpTransportClient::InterceptedChildProcess(client) => {
+                client.set_progress_handler(handler)
+            }
 
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.set_progress_handler(handler),
@@ -798,7 +935,9 @@ impl McpTransportClient {
             #[cfg(feature = "websocket")]
             McpTransportClient::WebSocket(client) => client.set_progress_handler(handler),
             #[cfg(feature = "websocket")]
-            McpTransportClient::InterceptedWebSocket(client) => client.set_progress_handler(handler),
+            McpTransportClient::InterceptedWebSocket(client) => {
+                client.set_progress_handler(handler)
+            }
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.set_progress_handler(handler),
             #[cfg(feature = "tcp")]
@@ -839,82 +978,131 @@ impl McpTransportClient {
 
     /// Register a tool list changed handler
     #[allow(dead_code)]
-    pub fn register_tool_list_changed_handler(&self, handler: std::sync::Arc<dyn ToolListChangedHandler>) {
+    pub fn register_tool_list_changed_handler(
+        &self,
+        handler: std::sync::Arc<dyn ToolListChangedHandler>,
+    ) {
         match self {
             McpTransportClient::Stdio(client) => client.set_tool_list_changed_handler(handler),
-            McpTransportClient::ChildProcess(client) => client.set_tool_list_changed_handler(handler),
-            McpTransportClient::InterceptedChildProcess(client) => client.set_tool_list_changed_handler(handler),
+            McpTransportClient::ChildProcess(client) => {
+                client.set_tool_list_changed_handler(handler)
+            }
+            McpTransportClient::InterceptedChildProcess(client) => {
+                client.set_tool_list_changed_handler(handler)
+            }
 
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.set_tool_list_changed_handler(handler),
             #[cfg(feature = "http")]
-            McpTransportClient::InterceptedHttp(client) => client.set_tool_list_changed_handler(handler),
+            McpTransportClient::InterceptedHttp(client) => {
+                client.set_tool_list_changed_handler(handler)
+            }
             #[cfg(feature = "websocket")]
             McpTransportClient::WebSocket(client) => client.set_tool_list_changed_handler(handler),
             #[cfg(feature = "websocket")]
-            McpTransportClient::InterceptedWebSocket(client) => client.set_tool_list_changed_handler(handler),
+            McpTransportClient::InterceptedWebSocket(client) => {
+                client.set_tool_list_changed_handler(handler)
+            }
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.set_tool_list_changed_handler(handler),
             #[cfg(feature = "tcp")]
-            McpTransportClient::InterceptedTcp(client) => client.set_tool_list_changed_handler(handler),
+            McpTransportClient::InterceptedTcp(client) => {
+                client.set_tool_list_changed_handler(handler)
+            }
             #[cfg(unix)]
             McpTransportClient::Unix(client) => client.set_tool_list_changed_handler(handler),
             #[cfg(unix)]
-            McpTransportClient::InterceptedUnix(client) => client.set_tool_list_changed_handler(handler),
+            McpTransportClient::InterceptedUnix(client) => {
+                client.set_tool_list_changed_handler(handler)
+            }
         }
     }
 
     /// Register a prompt list changed handler
     #[allow(dead_code)]
-    pub fn register_prompt_list_changed_handler(&self, handler: std::sync::Arc<dyn PromptListChangedHandler>) {
+    pub fn register_prompt_list_changed_handler(
+        &self,
+        handler: std::sync::Arc<dyn PromptListChangedHandler>,
+    ) {
         match self {
             McpTransportClient::Stdio(client) => client.set_prompt_list_changed_handler(handler),
-            McpTransportClient::ChildProcess(client) => client.set_prompt_list_changed_handler(handler),
-            McpTransportClient::InterceptedChildProcess(client) => client.set_prompt_list_changed_handler(handler),
+            McpTransportClient::ChildProcess(client) => {
+                client.set_prompt_list_changed_handler(handler)
+            }
+            McpTransportClient::InterceptedChildProcess(client) => {
+                client.set_prompt_list_changed_handler(handler)
+            }
 
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.set_prompt_list_changed_handler(handler),
             #[cfg(feature = "http")]
-            McpTransportClient::InterceptedHttp(client) => client.set_prompt_list_changed_handler(handler),
+            McpTransportClient::InterceptedHttp(client) => {
+                client.set_prompt_list_changed_handler(handler)
+            }
             #[cfg(feature = "websocket")]
-            McpTransportClient::WebSocket(client) => client.set_prompt_list_changed_handler(handler),
+            McpTransportClient::WebSocket(client) => {
+                client.set_prompt_list_changed_handler(handler)
+            }
             #[cfg(feature = "websocket")]
-            McpTransportClient::InterceptedWebSocket(client) => client.set_prompt_list_changed_handler(handler),
+            McpTransportClient::InterceptedWebSocket(client) => {
+                client.set_prompt_list_changed_handler(handler)
+            }
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.set_prompt_list_changed_handler(handler),
             #[cfg(feature = "tcp")]
-            McpTransportClient::InterceptedTcp(client) => client.set_prompt_list_changed_handler(handler),
+            McpTransportClient::InterceptedTcp(client) => {
+                client.set_prompt_list_changed_handler(handler)
+            }
             #[cfg(unix)]
             McpTransportClient::Unix(client) => client.set_prompt_list_changed_handler(handler),
             #[cfg(unix)]
-            McpTransportClient::InterceptedUnix(client) => client.set_prompt_list_changed_handler(handler),
+            McpTransportClient::InterceptedUnix(client) => {
+                client.set_prompt_list_changed_handler(handler)
+            }
         }
     }
 
     /// Register a resource list changed handler
     #[allow(dead_code)]
-    pub fn register_resource_list_changed_handler(&self, handler: std::sync::Arc<dyn ResourceListChangedHandler>) {
+    pub fn register_resource_list_changed_handler(
+        &self,
+        handler: std::sync::Arc<dyn ResourceListChangedHandler>,
+    ) {
         match self {
             McpTransportClient::Stdio(client) => client.set_resource_list_changed_handler(handler),
-            McpTransportClient::ChildProcess(client) => client.set_resource_list_changed_handler(handler),
-            McpTransportClient::InterceptedChildProcess(client) => client.set_resource_list_changed_handler(handler),
+            McpTransportClient::ChildProcess(client) => {
+                client.set_resource_list_changed_handler(handler)
+            }
+            McpTransportClient::InterceptedChildProcess(client) => {
+                client.set_resource_list_changed_handler(handler)
+            }
 
             #[cfg(feature = "http")]
             McpTransportClient::Http(client) => client.set_resource_list_changed_handler(handler),
             #[cfg(feature = "http")]
-            McpTransportClient::InterceptedHttp(client) => client.set_resource_list_changed_handler(handler),
+            McpTransportClient::InterceptedHttp(client) => {
+                client.set_resource_list_changed_handler(handler)
+            }
             #[cfg(feature = "websocket")]
-            McpTransportClient::WebSocket(client) => client.set_resource_list_changed_handler(handler),
+            McpTransportClient::WebSocket(client) => {
+                client.set_resource_list_changed_handler(handler)
+            }
             #[cfg(feature = "websocket")]
-            McpTransportClient::InterceptedWebSocket(client) => client.set_resource_list_changed_handler(handler),
+            McpTransportClient::InterceptedWebSocket(client) => {
+                client.set_resource_list_changed_handler(handler)
+            }
             #[cfg(feature = "tcp")]
             McpTransportClient::Tcp(client) => client.set_resource_list_changed_handler(handler),
             #[cfg(feature = "tcp")]
-            McpTransportClient::InterceptedTcp(client) => client.set_resource_list_changed_handler(handler),
+            McpTransportClient::InterceptedTcp(client) => {
+                client.set_resource_list_changed_handler(handler)
+            }
             #[cfg(unix)]
             McpTransportClient::Unix(client) => client.set_resource_list_changed_handler(handler),
             #[cfg(unix)]
-            McpTransportClient::InterceptedUnix(client) => client.set_resource_list_changed_handler(handler),
+            McpTransportClient::InterceptedUnix(client) => {
+                client.set_resource_list_changed_handler(handler)
+            }
         }
     }
 

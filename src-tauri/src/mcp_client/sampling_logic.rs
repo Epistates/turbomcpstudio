@@ -10,7 +10,9 @@ use crate::error::{McpResult, McpStudioError};
 use crate::mcp_client::connection::ManagedConnection;
 use std::sync::Arc;
 use turbomcp_client::sampling::SamplingHandler; // Import trait for method availability
-use turbomcp_protocol::types::{ContentBlock, CreateMessageRequest, Role, SamplingMessage, TextContent};
+use turbomcp_protocol::types::{
+    ContentBlock, CreateMessageRequest, Role, SamplingMessage, TextContent,
+};
 use uuid::Uuid;
 
 /// Sampling Logic Operations

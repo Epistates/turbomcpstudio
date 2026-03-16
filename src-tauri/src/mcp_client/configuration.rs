@@ -44,19 +44,19 @@ impl Configuration {
 
         // Circuit breaker for cascade failure protection
         let circuit_config = CircuitBreakerConfig {
-            failure_threshold: 5,      // Open after 5 failures
-            success_threshold: 2,      // Close after 2 successes in half-open
+            failure_threshold: 5,             // Open after 5 failures
+            success_threshold: 2,             // Close after 2 successes in half-open
             timeout: Duration::from_secs(30), // Stay open for 30s before half-open
-            rolling_window_size: 100,  // Track last 100 requests
-            minimum_requests: 10,      // Minimum requests before opening
+            rolling_window_size: 100,         // Track last 100 requests
+            minimum_requests: 10,             // Minimum requests before opening
         };
 
         // Health check config for connection monitoring
         let health_config = HealthCheckConfig {
-            interval: Duration::from_secs(30),  // Check every 30s
-            timeout: Duration::from_secs(5),    // 5s timeout for health check
-            failure_threshold: 3,               // Unhealthy after 3 failed checks
-            success_threshold: 1,               // Healthy after 1 success
+            interval: Duration::from_secs(30), // Check every 30s
+            timeout: Duration::from_secs(5),   // 5s timeout for health check
+            failure_threshold: 3,              // Unhealthy after 3 failed checks
+            success_threshold: 1,              // Healthy after 1 success
             custom_check: None,
         };
 

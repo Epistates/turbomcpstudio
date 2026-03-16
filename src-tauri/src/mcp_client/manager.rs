@@ -55,8 +55,7 @@ use super::misc_operations::MiscOperations;
 use super::monitoring_loop::MonitoringLoop;
 use super::notification_handlers::{
     StudioLogHandler, StudioProgressHandler, StudioPromptListChangedHandler,
-    StudioResourceListChangedHandler, StudioResourceUpdateHandler,
-    StudioToolListChangedHandler,
+    StudioResourceListChangedHandler, StudioResourceUpdateHandler, StudioToolListChangedHandler,
 };
 use super::process::ManagedProcess;
 use super::rate_limiter::RateLimiter;
@@ -134,15 +133,19 @@ impl McpClientManager {
         let log_handler = Arc::new(StudioLogHandler::new(app_handle.clone()));
 
         // Initialize resource update handler for resource change notifications
-        let resource_update_handler = Arc::new(StudioResourceUpdateHandler::new(app_handle.clone()));
+        let resource_update_handler =
+            Arc::new(StudioResourceUpdateHandler::new(app_handle.clone()));
 
         // Initialize progress handler for progress notifications
         let progress_handler = Arc::new(StudioProgressHandler::new(app_handle.clone()));
 
         // Initialize list changed handlers
-        let tool_list_changed_handler = Arc::new(StudioToolListChangedHandler::new(app_handle.clone()));
-        let prompt_list_changed_handler = Arc::new(StudioPromptListChangedHandler::new(app_handle.clone()));
-        let resource_list_changed_handler = Arc::new(StudioResourceListChangedHandler::new(app_handle.clone()));
+        let tool_list_changed_handler =
+            Arc::new(StudioToolListChangedHandler::new(app_handle.clone()));
+        let prompt_list_changed_handler =
+            Arc::new(StudioPromptListChangedHandler::new(app_handle.clone()));
+        let resource_list_changed_handler =
+            Arc::new(StudioResourceListChangedHandler::new(app_handle.clone()));
 
         // Initialize rate limiter (100 requests per minute per server, disabled in dev mode)
         let rate_limiter = Arc::new(RateLimiter::new(100, 60));
@@ -695,20 +698,12 @@ impl McpClientManager {
     // ========================================================================
 
     /// Subscribe to resource updates on an MCP server
-    pub async fn subscribe_resource(
-        &self,
-        server_id: Uuid,
-        uri: String,
-    ) -> McpResult<()> {
+    pub async fn subscribe_resource(&self, server_id: Uuid, uri: String) -> McpResult<()> {
         McpOperations::subscribe_resource(&self.connections, server_id, &uri).await
     }
 
     /// Unsubscribe from resource updates on an MCP server
-    pub async fn unsubscribe_resource(
-        &self,
-        server_id: Uuid,
-        uri: String,
-    ) -> McpResult<()> {
+    pub async fn unsubscribe_resource(&self, server_id: Uuid, uri: String) -> McpResult<()> {
         McpOperations::unsubscribe_resource(&self.connections, server_id, &uri).await
     }
 

@@ -46,10 +46,9 @@ impl ElicitationHandler for ContextAwareElicitationHandler {
 
         Box::pin(async move {
             CURRENT_SERVER_CONTEXT
-                .scope(
-                    context,
-                    async move { inner.handle_elicitation_internal(request).await },
-                )
+                .scope(context, async move {
+                    inner.handle_elicitation_internal(request).await
+                })
                 .await
         })
     }
