@@ -61,13 +61,16 @@ turbomcp-types = "3.0.4"
 turbomcp-auth = { version = "3.0.4", features = ["oauth2", "jwt", "token-refresh"] }
 turbomcp-dpop = { version = "3.0.4", optional = true }
 turbomcp-proxy = { version = "3.0.4", default-features = false, features = ["introspection", "runtime"] }
-turbomcp-transport = { version = "3.0.4", default-features = false, features = ["stdio", "http", "websocket", "tcp", "unix"] }
+turbomcp-transport = { version = "3.0.4", default-features = false, features = ["stdio", "http", "websocket", "tcp"] }
 turbomcp-stdio = "3.0.4"
 turbomcp-http = "3.0.4"
 turbomcp-websocket = "3.0.4"
 turbomcp-tcp = "3.0.4"
-turbomcp-unix = "3.0.4"
 turbomcp-transport-traits = "3.0.4"
+
+# Unix socket transport — only available on Unix platforms (macOS, Linux)
+[target.'cfg(unix)'.dependencies]
+turbomcp-unix = "3.0.4"
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }

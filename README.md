@@ -24,7 +24,7 @@ A native desktop application for developing, testing, and debugging Model Contex
 - **Protocol Inspector** — Real-time message tracing with latency tracking and filtering
 - **OAuth 2.1 Built-in** — PKCE, token refresh, and provider templates for secured MCP servers
 - **Sampling & Elicitation** — Human-in-the-loop approval for LLM sampling requests
-- **Cross-Platform** — Single codebase for macOS, Windows, and Linux
+- **Cross-Platform** — macOS, Windows, and Linux from a single codebase (Unix sockets on macOS/Linux, TCP/HTTP/WebSocket everywhere)
 - **Developer-Friendly** — Think Postman, but for MCP servers
 
 ## Quick Start
@@ -42,6 +42,8 @@ A native desktop application for developing, testing, and debugging Model Contex
 - Profile-based configuration with server groups and persistence
 - Health monitoring with automatic reconnection and status tracking
 - Rate limiting (configurable per-server) to protect upstream services
+
+<img src="static/screenshot-profile.png" alt="TurboMCP Studio Profiles" style="width: 100%; max-width: 100%; margin: 20px 0;"/>
 
 ### Developer Tools
 - **Tool Explorer** — Discover, inspect, and invoke MCP tools with schema validation
@@ -78,7 +80,14 @@ A native desktop application for developing, testing, and debugging Model Contex
 
 ### Pre-built Binaries
 
-Pre-built binaries for macOS, Windows, and Linux are planned. For now, build from source (see below).
+Download the latest release for your platform from [GitHub Releases](https://github.com/Epistates/turbomcpstudio/releases/latest):
+
+| Platform | Format |
+|----------|--------|
+| macOS (Apple Silicon) | `.dmg` or `.app` (signed + notarized) |
+| macOS (Intel) | `.dmg` or `.app` (signed + notarized) |
+| Windows | `.msi` installer |
+| Linux | `.AppImage` or `.deb` |
 
 ## Building from Source
 
@@ -577,4 +586,4 @@ TurboMCP Studio is powered by **[TurboMCP](https://github.com/Epistates/turbomcp
 
 ---
 
-**Status**: v0.1.0 — Active development. Contributions welcome.
+**Status**: v0.1.0 — Actively developed. Contributions welcome.
