@@ -287,8 +287,7 @@ pub async fn get_server_templates() -> Result<Vec<ServerTemplate>, String> {
                 "TurboMCP hello world example server with production-grade transport implementation"
                     .to_string(),
             transport: TransportConfig::Stdio {
-                command: "/Users/nickpaterno/work/turbomcp/target/release/examples/01_hello_world"
-                    .to_string(),
+                command: "/path/to/your/mcp-server".to_string(),
                 args: vec![],
                 working_directory: None,
             },

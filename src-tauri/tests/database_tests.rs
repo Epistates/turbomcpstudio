@@ -1,3 +1,11 @@
+//! # Database Tests
+//!
+//! IMPORTANT: These tests recreate the database schema manually rather than using
+//! Database::new_with_full_migration(). If the migration logic in database.rs changes,
+//! these tests may pass while the real migration breaks.
+//!
+//! TODO: Refactor to use the real Database initialization path.
+
 /// Database Tests for TurboMCP Studio Backend
 ///
 /// Tests database migrations, schema integrity, and query correctness

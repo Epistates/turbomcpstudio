@@ -1,20 +1,15 @@
-/// DPoP (Demonstration of Proof-of-Possession) Manager
-///
-/// Implements RFC 9449 for enhanced OAuth 2.0 security through token binding.
-///
-/// DPoP provides:
-/// - Cryptographic proof that the client presenting a token is the same client
-///   that the token was issued to
-/// - Protection against token theft and replay attacks
-/// - ES256 (ECDSA with P-256 and SHA-256) signature algorithm
-///
-/// This module is optional and only compiled when the "dpop" feature is enabled.
-/// Most OAuth servers don't require DPoP, but it's supported by:
-/// - Microsoft Azure AD / Entra ID
-/// - Some custom enterprise OAuth implementations
-///
-/// Note: This is a placeholder implementation. Full DPoP support would integrate
-/// with the turbomcp-dpop crate when available.
+//! DPoP (Demonstrating Proof-of-Possession) - PLACEHOLDER IMPLEMENTATION
+//!
+//! WARNING: This module does NOT implement DPoP (RFC 9449). The `generate_key_pair`
+//! and `generate_proof` functions return errors to prevent callers from believing
+//! DPoP binding is active when it is not. Do not enable `use_dpop` in OAuth
+//! configurations until a real implementation is provided.
+//!
+//! When implemented, this module will provide:
+//! - Cryptographic proof that the client presenting a token is the same client
+//!   that the token was issued to
+//! - Protection against token theft and replay attacks
+//! - ES256 (ECDSA with P-256 and SHA-256) signature algorithm
 
 #[cfg(feature = "dpop")]
 use parking_lot::RwLock;
@@ -65,26 +60,16 @@ impl DPoPManager {
     /// * `server_id` - Unique identifier for the MCP server
     ///
     /// # Returns
-    /// JWK thumbprint (jkt) of the generated key pair
+    /// Error — DPoP key generation is not yet implemented.
     pub async fn generate_key_pair(&self, server_id: i64) -> McpResult<String> {
-        // In a real implementation, this would use turbomcp-dpop to generate
-        // an ES256 key pair. For now, this is a placeholder.
-        tracing::warn!(
-            "DPoP key generation is not yet implemented. Using placeholder for server {}",
+        tracing::error!(
+            "DPoP key generation is a placeholder — DPoP binding is NOT active (server {})",
             server_id
         );
-
-        let key_pair = DPoPKeyPair {
-            thumbprint: format!("dpop_jkt_{}", server_id),
-            public_key: "placeholder_public_key".to_string(),
-            private_key: "placeholder_private_key".to_string(),
-            created_at: chrono::Utc::now().timestamp(),
-        };
-
-        let thumbprint = key_pair.thumbprint.clone();
-        self.key_pairs.write().insert(server_id, key_pair);
-
-        Ok(thumbprint)
+        Err(McpError::new(
+            ErrorKind::Internal,
+            "DPoP is not yet implemented. Disable use_dpop in your OAuth configuration.",
+        ))
     }
 
     /// Generate a DPoP proof for a request
@@ -96,7 +81,7 @@ impl DPoPManager {
     /// * `access_token` - Optional access token to bind proof to
     ///
     /// # Returns
-    /// DPoP proof JWT to be sent in DPoP header
+    /// Error — DPoP proof generation is not yet implemented.
     pub async fn generate_proof(
         &self,
         server_id: i64,
@@ -104,31 +89,10 @@ impl DPoPManager {
         htu: &str,
         access_token: Option<&str>,
     ) -> McpResult<String> {
-        let key_pairs = self.key_pairs.read();
-        let _key_pair = key_pairs.get(&server_id).ok_or_else(|| {
-            McpError::new(
-                ErrorKind::Internal,
-                format!("No DPoP key pair found for server {}", server_id),
-            )
-        })?;
-
-        // In a real implementation, this would:
-        // 1. Create a DPoP JWT header with jwk and typ
-        // 2. Create a DPoP JWT payload with htm, htu, iat, jti, and optionally ath
-        // 3. Sign with ES256 using the private key
-        // 4. Return the signed JWT
-        tracing::warn!(
-            "DPoP proof generation is not yet implemented. Generating placeholder for {} {}",
-            htm,
-            htu
-        );
-
-        let _ = access_token; // Suppress unused warning
-
-        // Placeholder JWT structure (not a valid signature)
-        Ok(format!(
-            "eyJhbGciOiJFUzI1NiIsInR5cCI6ImRwb3Arand0In0.placeholder_payload_{}.placeholder_signature",
-            server_id
+        let _ = (server_id, htm, htu, access_token); // Suppress unused warnings
+        Err(McpError::new(
+            ErrorKind::Internal,
+            "DPoP is not yet implemented. Disable use_dpop in your OAuth configuration.",
         ))
     }
 
@@ -187,34 +151,29 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_generate_key_pair() {
+    async fn test_generate_key_pair_returns_err() {
+        // DPoP is a placeholder — key generation must return an error to
+        // prevent callers from believing DPoP binding is active.
         let manager = DPoPManager::new();
-        let thumbprint = manager.generate_key_pair(1).await.unwrap();
-        assert!(!thumbprint.is_empty());
-        assert!(manager.has_key_pair(1));
+        let result = manager.generate_key_pair(1).await;
+        assert!(result.is_err(), "Expected generate_key_pair to return Err");
+        assert!(!manager.has_key_pair(1));
     }
 
     #[tokio::test]
-    async fn test_generate_proof() {
+    async fn test_generate_proof_returns_err() {
         let manager = DPoPManager::new();
-        manager.generate_key_pair(1).await.unwrap();
-
-        let proof = manager
+        let result = manager
             .generate_proof(1, "POST", "https://example.com/api", None)
-            .await
-            .unwrap();
-
-        assert!(!proof.is_empty());
-        // Placeholder JWT format
-        assert!(proof.starts_with("eyJ"));
+            .await;
+        assert!(result.is_err(), "Expected generate_proof to return Err");
     }
 
     #[tokio::test]
     async fn test_delete_key_pair() {
         let manager = DPoPManager::new();
-        manager.generate_key_pair(1).await.unwrap();
-        assert!(manager.has_key_pair(1));
-
+        // generate_key_pair now returns Err, so no key is inserted
+        assert!(!manager.has_key_pair(1));
         manager.delete_key_pair(1).await.unwrap();
         assert!(!manager.has_key_pair(1));
     }

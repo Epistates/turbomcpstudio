@@ -210,11 +210,14 @@ pub async fn export_oauth_config(
                 McpStudioError::ConfigError(format!("No OAuth config found for server {}", server_id))
             })?;
 
-        // Create export format (Claude Desktop compatible)
+        // Create export format (Claude Desktop compatible).
+        // client_secret is intentionally replaced with a placeholder: secrets
+        // must never be written to export files — the user must enter the
+        // secret manually after importing the config into another environment.
         let export_data = serde_json::json!({
             "oauth": {
                 "client_id": config.client_id,
-                "client_secret": config.client_secret,
+                "client_secret": "<REDACTED - enter manually>",
                 "auth_url": config.auth_server_url,
                 "token_url": config.token_endpoint,
                 "redirect_uri": config.redirect_uri,

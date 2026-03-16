@@ -10,6 +10,74 @@ use tauri::Manager;
 
 use serde::{Deserialize, Serialize};
 
+/// Validate a base URL intended for LLM API requests.
+///
+/// Enforces:
+/// - Only `http` or `https` schemes (file:// and others are rejected outright)
+/// - Private IP ranges and link-local addresses are warned but ALLOWED when scheme is https
+/// - Plain `http://` to non-localhost hosts emits a warning but is ALLOWED (developer tool)
+/// - `http://localhost` and `http://127.0.0.1` are always allowed silently
+fn validate_llm_url(base_url: &str) -> Result<(), String> {
+    let parsed = url::Url::parse(base_url)
+        .map_err(|e| format!("Invalid URL '{}': {}", base_url, e))?;
+
+    let scheme = parsed.scheme();
+
+    // Reject file:// and any non-http/https scheme entirely
+    if scheme == "file" {
+        return Err("file:// URLs are not permitted for LLM API access".to_string());
+    }
+    if scheme != "http" && scheme != "https" {
+        return Err(format!(
+            "Unsupported URL scheme '{}'. Only http and https are allowed.",
+            scheme
+        ));
+    }
+
+    let host = parsed.host_str().unwrap_or("");
+
+    // Determine if the host is localhost or the loopback address
+    let is_local = host == "localhost" || host == "127.0.0.1";
+
+    // Classify private / link-local ranges
+    let is_private = {
+        // Attempt to parse as an IPv4 address for range checks
+        if let Ok(addr) = host.parse::<std::net::Ipv4Addr>() {
+            let octets = addr.octets();
+            // 10.0.0.0/8
+            let is_10 = octets[0] == 10;
+            // 172.16.0.0/12
+            let is_172 = octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31;
+            // 192.168.0.0/16
+            let is_192 = octets[0] == 192 && octets[1] == 168;
+            // 169.254.0.0/16 (link-local)
+            let is_link_local = octets[0] == 169 && octets[1] == 254;
+            is_10 || is_172 || is_192 || is_link_local
+        } else {
+            false
+        }
+    };
+
+    if scheme == "http" {
+        if is_private {
+            tracing::warn!(
+                "Warning: Using unencrypted HTTP connection to private/link-local address {}. \
+                 Consider using HTTPS for production servers.",
+                host
+            );
+        } else if !is_local {
+            tracing::warn!(
+                "Warning: Using unencrypted HTTP connection to {}. \
+                 Consider using HTTPS for production servers.",
+                host
+            );
+        }
+        // localhost / 127.0.0.1 over http is fine — no warning needed
+    }
+
+    Ok(())
+}
+
 /// Application paths response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppPaths {
@@ -66,6 +134,7 @@ pub async fn get_app_paths(app_handle: tauri::AppHandle) -> Result<AppPaths, Str
 /// Fetch available models from LLM API (avoids CORS issues)
 #[tauri::command]
 pub async fn fetch_llm_models(base_url: String) -> Result<Value, String> {
+    validate_llm_url(&base_url)?;
     let client = reqwest::Client::new();
     // Handle base URL properly - if it already ends with /v1, just add /models
     let base = base_url.trim_end_matches('/');
@@ -100,6 +169,10 @@ pub async fn llm_completion_request(
     max_tokens: Option<i32>,
     temperature: Option<f32>,
 ) -> Result<Value, String> {
+    validate_llm_url(&base_url)?;
+    if !api_key.is_empty() {
+        tracing::debug!("API key received via IPC");
+    }
     let client = reqwest::Client::new();
     // Handle baseUrl that may or may not already include /v1
     let base = base_url.trim_end_matches('/');

@@ -391,6 +391,21 @@ impl OAuthFlowManager {
             .as_ref()
             .ok_or_else(|| McpError::invalid_params("Token endpoint not configured"))?;
 
+        // Warn if token exchange is occurring over unencrypted HTTP to a
+        // non-localhost host; credentials may be exposed on the network.
+        if let Ok(endpoint_url) = url::Url::parse(token_endpoint) {
+            let host = endpoint_url.host_str().unwrap_or("");
+            let is_local = host == "localhost" || host == "127.0.0.1";
+            if endpoint_url.scheme() == "http" && !is_local {
+                tracing::warn!(
+                    "Security warning: Token exchange using unencrypted HTTP to {}. \
+                     Credentials may be exposed on the network. \
+                     Use HTTPS for production OAuth servers.",
+                    host
+                );
+            }
+        }
+
         let mut params = vec![
             ("grant_type", "authorization_code"),
             ("code", code),
@@ -498,6 +513,21 @@ impl OAuthFlowManager {
             .ok_or_else(|| McpError::invalid_params("Token endpoint not configured"))?;
 
         tracing::info!("Refreshing OAuth token for server {}", server_id);
+
+        // Warn if token refresh is occurring over unencrypted HTTP to a
+        // non-localhost host; credentials may be exposed on the network.
+        if let Ok(endpoint_url) = url::Url::parse(token_endpoint) {
+            let host = endpoint_url.host_str().unwrap_or("");
+            let is_local = host == "localhost" || host == "127.0.0.1";
+            if endpoint_url.scheme() == "http" && !is_local {
+                tracing::warn!(
+                    "Security warning: Token exchange using unencrypted HTTP to {}. \
+                     Credentials may be exposed on the network. \
+                     Use HTTPS for production OAuth servers.",
+                    host
+                );
+            }
+        }
 
         // Build refresh request
         let mut params = vec![

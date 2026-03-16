@@ -2,6 +2,20 @@
 //!
 //! This test verifies that the InterceptedTransport correctly captures
 //! all MCP protocol messages for the Protocol Inspector.
+//!
+//! # Running locally
+//!
+//! These tests require an external `turbomcp-demo` binary. They are skipped
+//! in CI by default. To run them locally:
+//!
+//! ```sh
+//! TURBOMCP_DEMO_PATH=/path/to/turbomcp-demo cargo test -- --ignored
+//! ```
+//!
+//! If `TURBOMCP_DEMO_PATH` is not set, the tests fall back to a path derived
+//! from `CARGO_MANIFEST_DIR` (i.e. `../../turbomcp/target/release/turbomcp-demo`
+//! relative to the manifest). The tests will still be skipped gracefully if
+//! neither resolves to an executable file.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -10,11 +24,50 @@ use turbomcp_client::Client;
 use turbomcp_transport::{ChildProcessTransport, Transport, child_process::ChildProcessConfig};
 use turbomcpstudio_lib::interceptor::{InterceptedTransport, Direction};
 
+/// Resolve the path to the turbomcp-demo binary.
+///
+/// Resolution order:
+/// 1. `TURBOMCP_DEMO_PATH` environment variable
+/// 2. Sibling directory heuristic: `<CARGO_MANIFEST_DIR>/../../turbomcp/target/release/turbomcp-demo`
+///
+/// Returns `None` when neither resolves to an existing file.
+fn resolve_demo_path() -> Option<String> {
+    // 1. Explicit override via environment variable (required in CI if ever enabled)
+    if let Ok(path) = std::env::var("TURBOMCP_DEMO_PATH") {
+        if std::path::Path::new(&path).exists() {
+            return Some(path);
+        }
+    }
+
+    // 2. Heuristic: look two levels above the crate manifest
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let heuristic = std::path::PathBuf::from(manifest_dir)
+        .join("../../turbomcp/target/release/turbomcp-demo");
+
+    if heuristic.exists() {
+        return Some(heuristic.to_string_lossy().into_owned());
+    }
+
+    None
+}
+
 #[tokio::test]
+#[ignore = "requires external turbomcp-demo binary — set TURBOMCP_DEMO_PATH env var"]
 async fn test_interceptor_captures_stdio_messages() {
+    let demo_path = match resolve_demo_path() {
+        Some(p) => p,
+        None => {
+            eprintln!(
+                "Skipping test: turbomcp-demo binary not found. \
+                 Set TURBOMCP_DEMO_PATH to the binary path to run this test."
+            );
+            return;
+        }
+    };
+
     // Create a ChildProcessTransport to the demo server
     let config = ChildProcessConfig {
-        command: "/Users/nickpaterno/work/turbomcp/target/release/turbomcp-demo".to_string(),
+        command: demo_path,
         args: vec![],
         working_directory: None,
         environment: Some(vec![("RUST_LOG".to_string(), "".to_string())]),
@@ -54,7 +107,7 @@ async fn test_interceptor_captures_stdio_messages() {
     let init_result = client.initialize().await;
     assert!(init_result.is_ok(), "Failed to initialize: {:?}", init_result);
 
-    println!("✅ MCP handshake completed");
+    println!("MCP handshake completed");
 
     // Give collector a moment to process messages
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -70,8 +123,8 @@ async fn test_interceptor_captures_stdio_messages() {
 
     for (i, (direction, payload)) in captured.iter().enumerate() {
         let direction_str = match direction {
-            Direction::Outgoing => "→ OUTGOING",
-            Direction::Incoming => "← INCOMING",
+            Direction::Outgoing => "-> OUTGOING",
+            Direction::Incoming => "<- INCOMING",
         };
 
         let payload_str = String::from_utf8_lossy(payload);
@@ -101,18 +154,30 @@ async fn test_interceptor_captures_stdio_messages() {
     assert!(has_outgoing, "Should have captured at least one outgoing message");
     assert!(has_incoming, "Should have captured at least one incoming message");
 
-    println!("✅ Interceptor successfully captured bidirectional MCP protocol messages!");
+    println!("Interceptor successfully captured bidirectional MCP protocol messages!");
 
     // Shutdown client
     let _ = client.shutdown().await;
 }
 
 #[tokio::test]
+#[ignore = "requires external turbomcp-demo binary — set TURBOMCP_DEMO_PATH env var"]
 async fn test_interceptor_zero_copy_verification() {
     // This test verifies that the Arc-based zero-copy design works correctly
 
+    let demo_path = match resolve_demo_path() {
+        Some(p) => p,
+        None => {
+            eprintln!(
+                "Skipping test: turbomcp-demo binary not found. \
+                 Set TURBOMCP_DEMO_PATH to the binary path to run this test."
+            );
+            return;
+        }
+    };
+
     let config = ChildProcessConfig {
-        command: "/Users/nickpaterno/work/turbomcp/target/release/turbomcp-demo".to_string(),
+        command: demo_path,
         args: vec![],
         working_directory: None,
         environment: Some(vec![("RUST_LOG".to_string(), "".to_string())]),
@@ -141,7 +206,7 @@ async fn test_interceptor_zero_copy_verification() {
 
         // The message payload uses Bytes which is already zero-copy
         println!("Message payload size: {} bytes", msg.message.payload.len());
-        println!("✅ Zero-copy verification passed!");
+        println!("Zero-copy verification passed!");
     }
 
     let _ = client.shutdown().await;

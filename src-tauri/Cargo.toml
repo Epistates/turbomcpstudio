@@ -48,26 +48,26 @@ jsonwebtoken = "9.3"
 axum = "0.8"
 sysinfo = "0.33"
 regex = "1.10"
-rand = "0.8"
+rand = "0.8" # TODO: Consider upgrading to rand 0.9
 sha2 = "0.10"
 open = "5.0"
 dirs = "5.0"
 log = "0.4"
 
 # TurboMCP integration - v3.0.4 (progress handler + pagination)
-turbomcp-client = { path = "../../turbomcp/crates/turbomcp-client" }
-turbomcp-protocol = { path = "../../turbomcp/crates/turbomcp-protocol" }
-turbomcp-types = { path = "../../turbomcp/crates/turbomcp-types" }
-turbomcp-auth = { path = "../../turbomcp/crates/turbomcp-auth", features = ["oauth2", "jwt", "token-refresh"] }
-turbomcp-dpop = { path = "../../turbomcp/crates/turbomcp-dpop", optional = true }
-turbomcp-proxy = { path = "../../turbomcp/crates/turbomcp-proxy", default-features = false, features = ["introspection", "runtime"] }
-turbomcp-transport = { path = "../../turbomcp/crates/turbomcp-transport", default-features = false, features = ["stdio", "http", "websocket", "tcp", "unix"] }
-turbomcp-stdio = { path = "../../turbomcp/crates/turbomcp-stdio" }
-turbomcp-http = { path = "../../turbomcp/crates/turbomcp-http" }
-turbomcp-websocket = { path = "../../turbomcp/crates/turbomcp-websocket" }
-turbomcp-tcp = { path = "../../turbomcp/crates/turbomcp-tcp" }
-turbomcp-unix = { path = "../../turbomcp/crates/turbomcp-unix" }
-turbomcp-transport-traits = { path = "../../turbomcp/crates/turbomcp-transport-traits" }
+turbomcp-client = "3.0.4"
+turbomcp-protocol = "3.0.4"
+turbomcp-types = "3.0.4"
+turbomcp-auth = { version = "3.0.4", features = ["oauth2", "jwt", "token-refresh"] }
+turbomcp-dpop = { version = "3.0.4", optional = true }
+turbomcp-proxy = { version = "3.0.4", default-features = false, features = ["introspection", "runtime"] }
+turbomcp-transport = { version = "3.0.4", default-features = false, features = ["stdio", "http", "websocket", "tcp", "unix"] }
+turbomcp-stdio = "3.0.4"
+turbomcp-http = "3.0.4"
+turbomcp-websocket = "3.0.4"
+turbomcp-tcp = "3.0.4"
+turbomcp-unix = "3.0.4"
+turbomcp-transport-traits = "3.0.4"
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }

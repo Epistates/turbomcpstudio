@@ -1,3 +1,10 @@
+//! # Monitoring Tests
+//!
+//! WARNING: These tests validate Arc/DashMap sharing patterns using MockConnectionManager,
+//! NOT the real McpClientManager. Changes to McpClientManager are not covered.
+//!
+//! TODO: Add integration tests for real connection state transitions and health checks.
+
 use dashmap::DashMap;
 /// Connection Monitoring Tests for TurboMCP Studio Backend
 ///

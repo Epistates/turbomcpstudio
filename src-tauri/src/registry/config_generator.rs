@@ -455,8 +455,11 @@ fn resolve_template(
 ) -> String {
     let mut result = template.to_string();
 
-    // Find all {{...}} patterns
-    let re = regex::Regex::new(r"\{\{([^}]+)\}\}").unwrap();
+    // Find all {{...}} patterns — compiled once via OnceLock to avoid per-call allocation
+    static TEMPLATE_REGEX: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re = TEMPLATE_REGEX.get_or_init(|| {
+        regex::Regex::new(r"\{\{([^}]+)\}\}").expect("template variable regex is valid")
+    });
 
     for cap in re.captures_iter(template) {
         if let Some(matched) = cap.get(1) {

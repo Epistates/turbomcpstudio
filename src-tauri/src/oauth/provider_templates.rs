@@ -203,8 +203,12 @@ pub fn validate_manual_config(
     }
 
     // Validate HTTPS (except localhost for testing)
-    let auth_url = url::Url::parse(authorization_endpoint).unwrap();
-    let token_url = url::Url::parse(token_endpoint).unwrap();
+    // Both URLs were already validated above via Url::parse, so these cannot
+    // fail; use map_err instead of unwrap to avoid a potential panic.
+    let auth_url = url::Url::parse(authorization_endpoint)
+        .map_err(|e| format!("Invalid authorization endpoint URL: {}", e))?;
+    let token_url = url::Url::parse(token_endpoint)
+        .map_err(|e| format!("Invalid token endpoint URL: {}", e))?;
 
     if auth_url.scheme() != "https"
         && auth_url.host_str() != Some("localhost")

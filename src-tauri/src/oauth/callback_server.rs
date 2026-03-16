@@ -14,6 +14,7 @@
 use axum::{extract::Query, response::Html, routing::get, Router};
 use parking_lot::Mutex;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::oneshot;
 use turbomcp_protocol::{Error as McpError, ErrorKind, Result as McpResult};
 
@@ -37,6 +38,9 @@ pub struct CallbackParams {
 /// (port 0 strategy) so that there are no conflicts with other processes.
 /// Uses a oneshot channel to notify the OAuth flow manager when a callback
 /// is received.
+///
+/// Note: Only one OAuth flow can be pending at a time. Starting a new flow
+/// while one is active will cancel the previous flow.
 pub struct CallbackServer {
     /// Actual port chosen by the OS after binding (0 until the server starts).
     port: Arc<Mutex<u16>>,
@@ -96,13 +100,13 @@ impl CallbackServer {
     }
 
     async fn start_server(&self) -> McpResult<()> {
-        // Check if already running
+        // Check if already running — do NOT set is_running here to avoid TOCTOU:
+        // the flag is only set to true after the bind succeeds.
         {
-            let mut is_running = self.is_running.lock();
+            let is_running = self.is_running.lock();
             if *is_running {
                 return Ok(());
             }
-            *is_running = true;
         }
 
         let pending = self.pending_callback.clone();
@@ -269,6 +273,11 @@ impl CallbackServer {
             McpError::new(ErrorKind::Internal, format!("Failed to bind OAuth callback server: {}", e))
         })?;
 
+        // Bind succeeded — mark the server as running only now to avoid TOCTOU
+        // (is_running stayed false while bind was in progress; if bind had
+        // failed, no caller would observe a stuck is_running=true).
+        *self.is_running.lock() = true;
+
         // Record the actual port assigned by the OS so redirect_uri() returns
         // the correct value before the browser redirect happens.
         let actual_port = listener
@@ -279,11 +288,23 @@ impl CallbackServer {
 
         tracing::info!("OAuth callback server listening on 127.0.0.1:{}", actual_port);
 
-        // Spawn server in background
+        // Spawn server in background with a 5-minute hard timeout.
+        // If no callback arrives within 300 seconds the listener is dropped
+        // and is_running is reset, allowing a future flow to bind a new port.
         let is_running = self.is_running.clone();
         tokio::spawn(async move {
-            if let Err(e) = axum::serve(listener, app).await {
-                tracing::error!("OAuth callback server error: {}", e);
+            let serve_future = axum::serve(listener, app);
+            match tokio::time::timeout(Duration::from_secs(300), serve_future).await {
+                Ok(Err(e)) => {
+                    tracing::error!("OAuth callback server error: {}", e);
+                }
+                Err(_) => {
+                    tracing::warn!(
+                        "OAuth callback server timed out after 300 seconds — \
+                         shutting down listener and resetting state"
+                    );
+                }
+                Ok(Ok(())) => {}
             }
             *is_running.lock() = false;
         });

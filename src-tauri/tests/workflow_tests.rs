@@ -1,3 +1,10 @@
+//! # Workflow Tests
+//!
+//! WARNING: These tests validate state management patterns using MockWorkflowEngine,
+//! NOT the real WorkflowEngine. Changes to WorkflowEngine are not covered.
+//!
+//! TODO: Add integration tests that exercise the real WorkflowEngine with a test database.
+
 /// Workflow Execution Tests for TurboMCP Studio Backend
 ///
 /// Tests workflow state sharing, cancellation, and persistence
