@@ -7095,9 +7095,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-auth"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "305a1f7a3bcb1f03bd7f2eb4798fdd43c261842d89fb6b161edffa8a4805b7e3"
+checksum = "8d5c8ede47df5fc616ab87bca3ac55513af47eec9765287bffe903edbd2fb785"
 dependencies = [
  "base64 0.22.1",
  "blake3",
@@ -7123,9 +7123,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-client"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c964bbdc2be5616fc18787dcec6ef78093584ccaae1fecbf89f7ae937aea4262"
+checksum = "2ae85e2b4d5541d6143f6ab5d090b20cd21cb6b381f5f3350e145012206c5b28"
 dependencies = [
  "chrono",
  "futures",
@@ -7147,9 +7147,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-core"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb666e3c83fd9173ac7c6599f258902b8a5204f23092ac39d07ba1f42ef67a8e"
+checksum = "01c4c7402996fa00c65dc40ba02644f7a72e09da3fd96d91a442adb52cc31fa4"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -7165,9 +7165,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-dpop"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a4e53306b1028bfb200bf5eefafc1b0b9252f670acdf856d7fff4db0f6d1aa8"
+checksum = "18e3b65acf7399ce9e2c7cafd2ce8100c13c572729d9d30d146cc4a1eadc28cb"
 dependencies = [
  "base64 0.22.1",
  "bon",
@@ -7195,9 +7195,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-http"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e898dd58c20a7dfbed2dea9b872454ee2792f2b1ed9ed1efacab3022aa2993b"
+checksum = "4f25fd0e25e25f46c4a7ded3b2592d95919be7a6869d70e04b2c6f2ad5ba679d"
 dependencies = [
  "bytes",
  "futures",
@@ -7213,9 +7213,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-protocol"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da499e9cd2127015d1b63e632abef7dddc62abc5b0c17a877013ac0770a98100"
+checksum = "9b1b8aabb075b9305376a03d1ff9189bb02ef174fa5151a2f76a82301490a43c"
 dependencies = [
  "ahash 0.8.12",
  "arc-swap",
@@ -7249,9 +7249,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-proxy"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f73ac9b40b74f4c6eb1cf85c48273adb74528f761976bed067034e14f4d8d071"
+checksum = "86ebf5dc24fcd54a322897693bcc7aef4311c972ea9f6d65eaf6020a3ac72f9e"
 dependencies = [
  "axum",
  "bytes",
@@ -7281,9 +7281,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-stdio"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37d2b5a3ce752604e4cca8ca3fab89360f11a6d411ab194bbedb46fb3057cb7a"
+checksum = "ecc0485d89d64be1cbf5fd33cf8a3030d1af2a7912cbc40549c084adf53eeaa3"
 dependencies = [
  "bytes",
  "futures",
@@ -7299,9 +7299,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-tcp"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53bdf53ce05124df777cd5fc039461f9eed28b487ca02e1ce7d4df1674000dcf"
+checksum = "e267ec263cac9f6ee0e1316fda0cf0c9d7557cb90739cbd9f6f447671bcbbf2c"
 dependencies = [
  "bytes",
  "futures",
@@ -7318,9 +7318,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-transport"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5775a34f432207045487d685fbefa353ddf901fb5483a1ce5b1eda3169c6b621"
+checksum = "53681b32e0ac7f21a0ad2229cd3497eff163f421c75ddcebbc903156a273a373"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -7363,9 +7363,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-transport-traits"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88728b93d036192a97440e8c76ba17792042ef93cd006d910979bb35c1b6039a"
+checksum = "6aac6d02590f2ba5f5688aa5ff42a78f8a62118550d3c79da54e4d4b9ae9977c"
 dependencies = [
  "bytes",
  "futures",
@@ -7378,9 +7378,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-types"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d460804dc7894947512e88bef56d41bdc45be0810a3f534925f00706be2ddd27"
+checksum = "906b61d1b7d0533d3d00b5c83f76c8a6f3e4df9f27001c1c7527a291d32b5e8a"
 dependencies = [
  "serde",
  "serde_json",
@@ -7388,9 +7388,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-unix"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81419043bdf70e4ad3ed29fbccd09e82e7ca1fe28356303b9dfbce12b55ba23a"
+checksum = "193244f291efb04e7324c6c586182da9f860f7d393660d6c6f9318c9dae9fe20"
 dependencies = [
  "bytes",
  "futures",
@@ -7407,9 +7407,9 @@ dependencies = [
 
 [[package]]
 name = "turbomcp-websocket"
-version = "3.0.4"
+version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33e471f5ffacb1d7cd44a93db7f1577d4cb8f75a1c40caf42241bbfc1cd5b559"
+checksum = "30e93abb49801c8863490acddbebb931448d643bbc7aa1563a4455a78278e4f2"
 dependencies = [
  "bytes",
  "chrono",
