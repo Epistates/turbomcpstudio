@@ -3,7 +3,7 @@ import { notificationStore } from './notificationStore';
 import type { PendingSamplingRequest } from './samplingStore';
 import type { ActiveElicitationRequest } from './elicitationStore';
 
-export type View = 'dashboard' | 'servers' | 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | 'protocol' | 'chat' | 'testing' | 'collections' | 'oauth' | 'settings';
+export type View = 'dashboard' | 'servers' | 'tools' | 'resources' | 'prompts' | 'sampling' | 'elicitation' | 'protocol' | 'proxy' | 'chat' | 'testing' | 'collections' | 'oauth' | 'settings';
 
 /**
  * ✅ NEW: Unified modal state structure

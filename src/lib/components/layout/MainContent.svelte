@@ -22,6 +22,7 @@
   import ModeIndicator from '../ModeIndicator.svelte';
   import ServerContextBar from '../ServerContextBar.svelte';
   import OAuthDebugger from '../oauth/OAuthDebugger.svelte';
+  import ProxyManager from '../ProxyManager.svelte';
 
   // Reactive view state using Svelte 5 runes
   // Access store properties directly with $derived to maintain reactivity
@@ -145,6 +146,8 @@
       <ElicitationView />
     {:else if currentView === 'protocol'}
       <ProtocolInspector />
+    {:else if currentView === 'proxy'}
+      <ProxyManager />
     {:else if currentView === 'collections'}
       <CollectionsManager />
     {:else if currentView === 'chat'}

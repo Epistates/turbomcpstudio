@@ -24,6 +24,7 @@
     Play,
     Square,
     Network,
+    ArrowLeftRight,
     Sparkles,
     Beaker,
     Radar,
@@ -59,6 +60,7 @@
     { id: 'sampling', label: 'Sampling', icon: MessageSquare },
     { id: 'elicitation', label: 'Elicitation', icon: Activity },
     { id: 'protocol', label: 'Protocol', icon: Network },
+    { id: 'proxy', label: 'Proxy', icon: ArrowLeftRight },
     { id: 'chat', label: 'LLM Playground', icon: Sparkles },
     { id: 'testing', label: 'Testing', icon: Beaker },
     { id: 'collections', label: 'Collections', icon: Layers3 },
@@ -79,6 +81,7 @@
     'sampling': 'sampling',
     'elicitation': 'elicitation',
     'protocol': null,         // Protocol inspector supports all servers
+    'proxy': null,            // Proxy manager is standalone
     'chat': null,             // LLM Playground doesn't require MCP servers
     'testing': null,          // Unified Testing supports all servers
     'collections': null,      // Collections supports all servers
