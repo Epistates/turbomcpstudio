@@ -1,5 +1,6 @@
 <script lang="ts">
   import { proxyStore, activeProxy, runningProxies } from '$lib/stores/proxyStore';
+  import BenchmarkPanel from './BenchmarkPanel.svelte';
   import { onMount } from 'svelte';
 
   interface Props {
@@ -23,6 +24,7 @@
   let loadingMetrics = $state(false);
   let autoRefresh = $state(true);
   let refreshInterval: ReturnType<typeof setInterval> | null = null;
+  let benchmarkExpanded = $state(false);
 
   async function loadMetrics() {
     if (!selectedProxyId) return;
@@ -244,6 +246,33 @@
           </div>
         </div>
       {/if}
+
+      <!-- Benchmark -->
+      <div class="info-section benchmark-section">
+        <div class="section-header" role="button" tabindex="0"
+          onclick={() => (benchmarkExpanded = !benchmarkExpanded)}
+          onkeydown={(e) => e.key === 'Enter' && (benchmarkExpanded = !benchmarkExpanded)}
+          aria-expanded={benchmarkExpanded}
+          aria-controls="benchmark-panel-body"
+        >
+          <h3 class="section-title">Benchmark</h3>
+          <svg
+            class="section-chevron"
+            class:rotated={benchmarkExpanded}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+
+        {#if benchmarkExpanded}
+          <div id="benchmark-panel-body">
+            <BenchmarkPanel proxyId={selectedProxyId} proxyName={proxy?.name} />
+          </div>
+        {/if}
+      </div>
 
       <!-- Help -->
       <div class="info-section help-section">
@@ -506,6 +535,41 @@
 
   .metric-value.error {
     color: var(--color-error);
+  }
+
+  /* Benchmark section */
+  .benchmark-section {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .section-header:hover {
+    background: var(--color-bg);
+  }
+
+  .section-chevron {
+    width: 16px;
+    height: 16px;
+    color: var(--color-text-secondary);
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .section-chevron.rotated {
+    transform: rotate(180deg);
+  }
+
+  #benchmark-panel-body {
+    padding: 0 1rem 1rem;
   }
 
   .help-section {

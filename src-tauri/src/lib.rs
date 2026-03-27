@@ -572,6 +572,13 @@ pub fn run() {
             commands::list_proxies,
             commands::get_proxy_metrics,
             commands::introspect_backend,
+            // Benchmark commands
+            commands::start_benchmark_session,
+            commands::stop_benchmark_session,
+            commands::get_benchmark_records,
+            commands::get_benchmark_report,
+            commands::list_benchmark_sessions,
+            commands::compare_benchmark_reports,
             // OAuth 2.1 Visual Debugger commands
             commands::discover_oauth_metadata,
             commands::start_oauth_authorization_flow,

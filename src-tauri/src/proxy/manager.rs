@@ -2,21 +2,33 @@
 //!
 //! Integrates with turbomcp-proxy for introspection and runtime capabilities.
 
+use super::benchmark::{
+    compare_reports as do_compare, BenchmarkReport, BenchmarkSession, CallRecord, MetricsStore,
+    ReportComparison, SharedMetricsStore,
+};
 use super::types::*;
 use crate::database::Database;
 use crate::error::{AppError, AppResult};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;
 
 // Import turbomcp-proxy introspection types
 use turbomcp_proxy::introspection::spec::ServerSpec as TurboServerSpec;
 use turbomcp_proxy::introspection::{McpBackend, McpIntrospector, StdioBackend};
 
+/// Internal record pairing a session descriptor with its live metrics store.
+struct BenchmarkEntry {
+    session: BenchmarkSession,
+    store: SharedMetricsStore,
+}
+
 /// Main proxy manager for creating, starting, stopping, and monitoring proxies
 pub struct ProxyManager {
     database: Arc<RwLock<Option<Arc<Database>>>>,
     running_proxies: Arc<RwLock<HashMap<String, RunningProxyInfo>>>,
+    /// Benchmark sessions keyed by session UUID.
+    benchmark_sessions: Arc<RwLock<HashMap<String, BenchmarkEntry>>>,
 }
 
 /// Information about a running proxy
@@ -34,6 +46,7 @@ impl ProxyManager {
         Self {
             database,
             running_proxies: Arc::new(RwLock::new(HashMap::new())),
+            benchmark_sessions: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -67,6 +80,8 @@ impl ProxyManager {
             frontend_config: serde_json::json!({ "enabled": false }),
             auth_config,
             metrics_enabled: true,
+            benchmark_enabled: false,
+            bind_address: None,
             max_requests_tracked: 10000,
             created_at: now,
             updated_at: now,
@@ -364,6 +379,144 @@ impl ProxyManager {
                 })
             }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Benchmark session management
+    // -----------------------------------------------------------------------
+
+    /// Start a new benchmark session for the given proxy.
+    ///
+    /// Returns the new session UUID which callers use for subsequent calls.
+    /// Multiple concurrent sessions for the same proxy are supported.
+    pub async fn start_benchmark_session(
+        &self,
+        proxy_id: &str,
+        session_name: Option<String>,
+    ) -> AppResult<String> {
+        // Resolve the backend name from the proxy config so we can label the session.
+        let db = self
+            .database
+            .read()
+            .await
+            .as_ref()
+            .ok_or_else(|| AppError::proxy("Database not initialized"))?
+            .clone();
+
+        let config = db
+            .get_proxy_config(proxy_id)
+            .await?
+            .ok_or_else(|| AppError::proxy(format!("Proxy {} not found", proxy_id)))?;
+
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let name = session_name.unwrap_or_else(|| format!("Session {}", &session_id[..8]));
+
+        let session = BenchmarkSession {
+            id: session_id.clone(),
+            name,
+            backend_name: config.name.clone(),
+            started_at: chrono::Utc::now(),
+            active: true,
+        };
+
+        let store: SharedMetricsStore = Arc::new(Mutex::new(MetricsStore::new()));
+
+        self.benchmark_sessions
+            .write()
+            .await
+            .insert(session_id.clone(), BenchmarkEntry { session, store });
+
+        tracing::info!(
+            session_id = %session_id,
+            proxy_id = %proxy_id,
+            backend = %config.name,
+            "Benchmark session started"
+        );
+
+        Ok(session_id)
+    }
+
+    /// Stop an active benchmark session and return its final report.
+    ///
+    /// The session is marked inactive but its records remain accessible until
+    /// the session is explicitly removed or the process exits.
+    pub async fn stop_benchmark_session(&self, session_id: &str) -> AppResult<BenchmarkReport> {
+        let mut sessions = self.benchmark_sessions.write().await;
+        let entry = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| AppError::proxy(format!("Benchmark session {} not found", session_id)))?;
+
+        entry.session.active = false;
+
+        let report = entry
+            .store
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .generate_report(session_id);
+
+        tracing::info!(
+            session_id = %session_id,
+            total_records = report.records.len(),
+            duration_secs = report.duration_secs,
+            "Benchmark session stopped"
+        );
+
+        Ok(report)
+    }
+
+    /// Return the raw call records for an active or stopped session.
+    pub async fn get_benchmark_records(&self, session_id: &str) -> AppResult<Vec<CallRecord>> {
+        let sessions = self.benchmark_sessions.read().await;
+        let entry = sessions
+            .get(session_id)
+            .ok_or_else(|| AppError::proxy(format!("Benchmark session {} not found", session_id)))?;
+
+        let records = entry
+            .store
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .records
+            .clone();
+
+        Ok(records)
+    }
+
+    /// Generate a [`BenchmarkReport`] from an active or stopped session without
+    /// stopping it.
+    pub async fn get_benchmark_report(&self, session_id: &str) -> AppResult<BenchmarkReport> {
+        let sessions = self.benchmark_sessions.read().await;
+        let entry = sessions
+            .get(session_id)
+            .ok_or_else(|| AppError::proxy(format!("Benchmark session {} not found", session_id)))?;
+
+        let report = entry
+            .store
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .generate_report(session_id);
+
+        Ok(report)
+    }
+
+    /// List all known benchmark sessions (active and stopped).
+    pub async fn list_benchmark_sessions(&self) -> AppResult<Vec<BenchmarkSession>> {
+        let sessions = self.benchmark_sessions.read().await;
+        let mut list: Vec<BenchmarkSession> = sessions
+            .values()
+            .map(|e| e.session.clone())
+            .collect();
+        // Deterministic ordering: most recently started first.
+        list.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        Ok(list)
+    }
+
+    /// Compare two previously generated [`BenchmarkReport`]s.
+    pub async fn compare_reports(
+        &self,
+        report_a: BenchmarkReport,
+        report_b: BenchmarkReport,
+    ) -> AppResult<ReportComparison> {
+        Ok(do_compare(&report_a, &report_b))
     }
 
     /// Convert turbomcp-proxy ServerSpec to our local types

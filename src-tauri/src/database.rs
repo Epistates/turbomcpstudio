@@ -787,8 +787,28 @@ impl Database {
         .execute(&self.pool)
         .await?;
 
+        // v0.1.1: Add benchmark and bind_address columns to proxies table
+        // Using ALTER TABLE with IF NOT EXISTS pattern (SQLite ignores duplicate column adds via error handling)
+        for col_sql in [
+            "ALTER TABLE proxies ADD COLUMN benchmark_enabled BOOLEAN NOT NULL DEFAULT 0",
+            "ALTER TABLE proxies ADD COLUMN bind_address TEXT",
+        ] {
+            match sqlx::query(col_sql).execute(&self.pool).await {
+                Ok(_) => tracing::info!("Migration: added column via {}", col_sql),
+                Err(e) => {
+                    // "duplicate column name" is expected on existing DBs that already ran this migration
+                    let msg = e.to_string();
+                    if msg.contains("duplicate column") {
+                        tracing::debug!("Column already exists (expected): {}", col_sql);
+                    } else {
+                        tracing::warn!("Migration warning for '{}': {}", col_sql, msg);
+                    }
+                }
+            }
+        }
+
         let migration_duration = migration_start.elapsed();
-        tracing::info!("Database migrations completed successfully in {:?} (15 tables + 7 indexes, typically 3-15ms)", migration_duration);
+        tracing::info!("Database migrations completed successfully in {:?}", migration_duration);
         Ok(())
     }
 
@@ -1473,9 +1493,9 @@ impl Database {
             r#"
             INSERT OR REPLACE INTO proxies
             (id, name, description, backend_type, backend_config, frontend_type, frontend_config,
-             auth_type, auth_config, metrics_enabled, max_requests_tracked, created_at, updated_at,
-             last_started_at, last_stopped_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             auth_type, auth_config, metrics_enabled, benchmark_enabled, bind_address,
+             max_requests_tracked, created_at, updated_at, last_started_at, last_stopped_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&config.id.0)
@@ -1496,6 +1516,8 @@ impl Database {
         ))
         .bind(&auth_config_json)
         .bind(config.metrics_enabled as i32)
+        .bind(config.benchmark_enabled as i32)
+        .bind(&config.bind_address)
         .bind(config.max_requests_tracked as i32)
         .bind(
             config
@@ -1618,6 +1640,8 @@ impl Database {
                 frontend_config: serde_json::from_str(&row.get::<String, _>("frontend_config"))?,
                 auth_config,
                 metrics_enabled: row.get::<i32, _>("metrics_enabled") != 0,
+                benchmark_enabled: row.get::<i32, _>("benchmark_enabled") != 0,
+                bind_address: row.get::<Option<String>, _>("bind_address"),
                 max_requests_tracked: row.get::<i32, _>("max_requests_tracked") as usize,
                 created_at: std::time::UNIX_EPOCH
                     + std::time::Duration::from_secs(created_at_secs as u64),
@@ -1646,8 +1670,8 @@ impl Database {
         let rows = sqlx::query(
             r#"
             SELECT id, name, description, backend_type, backend_config, frontend_type, frontend_config,
-                   auth_type, auth_config, metrics_enabled, max_requests_tracked, created_at, updated_at,
-                   last_started_at, last_stopped_at
+                   auth_type, auth_config, metrics_enabled, benchmark_enabled, bind_address,
+                   max_requests_tracked, created_at, updated_at, last_started_at, last_stopped_at
             FROM proxies
             ORDER BY created_at DESC
             "#,
@@ -1693,6 +1717,8 @@ impl Database {
                 frontend_config: serde_json::from_str(&row.get::<String, _>("frontend_config"))?,
                 auth_config,
                 metrics_enabled: row.get::<i32, _>("metrics_enabled") != 0,
+                benchmark_enabled: row.get::<i32, _>("benchmark_enabled") != 0,
+                bind_address: row.get::<Option<String>, _>("bind_address"),
                 max_requests_tracked: row.get::<i32, _>("max_requests_tracked") as usize,
                 created_at: std::time::UNIX_EPOCH
                     + std::time::Duration::from_secs(created_at_secs as u64),

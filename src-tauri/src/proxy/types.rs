@@ -121,6 +121,15 @@ pub struct ProxyConfig {
     #[serde(default = "default_true")]
     pub metrics_enabled: bool,
 
+    /// Whether benchmark session recording is enabled for this proxy.
+    #[serde(default)]
+    pub benchmark_enabled: bool,
+
+    /// Optional explicit bind address for the frontend listener (e.g. `"127.0.0.1:8080"`).
+    /// When `None` the manager selects an ephemeral port on localhost.
+    #[serde(default)]
+    pub bind_address: Option<String>,
+
     pub max_requests_tracked: usize,
 
     pub created_at: SystemTime,
@@ -255,6 +264,8 @@ mod tests {
             frontend_config: serde_json::json!({}),
             auth_config: AuthConfig::None,
             metrics_enabled: true,
+            benchmark_enabled: false,
+            bind_address: None,
             max_requests_tracked: 10000,
             created_at: SystemTime::now(),
             updated_at: SystemTime::now(),

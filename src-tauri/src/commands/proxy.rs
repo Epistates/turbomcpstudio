@@ -1,8 +1,8 @@
 //! Proxy management commands for Tauri
 
 use crate::proxy::{
-    AuthConfig, BackendConfig, FrontendType, ProxyId, ProxyInfo, ProxyMetrics, ProxyStatus,
-    ServerSpec,
+    AuthConfig, BackendConfig, BenchmarkReport, BenchmarkSession, CallRecord, FrontendType,
+    ProxyId, ProxyInfo, ProxyMetrics, ProxyStatus, ReportComparison, ServerSpec,
 };
 use tauri::State;
 
@@ -214,4 +214,88 @@ pub async fn introspect_backend(
         .introspect_backend(&backend, timeout_seconds)
         .await
         .map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Benchmark commands
+// ---------------------------------------------------------------------------
+
+/// Start a new benchmark session for a proxy.
+///
+/// Returns the session UUID callers must pass to subsequent benchmark commands.
+#[tauri::command]
+pub async fn start_benchmark_session(
+    proxy_id: String,
+    session_name: Option<String>,
+    state: State<'_, crate::AppState>,
+) -> Result<String, String> {
+    state
+        .proxy_manager
+        .start_benchmark_session(&proxy_id, session_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Stop an active benchmark session and return its final report.
+#[tauri::command]
+pub async fn stop_benchmark_session(
+    session_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<BenchmarkReport, String> {
+    state
+        .proxy_manager
+        .stop_benchmark_session(&session_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Return the raw call records for a session (active or stopped).
+#[tauri::command]
+pub async fn get_benchmark_records(
+    session_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<Vec<CallRecord>, String> {
+    state
+        .proxy_manager
+        .get_benchmark_records(&session_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Generate and return a report from a session without stopping it.
+#[tauri::command]
+pub async fn get_benchmark_report(
+    session_id: String,
+    state: State<'_, crate::AppState>,
+) -> Result<BenchmarkReport, String> {
+    state
+        .proxy_manager
+        .get_benchmark_report(&session_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// List all benchmark sessions (active and stopped), most recent first.
+#[tauri::command]
+pub async fn list_benchmark_sessions(
+    state: State<'_, crate::AppState>,
+) -> Result<Vec<BenchmarkSession>, String> {
+    state
+        .proxy_manager
+        .list_benchmark_sessions()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Compare two benchmark reports and return per-backend deltas.
+///
+/// This command accepts the full report payloads directly so the frontend can
+/// compare any two reports it has on hand without requiring them to still be
+/// held in the manager's in-process state.
+#[tauri::command]
+pub async fn compare_benchmark_reports(
+    report_a: BenchmarkReport,
+    report_b: BenchmarkReport,
+) -> Result<ReportComparison, String> {
+    Ok(crate::proxy::compare_reports(&report_a, &report_b))
 }

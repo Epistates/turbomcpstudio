@@ -25,6 +25,8 @@ A native desktop application for developing, testing, and debugging Model Contex
 - **OAuth 2.1 Built-in** — PKCE, token refresh, and provider templates for secured MCP servers
 - **Sampling & Elicitation** — Human-in-the-loop approval for LLM sampling requests
 - **Cross-Platform** — macOS, Windows, and Linux from a single codebase (Unix sockets on macOS/Linux, TCP/HTTP/WebSocket everywhere)
+- **MCP Proxy** — Transparent proxy with transport bridging (STDIO ↔ HTTP ↔ WebSocket ↔ TCP)
+- **Benchmarking** — Per-call instrumentation with latency percentiles, token estimation, and A/B comparison
 - **Developer-Friendly** — Think Postman, but for MCP servers
 
 ## Quick Start
@@ -52,6 +54,16 @@ A native desktop application for developing, testing, and debugging Model Contex
 - **Protocol Inspector** — Real-time message tracing with request/response correlation and latency
 - **Developer Console** — Integrated logging with level filtering
 
+### MCP Proxy & Benchmarking
+- **Transparent Proxy** — Sit between any MCP client (Claude, etc.) and server, inspect all traffic
+- **Transport Bridging** — Bridge different transports (e.g., expose a STDIO server over HTTP)
+- **Per-Call Metrics** — Latency (min/P50/P95/P99/max), request/response bytes, estimated tokens
+- **Per-Tool Breakdown** — Identify which tools are expensive with detailed statistics
+- **Per-Method Analysis** — Aggregate metrics by RPC method (tools/list, tools/call, etc.)
+- **Benchmark Sessions** — Start/stop instrumented sessions, generate JSON reports
+- **Report Comparison** — A/B compare benchmark runs with delta analysis (latency, throughput, success rates)
+- **Live Feed** — Real-time stream of call records with auto-scroll and filtering
+
 ### Sampling & Elicitation
 - Human-in-the-loop approval flow for MCP sampling requests
 - Configurable auto-approve, manual, and LLM-assisted modes
@@ -72,7 +84,6 @@ A native desktop application for developing, testing, and debugging Model Contex
 ### Additional
 - Light/dark theme with system preference detection
 - Server registry browser for discovering MCP servers
-- Proxy server management for MCP traffic inspection
 - Collections for organizing and replaying MCP operations
 - SQLite-backed local storage for history and configuration
 
@@ -157,7 +168,7 @@ cd turbomcpstudio
 pnpm install
 ```
 
-TurboMCP v3.0.4 is published to [crates.io](https://crates.io/crates/turbomcp-client) and fetched automatically during the build process. No additional setup required.
+TurboMCP v3.0.10 is published to [crates.io](https://crates.io/crates/turbomcp-client) and fetched automatically during the build process. No additional setup required.
 
 ### Development Build
 
@@ -350,7 +361,7 @@ turbomcpstudio/
 │   │   ├── commands/               #   Tauri IPC command handlers
 │   │   ├── mcp_client/             #   MCP client: transport, health, sampling, rate limiting
 │   │   ├── oauth/                  #   OAuth 2.1: flows, tokens, callback server, DPoP
-│   │   ├── proxy/                  #   MCP proxy server management
+│   │   ├── proxy/                  #   MCP proxy, benchmarking, metrics
 │   │   ├── types/                  #   Shared Rust type definitions
 │   │   ├── database.rs             #   SQLite via sqlx (migrations, queries)
 │   │   ├── hitl_sampling.rs        #   Human-in-the-loop sampling manager
@@ -397,11 +408,18 @@ turbomcpstudio/
 │  │ • Interceptor│ │ • Refresh    │ │                          │ │
 │  └──────┬───────┘ └──────────────┘ └─────────────────────────┘ │
 │         │          ┌──────────────┐ ┌─────────────────────────┐ │
-│         │          │ HITL Sampling│ │ SQLite (sqlx)           │ │
-│         │          │ • Approve    │ │ • Servers & profiles    │ │
-│         │          │ • Cost est.  │ │ • Message history       │ │
-│         │          │ • History    │ │ • Workflow executions    │ │
+│         │          │ MCP Proxy    │ │ HITL Sampling           │ │
+│         │          │ • Bridging   │ │ • Approve / reject      │ │
+│         │          │ • Benchmark  │ │ • Cost estimation       │ │
+│         │          │ • Metrics    │ │ • History tracking      │ │
+│         │          │ • Comparison │ │                         │ │
 │         │          └──────────────┘ └─────────────────────────┘ │
+│         │                           ┌─────────────────────────┐ │
+│         │                           │ SQLite (sqlx)           │ │
+│         │                           │ • Servers & profiles    │ │
+│         │                           │ • Message history       │ │
+│         │                           │ • Workflow executions   │ │
+│         │                           └─────────────────────────┘ │
 └─────────┼───────────────────────────────────────────────────────┘
           │ STDIO / HTTP / WebSocket / TCP / Unix
 ┌─────────┴───────────────────────────────────────────────────────┐
@@ -508,7 +526,7 @@ cd src-tauri && cargo audit                            # Dependency vulnerabilit
 ### Build Errors
 
 **Error**: "could not find `turbomcp` crates"
-- **Solution**: Run `cargo clean` and rebuild. TurboMCP v3.0.4 is automatically fetched from crates.io during build.
+- **Solution**: Run `cargo clean` and rebuild. TurboMCP v3.0.10 is automatically fetched from crates.io during build.
 
 **Error**: "webkit2gtk not found" (Linux)
 - **Solution**: Install required system dependencies:
@@ -586,4 +604,4 @@ TurboMCP Studio is powered by **[TurboMCP](https://github.com/Epistates/turbomcp
 
 ---
 
-**Status**: v0.1.0 — Actively developed. Contributions welcome.
+**Status**: v0.1.1 — Actively developed. Contributions welcome.
