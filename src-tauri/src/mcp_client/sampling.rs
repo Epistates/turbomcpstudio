@@ -180,9 +180,11 @@ impl StudioSamplingHandler {
         let input_tokens: usize = request
             .messages
             .iter()
-            .map(|m| match &m.content {
-                turbomcp_protocol::types::ContentBlock::Text(t) => t.text.len() / 4, // ~4 chars per token
-                _ => 100, // Rough guess for non-text
+            .map(|m| {
+                m.content
+                    .as_text()
+                    .map(|text| text.len() / 4)
+                    .unwrap_or(100)
             })
             .sum();
 
@@ -200,9 +202,11 @@ impl StudioSamplingHandler {
         let input_tokens: u32 = request
             .messages
             .iter()
-            .map(|m| match &m.content {
-                turbomcp_protocol::types::ContentBlock::Text(t) => (t.text.len() / 4) as u32,
-                _ => 100,
+            .map(|m| {
+                m.content
+                    .as_text()
+                    .map(|text| (text.len() / 4) as u32)
+                    .unwrap_or(100)
             })
             .sum();
 

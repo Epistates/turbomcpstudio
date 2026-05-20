@@ -89,12 +89,12 @@ impl McpTransportClient {
     fn create_basic_tool_schema(_name: &str) -> ToolInputSchema {
         // Create an empty schema that allows any properties
         // The actual tool will define its own parameter schema
-        ToolInputSchema {
-            schema_type: "object".to_string(),
-            properties: Some(HashMap::new()),
-            required: Some(vec![]),
-            additional_properties: Some(true),
-        }
+        ToolInputSchema::from_value(serde_json::json!({
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": true
+        }))
     }
 
     /// Get tools with their schemas from the MCP server

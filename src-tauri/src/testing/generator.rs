@@ -14,7 +14,7 @@ use crate::types::{
 use futures::future::join_all;
 use std::sync::Arc;
 use turbomcp_protocol::types::{
-    ContentBlock, CreateMessageRequest, ModelHint, ModelPreferences, Role, SamplingMessage,
+    CreateMessageRequest, ModelHint, ModelPreferences, Role, SamplingContent, SamplingMessage,
     TextContent,
 };
 
@@ -408,12 +408,13 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
         let request = CreateMessageRequest {
             messages: vec![SamplingMessage {
                 role: Role::User,
-                content: ContentBlock::Text(TextContent {
+                content: SamplingContent::Text(TextContent {
                     text: prompt.to_string(),
                     annotations: None,
                     meta: None,
-                }),
-                metadata: None,
+                })
+                .into(),
+                meta: None,
             }],
             system_prompt: Some("You are a QA engineer generating focused test cases. Output ONLY valid JSON with no markdown formatting.".to_string()),
             max_tokens,  // Use category-specific limit
@@ -421,7 +422,7 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
             model_preferences: model_id.clone().map(|m| {
                 tracing::info!("Creating model preferences with hint: {}", m);
                 ModelPreferences {
-                    hints: Some(vec![ModelHint::new(m)]),
+                    hints: Some(vec![ModelHint { name: Some(m) }]),
                     cost_priority: None,
                     speed_priority: None,
                     intelligence_priority: None,
@@ -436,7 +437,8 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
             tools: None,
             tool_choice: None,
             task: None,
-            _meta: None,
+            metadata: None,
+            meta: None,
         };
 
         // Invoke LLM
@@ -454,15 +456,16 @@ START YOUR RESPONSE WITH {{ and END WITH }}"#,
             })?;
 
         // Extract text content
-        let response_text = match response.content {
-            ContentBlock::Text(text_content) => text_content.text,
-            _ => {
-                return Err(McpStudioError::ConfigError(format!(
+        let response_text = response
+            .content
+            .as_text()
+            .map(str::to_string)
+            .ok_or_else(|| {
+                McpStudioError::ConfigError(format!(
                     "Unexpected response format for tool {} category {}",
                     tool_name, category_name
-                )));
-            }
-        };
+                ))
+            })?;
 
         tracing::debug!(
             "LLM response for {} {}: {} chars",

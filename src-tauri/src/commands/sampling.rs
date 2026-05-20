@@ -222,7 +222,7 @@ pub async fn test_sampling_request(
 ) -> Result<Value, String> {
     // Convert JSON messages to MCP protocol format
     use turbomcp_protocol::types::{
-        ContentBlock, IncludeContext, Role, SamplingMessage, TextContent,
+        IncludeContext, Role, SamplingContent, SamplingMessage, TextContent,
     };
 
     let sampling_messages: Result<Vec<SamplingMessage>, String> = messages
@@ -235,18 +235,19 @@ pub async fn test_sampling_request(
             };
 
             let content = match msg.get("content").and_then(|c| c.as_str()) {
-                Some(text) => ContentBlock::Text(TextContent {
+                Some(text) => SamplingContent::Text(TextContent {
                     text: text.to_string(),
                     annotations: None,
                     meta: None,
-                }),
+                })
+                .into(),
                 None => return Err("Missing content in message".to_string()),
             };
 
             Ok(SamplingMessage {
                 role,
                 content,
-                metadata: None,
+                meta: None,
             })
         })
         .collect();
@@ -265,7 +266,8 @@ pub async fn test_sampling_request(
         tools: None,
         tool_choice: None,
         task: None,
-        _meta: None,
+        metadata: None,
+        meta: None,
     };
 
     // Get conversation analysis without actually processing

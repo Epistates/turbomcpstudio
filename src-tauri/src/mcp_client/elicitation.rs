@@ -135,8 +135,8 @@ impl StudioElicitationHandler {
             let request_summary = serde_json::json!({
                 "id": &request_id_str,
                 "message": request.message(),
-                "timeout_ms": request.timeout().map(|d| d.as_millis()),
-                "cancellable": request.is_cancellable(),
+                "timeout_ms": null,
+                "cancellable": true,
             });
             let request_json = serde_json::to_string(&request_summary)
                 .unwrap_or_else(|_| "Failed to serialize request".to_string());
@@ -174,9 +174,6 @@ impl StudioElicitationHandler {
         let schema_value =
             serde_json::to_value(request.schema()).unwrap_or_else(|_| serde_json::Value::Null);
 
-        // Convert timeout to seconds for display
-        let timeout_secs = request.timeout().map(|d| d.as_secs());
-
         let event_payload = serde_json::json!({
             "id": request_id_str,
             "protocolMessageId": protocol_msg_id.to_string(),  // For Protocol Inspector correlation
@@ -184,7 +181,7 @@ impl StudioElicitationHandler {
             "serverName": server_context.server_name,  // Human-readable server name
             "message": request.message(),
             "requestedSchema": schema_value,
-            "timeout": timeout_secs,
+            "timeout": 300,
             // Removed metadata - not in protocol
         });
 
@@ -199,8 +196,8 @@ impl StudioElicitationHandler {
             request_id_str
         );
 
-        // Use timeout from request (Duration) or default to 5 minutes
-        let timeout_duration = request.timeout().unwrap_or(Duration::from_secs(300));
+        // The v3.1 protocol wrapper no longer carries per-request timeouts.
+        let timeout_duration = Duration::from_secs(300);
 
         let response = tokio::time::timeout(timeout_duration, rx)
             .await

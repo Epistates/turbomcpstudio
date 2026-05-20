@@ -16,7 +16,7 @@ use tokio::sync::{broadcast, RwLock};
 use tracing::{debug, info, warn};
 use turbomcp_client::sampling::SamplingHandler;
 use turbomcp_protocol::types::{
-    ContentBlock, CreateMessageRequest, CreateMessageResult, Role, TextContent,
+    CreateMessageRequest, CreateMessageResult, Role, SamplingContent, TextContent,
 };
 use uuid::Uuid;
 
@@ -322,15 +322,16 @@ impl HITLSamplingManager {
             request_id: pending_request.id.clone(),
             response: CreateMessageResult {
                 role: Role::Assistant,
-                content: ContentBlock::Text(TextContent {
+                content: SamplingContent::Text(TextContent {
                     text: "Request queued for human approval. Please check the HITL interface."
                         .to_string(),
                     annotations: None,
                     meta: None,
-                }),
+                })
+                .into(),
                 model: "hitl-pending".to_string(),
                 stop_reason: None,
-                _meta: None,
+                meta: None,
             },
             model_used: "hitl-pending".to_string(),
             token_usage: TokenUsage {
@@ -529,17 +530,15 @@ impl HITLSamplingManager {
             .messages
             .iter()
             .map(|msg| {
-                let content_preview = match &msg.content {
-                    ContentBlock::Text(text) => {
-                        let preview = if text.text.len() > 100 {
-                            format!("{}...", &text.text[..97])
+                let content_preview = match msg.content.as_text() {
+                    Some(text) => {
+                        if text.len() > 100 {
+                            format!("{}...", &text[..97])
                         } else {
-                            text.text.clone()
-                        };
-                        preview
+                            text.to_string()
+                        }
                     }
-                    // TODO: Handle other content types
-                    _ => "[Non-text content]".to_string(),
+                    None => "[Non-text content]".to_string(),
                 };
 
                 ConversationTurn {
@@ -573,9 +572,11 @@ impl HITLSamplingManager {
         let estimated_tokens: u32 = request
             .messages
             .iter()
-            .map(|msg| match &msg.content {
-                ContentBlock::Text(text) => (text.text.len() / 4) as u32,
-                _ => 50, // Default estimate for non-text content
+            .map(|msg| {
+                msg.content
+                    .as_text()
+                    .map(|text| (text.len() / 4) as u32)
+                    .unwrap_or(50)
             })
             .sum::<u32>()
             + request
@@ -609,10 +610,11 @@ impl HITLSamplingManager {
     ///
     /// Uses heuristic: ~4 chars per token.
     async fn estimate_output_tokens(&self, response: &CreateMessageResult) -> u32 {
-        match &response.content {
-            ContentBlock::Text(text) => (text.text.len() / 4) as u32,
-            _ => 0,
-        }
+        response
+            .content
+            .as_text()
+            .map(|text| (text.len() / 4) as u32)
+            .unwrap_or(0)
     }
 
     /// Get pending requests for UI

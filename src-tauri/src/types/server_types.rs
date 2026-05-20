@@ -42,8 +42,8 @@ pub enum TransportConfig {
     /// Unix domain socket transport
     Unix { path: String },
 }
-// Note: TurboMCP's ServerInfo only has name, models, capabilities - we need our own for UI
-// pub use turbomcp_client::sampling::ServerInfo;
+// Note: TurboMCP's LlmServerInfo only has name, models, capabilities - we need our own for UI
+// pub use turbomcp_client::sampling::LlmServerInfo;
 
 /// Server information for MCP Studio UI (extends TurboMCP's minimal ServerInfo)
 #[derive(Debug, Clone, Serialize, Deserialize)]

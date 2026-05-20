@@ -1,6 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
-use turbomcp_client::sampling::{LLMServerClient, ServerInfo};
+use turbomcp_client::sampling::{LLMServerClient, LlmServerInfo};
 use turbomcp_protocol::types::{CreateMessageRequest, CreateMessageResult};
 
 /// Boxed future type alias for sampling operations (inlined from turbomcp-client v3 private type)
@@ -30,9 +30,9 @@ impl LLMServerClient for AnthropicClient {
         })
     }
 
-    fn get_server_info(&self) -> BoxSamplingFuture<'_, ServerInfo> {
+    fn get_server_info(&self) -> BoxSamplingFuture<'_, LlmServerInfo> {
         Box::pin(async move {
-            Ok(ServerInfo {
+            Ok(LlmServerInfo {
                 name: "Anthropic".to_string(),
                 models: vec!["claude-3-5-sonnet-20240620".to_string()],
                 capabilities: vec![],

@@ -2,7 +2,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::pin::Pin;
-use turbomcp_client::sampling::{LLMServerClient, ServerInfo};
+use turbomcp_client::sampling::{LLMServerClient, LlmServerInfo};
 use turbomcp_protocol::types::{CreateMessageRequest, CreateMessageResult, Role};
 
 /// Boxed future type alias for sampling operations (inlined from turbomcp-client v3 private type)
@@ -160,9 +160,9 @@ impl LLMServerClient for OpenAIClient {
         })
     }
 
-    fn get_server_info(&self) -> BoxSamplingFuture<'_, ServerInfo> {
+    fn get_server_info(&self) -> BoxSamplingFuture<'_, LlmServerInfo> {
         Box::pin(async move {
-            Ok(ServerInfo {
+            Ok(LlmServerInfo {
                 name: "OpenAI".to_string(),
                 models: vec!["gpt-4o".to_string(), "gpt-4o-mini".to_string()],
                 capabilities: vec![],

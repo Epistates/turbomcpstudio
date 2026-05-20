@@ -187,6 +187,8 @@ impl Configuration {
                     list_changed: r.list_changed,
                 }),
             completions: caps.completions.clone(),
+            tasks: caps.tasks.clone(),
+            extensions: caps.extensions.clone(),
             experimental: caps.experimental.clone(),
             logging: caps.logging.clone(),
         }

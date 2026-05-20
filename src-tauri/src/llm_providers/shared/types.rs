@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use turbomcp_protocol::types::{
-    ContentBlock, CreateMessageResult, Role, SamplingMessage, StopReason, TextContent,
+    CreateMessageResult, Role, SamplingContent, SamplingContentBlock, SamplingMessage, StopReason,
+    TextContent,
 };
 
 /// Token usage information
@@ -58,27 +59,29 @@ impl MessageConverter {
             .collect()
     }
 
-    /// Extract text from MCP ContentBlock enum
-    fn extract_text_from_content(content: &ContentBlock) -> String {
-        match content {
-            ContentBlock::Text(text_content) => text_content.text.clone(),
-            ContentBlock::Image(image_content) => {
-                // For image content, return description or placeholder
-                format!("[Image: {}]", image_content.mime_type)
-            }
-            ContentBlock::Audio(audio_content) => {
-                format!("[Audio: {}]", audio_content.mime_type)
-            }
-            ContentBlock::ResourceLink(_) => "[Resource link]".to_string(),
-            ContentBlock::Resource(_) => "[Embedded resource]".to_string(),
-            // v3 new variants for tool calling in sampling
-            ContentBlock::ToolUse(tool_use) => {
-                format!("[Tool call: {}]", tool_use.name)
-            }
-            ContentBlock::ToolResult(tool_result) => {
-                format!("[Tool result: {}]", tool_result.tool_use_id)
-            }
-        }
+    /// Extract text from MCP sampling content blocks.
+    fn extract_text_from_content(content: &SamplingContentBlock) -> String {
+        content
+            .to_vec()
+            .into_iter()
+            .map(|content| match content {
+                SamplingContent::Text(text_content) => text_content.text.clone(),
+                SamplingContent::Image(image_content) => {
+                    // For image content, return description or placeholder
+                    format!("[Image: {}]", image_content.mime_type)
+                }
+                SamplingContent::Audio(audio_content) => {
+                    format!("[Audio: {}]", audio_content.mime_type)
+                }
+                SamplingContent::ToolUse(tool_use) => {
+                    format!("[Tool call: {}]", tool_use.name)
+                }
+                SamplingContent::ToolResult(tool_result) => {
+                    format!("[Tool result: {}]", tool_result.tool_use_id)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("")
     }
 
     /// Create MCP CreateMessageResult from text response
@@ -89,14 +92,15 @@ impl MessageConverter {
     ) -> CreateMessageResult {
         CreateMessageResult {
             role: Role::Assistant,
-            content: ContentBlock::Text(TextContent {
+            content: SamplingContent::Text(TextContent {
                 text,
                 annotations: None,
                 meta: None,
-            }),
+            })
+            .into(),
             model,
-            stop_reason: Some(stop_reason),
-            _meta: None,
+            stop_reason: Some(stop_reason.into()),
+            meta: None,
         }
     }
 }

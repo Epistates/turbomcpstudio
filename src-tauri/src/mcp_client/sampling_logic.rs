@@ -11,7 +11,7 @@ use crate::mcp_client::connection::ManagedConnection;
 use std::sync::Arc;
 use turbomcp_client::sampling::SamplingHandler; // Import trait for method availability
 use turbomcp_protocol::types::{
-    ContentBlock, CreateMessageRequest, Role, SamplingMessage, TextContent,
+    CreateMessageRequest, Role, SamplingContent, SamplingMessage, TextContent,
 };
 use uuid::Uuid;
 
@@ -57,7 +57,8 @@ impl SamplingLogic {
                 tools: None,
                 tool_choice: None,
                 task: None,
-                _meta: None,
+                metadata: None,
+                meta: None,
             };
 
             // Generate request ID for this outgoing request
@@ -78,10 +79,7 @@ impl SamplingLogic {
                             Role::User => "user",
                             Role::Assistant => "assistant",
                         },
-                        "content": match result.content {
-                            ContentBlock::Text(text) => text.text,
-                            _ => "Unsupported content type".to_string(),
-                        },
+                        "content": result.content.as_text().unwrap_or("Unsupported content type").to_string(),
                         "model": result.model,
                         "stop_reason": result.stop_reason,
                         "processed_messages": 1
@@ -140,12 +138,13 @@ impl SamplingLogic {
 
                 Ok(SamplingMessage {
                     role,
-                    content: ContentBlock::Text(TextContent {
+                    content: SamplingContent::Text(TextContent {
                         text: content,
                         annotations: None,
                         meta: None,
-                    }),
-                    metadata: None, // TurboMCP 2.0: added optional metadata field
+                    })
+                    .into(),
+                    meta: None,
                 })
             })
             .collect();

@@ -857,7 +857,11 @@ impl TransportLayer {
             headers: custom_headers, // Use custom headers from configuration
             ..Default::default()
         };
-        let base_transport = StreamableHttpClientTransport::new(config);
+        let base_transport = StreamableHttpClientTransport::new(config).map_err(|e| {
+            let error_msg = format!("Failed to create HTTP transport for '{}': {}", url, e);
+            tracing::error!("{}", error_msg);
+            McpStudioError::ConnectionFailed(error_msg)
+        })?;
 
         // Wrap transport with interceptor for Protocol Inspector
         let (intercepted_transport, interceptor_rx) = InterceptedTransport::new(base_transport);

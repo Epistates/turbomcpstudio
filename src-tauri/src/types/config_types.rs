@@ -228,7 +228,9 @@ impl ModelPreferencesConfig {
             Some(
                 self.hints
                     .iter()
-                    .map(|name| ModelHint::new(name.clone()))
+                    .map(|name| ModelHint {
+                        name: Some(name.clone()),
+                    })
                     .collect(),
             )
         };
