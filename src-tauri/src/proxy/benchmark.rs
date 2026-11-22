@@ -19,7 +19,7 @@ const MAX_RECORDS: usize = 500_000;
 
 /// Estimate token count from raw byte length using the ~4 bytes/token heuristic.
 pub fn estimate_tokens(bytes: usize) -> usize {
-    (bytes + 3) / 4
+    bytes.div_ceil(4)
 }
 
 // ---------------------------------------------------------------------------
@@ -421,6 +421,7 @@ impl MetricsStore {
     ///
     /// This is a static helper so callers can construct records without holding
     /// a mutable borrow on the store.
+    #[allow(clippy::too_many_arguments)]
     pub fn build_record(
         backend: &str,
         method: &str,
@@ -551,7 +552,7 @@ impl MetricsStore {
             })
             .collect();
         // Sort tools by call count descending.
-        tools.sort_by(|a, b| b.call_count.cmp(&a.call_count));
+        tools.sort_by_key(|t| std::cmp::Reverse(t.call_count));
 
         // Per-method breakdown.
         let mut method_map: HashMap<String, Vec<&CallRecord>> = HashMap::new();
@@ -574,7 +575,7 @@ impl MetricsStore {
             })
             .collect();
         // Sort methods by call count descending.
-        methods.sort_by(|a, b| b.call_count.cmp(&a.call_count));
+        methods.sort_by_key(|m| std::cmp::Reverse(m.call_count));
 
         BackendSummary {
             name: name.to_string(),
@@ -662,7 +663,7 @@ mod tests {
         assert!((stats.p50_ms - 2.0).abs() < f64::EPSILON);
         // Sample std_dev for [1000, 3000] µs:
         //   sqrt(((1000-2000)² + (3000-2000)²) / 1) = sqrt(2_000_000) ≈ 1414.21 µs = 1.414 ms
-        assert!((stats.std_dev_ms - 1.414_213_562_373_095_1).abs() < 0.001);
+        assert!((stats.std_dev_ms - std::f64::consts::SQRT_2).abs() < 0.001);
     }
 
     #[test]
