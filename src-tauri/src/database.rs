@@ -808,7 +808,10 @@ impl Database {
         }
 
         let migration_duration = migration_start.elapsed();
-        tracing::info!("Database migrations completed successfully in {:?}", migration_duration);
+        tracing::info!(
+            "Database migrations completed successfully in {:?}",
+            migration_duration
+        );
         Ok(())
     }
 
