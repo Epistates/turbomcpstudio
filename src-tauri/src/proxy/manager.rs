@@ -550,6 +550,7 @@ impl ProxyManager {
                     arguments: p
                         .arguments
                         .iter()
+                        .flatten()
                         .map(|a| PromptArgumentSpec {
                             name: a.name.clone(),
                             description: a.description.clone(),

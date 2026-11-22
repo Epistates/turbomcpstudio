@@ -110,7 +110,7 @@ Download the latest release for your platform from [GitHub Releases](https://git
   ```bash
   npm install -g pnpm
   ```
-- **Rust**: 1.80 or later ([rustup.rs](https://rustup.rs/)) — Tauri 2.0 requires 1.77.2+
+- **Rust**: 1.90 or later ([rustup.rs](https://rustup.rs/)), the minimum the Tauri 2.12 crates declare
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   ```
@@ -168,7 +168,7 @@ cd turbomcpstudio
 pnpm install
 ```
 
-TurboMCP v3.1.5 is published to [crates.io](https://crates.io/crates/turbomcp-client) and fetched automatically during the build process. No additional setup required.
+TurboMCP v3.7.1 is published to [crates.io](https://crates.io/crates/turbomcp-client) and fetched automatically during the build process. No additional setup required.
 
 ### Development Build
 
@@ -526,7 +526,7 @@ cd src-tauri && cargo audit                            # Dependency vulnerabilit
 ### Build Errors
 
 **Error**: "could not find `turbomcp` crates"
-- **Solution**: Run `cargo clean` and rebuild. TurboMCP v3.1.5 is automatically fetched from crates.io during build.
+- **Solution**: Run `cargo clean` and rebuild. TurboMCP v3.7.1 is automatically fetched from crates.io during build.
 
 **Error**: "webkit2gtk not found" (Linux)
 - **Solution**: Install required system dependencies:
