@@ -37,7 +37,7 @@ dashmap = "6.0"
 parking_lot = "0.12"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid", "macros"] }
+sqlx = { version = "0.9", features = ["runtime-tokio", "tls-rustls-ring", "sqlite", "chrono", "uuid", "macros"] }
 reqwest = { version = "0.13", features = ["json"] }
 async-trait = "0.1"
 keyring = "3.0"
