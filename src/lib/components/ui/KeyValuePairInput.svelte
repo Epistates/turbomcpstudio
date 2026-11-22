@@ -23,14 +23,14 @@
     valuePlaceholder = 'Value',
     addButtonText = '+ Add Pair',
     onUpdate
-  } = $props<{
+  }: {
     pairs?: Array<{ key: string; value: string }>;
     label?: string;
     keyPlaceholder?: string;
     valuePlaceholder?: string;
     addButtonText?: string;
     onUpdate?: () => void;
-  }>();
+  } = $props();
 
   function addPair() {
     pairs = [...pairs, { key: '', value: '' }];

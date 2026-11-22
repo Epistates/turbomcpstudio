@@ -29,7 +29,7 @@
   const logger = createLogger('UnifiedTesting');
 
   // Props
-  const { serverId = null } = $props<{ serverId?: string | null }>();
+  const { serverId = null }: { serverId?: string | null } = $props();
 
   // Reactive derived state
   const context = $derived($workspaceServerContext);

@@ -11,12 +11,12 @@
   import { Zap, MessageSquare } from 'lucide-svelte';
   import type { ToolContext } from '$lib/types/sampling';
 
-  const { toolContext, operationContext, variant = 'default', serverName } = $props<{
+  const { toolContext, operationContext, variant = 'default', serverName }: {
     toolContext?: ToolContext | null;
     operationContext?: string;
     variant?: 'compact' | 'default' | 'detailed';
     serverName?: string;
-  }>();
+  } = $props();
 
   const hasContext = $derived(toolContext || operationContext);
 </script>

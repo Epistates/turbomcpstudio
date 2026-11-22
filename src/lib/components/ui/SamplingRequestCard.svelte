@@ -15,11 +15,11 @@
   import { formatMessageContent } from '$lib/utils/samplingUtils';
   import ToolContextBadge from './ToolContextBadge.svelte';
 
-  const { request, selected, onclick } = $props<{
+  const { request, selected, onclick }: {
     request: SamplingRequest;
     selected: boolean;
     onclick: () => void;
-  }>();
+  } = $props();
 
   const isPending = $derived(request.status === 'pending');
 
