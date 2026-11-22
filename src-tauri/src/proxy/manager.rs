@@ -504,7 +504,7 @@ impl ProxyManager {
         let mut list: Vec<BenchmarkSession> =
             sessions.values().map(|e| e.session.clone()).collect();
         // Deterministic ordering: most recently started first.
-        list.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        list.sort_by_key(|s| std::cmp::Reverse(s.started_at));
         Ok(list)
     }
 
