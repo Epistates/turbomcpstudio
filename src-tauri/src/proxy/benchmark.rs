@@ -237,7 +237,10 @@ impl LatencyDelta {
         } else {
             None
         };
-        Self { delta_ms, delta_pct }
+        Self {
+            delta_ms,
+            delta_pct,
+        }
     }
 }
 
@@ -835,7 +838,11 @@ mod tests {
         assert!(cmp.latency[0].mean.delta_ms > 0.0);
         // delta_pct should be ~+100%
         let pct = cmp.latency[0].mean.delta_pct.unwrap();
-        assert!((pct - 100.0).abs() < 1.0, "expected ~100% delta, got {}", pct);
+        assert!(
+            (pct - 100.0).abs() < 1.0,
+            "expected ~100% delta, got {}",
+            pct
+        );
     }
 
     #[test]

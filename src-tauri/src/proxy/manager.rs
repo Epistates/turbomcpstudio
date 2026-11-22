@@ -442,9 +442,9 @@ impl ProxyManager {
     /// the session is explicitly removed or the process exits.
     pub async fn stop_benchmark_session(&self, session_id: &str) -> AppResult<BenchmarkReport> {
         let mut sessions = self.benchmark_sessions.write().await;
-        let entry = sessions
-            .get_mut(session_id)
-            .ok_or_else(|| AppError::proxy(format!("Benchmark session {} not found", session_id)))?;
+        let entry = sessions.get_mut(session_id).ok_or_else(|| {
+            AppError::proxy(format!("Benchmark session {} not found", session_id))
+        })?;
 
         entry.session.active = false;
 
@@ -467,9 +467,9 @@ impl ProxyManager {
     /// Return the raw call records for an active or stopped session.
     pub async fn get_benchmark_records(&self, session_id: &str) -> AppResult<Vec<CallRecord>> {
         let sessions = self.benchmark_sessions.read().await;
-        let entry = sessions
-            .get(session_id)
-            .ok_or_else(|| AppError::proxy(format!("Benchmark session {} not found", session_id)))?;
+        let entry = sessions.get(session_id).ok_or_else(|| {
+            AppError::proxy(format!("Benchmark session {} not found", session_id))
+        })?;
 
         let records = entry
             .store
@@ -485,9 +485,9 @@ impl ProxyManager {
     /// stopping it.
     pub async fn get_benchmark_report(&self, session_id: &str) -> AppResult<BenchmarkReport> {
         let sessions = self.benchmark_sessions.read().await;
-        let entry = sessions
-            .get(session_id)
-            .ok_or_else(|| AppError::proxy(format!("Benchmark session {} not found", session_id)))?;
+        let entry = sessions.get(session_id).ok_or_else(|| {
+            AppError::proxy(format!("Benchmark session {} not found", session_id))
+        })?;
 
         let report = entry
             .store
@@ -501,10 +501,8 @@ impl ProxyManager {
     /// List all known benchmark sessions (active and stopped).
     pub async fn list_benchmark_sessions(&self) -> AppResult<Vec<BenchmarkSession>> {
         let sessions = self.benchmark_sessions.read().await;
-        let mut list: Vec<BenchmarkSession> = sessions
-            .values()
-            .map(|e| e.session.clone())
-            .collect();
+        let mut list: Vec<BenchmarkSession> =
+            sessions.values().map(|e| e.session.clone()).collect();
         // Deterministic ordering: most recently started first.
         list.sort_by(|a, b| b.started_at.cmp(&a.started_at));
         Ok(list)
