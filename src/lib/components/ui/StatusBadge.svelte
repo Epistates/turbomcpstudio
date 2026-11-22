@@ -10,11 +10,11 @@
 <script lang="ts">
   import { getStatusColor } from '$lib/utils/samplingUtils';
 
-  const { status, size = 'md', uppercase = true } = $props<{
+  const { status, size = 'md', uppercase = true }: {
     status: string;
     size?: 'sm' | 'md' | 'lg';
     uppercase?: boolean;
-  }>();
+  } = $props();
 
   const sizeClasses: Record<string, string> = {
     sm: 'text-xs px-2 py-1',

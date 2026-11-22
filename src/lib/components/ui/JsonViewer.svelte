@@ -22,7 +22,7 @@
     title,
     embedded = false,
     searchTerm = $bindable('')
-  } = $props<{
+  }: {
     data: any;
     expanded?: boolean;
     showCopy?: boolean;
@@ -31,7 +31,7 @@
     title?: string;
     embedded?: boolean;
     searchTerm?: string;
-  }>();
+  } = $props();
 
   let copyFeedback = $state<string | null>(null);
   let expandedPaths = $state(new Set<string>());

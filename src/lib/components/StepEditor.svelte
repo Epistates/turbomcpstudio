@@ -38,12 +38,12 @@
     servers,
     onSave,
     onCancel
-  } = $props<{
+  }: {
     step: WorkflowStep;
     servers: ServerInfo[];
     onSave: (step: WorkflowStep) => void;
     onCancel: () => void;
-  }>();
+  } = $props();
 
   // Local state for editing
   let editedStep = $state<WorkflowStep>(JSON.parse(JSON.stringify(step)));

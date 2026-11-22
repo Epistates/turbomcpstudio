@@ -9,10 +9,10 @@
   // Initialize scoped logger
   const logger = createLogger('DeveloperConsole');
 
-  const { isopen, onclose } = $props<{
+  const { isopen, onclose }: {
     isopen: boolean;
     onclose: () => void;
-  }>();
+  } = $props();
 
   const logState = $derived($logStore);
   const filteredLogs = $derived(logStore.getFilteredLogs(logState));

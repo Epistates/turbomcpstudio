@@ -3,7 +3,7 @@
   import { profileStore } from '$lib/stores/profileStore';
   import { Terminal, Activity, Zap, Server, AlertCircle } from 'lucide-svelte';
 
-  const { ontoggleconsole } = $props<{ ontoggleconsole: () => void }>();
+  const { ontoggleconsole }: { ontoggleconsole: () => void } = $props();
 
   const serverState = $derived($serverStore);
   const profileState = $derived($profileStore);

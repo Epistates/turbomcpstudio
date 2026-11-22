@@ -4,7 +4,7 @@
 	import { Play, Plus, Trash2, RefreshCw, Clock, CheckCircle2, XCircle, Beaker } from 'lucide-svelte';
 
 	// Props
-	const { serverId = '' } = $props<{ serverId?: string }>();
+	const { serverId = '' }: { serverId?: string | null } = $props();
 
 	// Type definitions
 	interface LLMProviderStatus {
