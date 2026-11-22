@@ -5,12 +5,12 @@
 # ============================================================================
 # TurboMCP is fetched from crates.io automatically
 # These versions match src-tauri/Cargo.toml
-TURBOMCP_VERSION ?= 3.1.5
-TURBOMCP_CLIENT_VERSION ?= 3.1.5
-TURBOMCP_PROTOCOL_VERSION ?= 3.1.5
-TURBOMCP_TRANSPORT_VERSION ?= 3.1.5
-TURBOMCP_AUTH_VERSION ?= 3.1.5
-TURBOMCP_DPOP_VERSION ?= 3.1.5
+TURBOMCP_VERSION ?= 3.7.1
+TURBOMCP_CLIENT_VERSION ?= 3.7.1
+TURBOMCP_PROTOCOL_VERSION ?= 3.7.1
+TURBOMCP_TRANSPORT_VERSION ?= 3.7.1
+TURBOMCP_AUTH_VERSION ?= 3.7.1
+TURBOMCP_DPOP_VERSION ?= 3.7.1
 
 # Default target
 help:

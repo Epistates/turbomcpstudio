@@ -53,25 +53,25 @@ open = "5.0"
 dirs = "5.0"
 log = "0.4"
 
-# TurboMCP integration - v3.1.5
+# TurboMCP integration - v3.7.1
 # default-features = false on client/proxy/transport to prevent turbomcp-unix from
 # being pulled in as a transitive dependency on Windows where Unix sockets don't exist.
-turbomcp-client = { version = "3.1.5", default-features = false }
-turbomcp-protocol = "3.1.5"
-turbomcp-types = "3.1.5"
-turbomcp-auth = { version = "3.1.5", features = ["oauth2", "jwt", "token-refresh"] }
-turbomcp-dpop = { version = "3.1.5", optional = true }
-turbomcp-proxy = { version = "3.1.5", default-features = false, features = ["introspection", "runtime"] }
-turbomcp-transport = { version = "3.1.5", default-features = false, features = ["stdio", "http", "websocket", "tcp"] }
-turbomcp-stdio = "3.1.5"
-turbomcp-http = "3.1.5"
-turbomcp-websocket = "3.1.5"
-turbomcp-tcp = "3.1.5"
-turbomcp-transport-traits = "3.1.5"
+turbomcp-client = { version = "3.7.1", default-features = false }
+turbomcp-protocol = "3.7.1"
+turbomcp-types = "3.7.1"
+turbomcp-auth = { version = "3.7.1", features = ["oauth2", "jwt", "token-refresh"] }
+turbomcp-dpop = { version = "3.7.1", optional = true }
+turbomcp-proxy = { version = "3.7.1", default-features = false, features = ["introspection", "runtime"] }
+turbomcp-transport = { version = "3.7.1", default-features = false, features = ["stdio", "http", "websocket", "tcp"] }
+turbomcp-stdio = "3.7.1"
+turbomcp-http = "3.7.1"
+turbomcp-websocket = "3.7.1"
+turbomcp-tcp = "3.7.1"
+turbomcp-transport-traits = "3.7.1"
 
 # Unix socket transport — only available on Unix platforms (macOS, Linux)
 [target.'cfg(unix)'.dependencies]
-turbomcp-unix = "3.1.5"
+turbomcp-unix = "3.7.1"
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }

@@ -522,6 +522,10 @@ impl McpTransportClient {
 
     /// Request completions from an MCP server (TurboMCP 1.0.10)
     /// This enables auto-completion for tool parameters and other inputs
+    // `Client::complete` is deprecated since TurboMCP 3.5 in favour of
+    // `complete_prompt` and `complete_resource`. Those need the prompt or
+    // resource and the argument name, which this command does not carry yet.
+    #[allow(deprecated)]
     pub async fn complete(
         &self,
         completion_name: &str,

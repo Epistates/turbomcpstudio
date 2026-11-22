@@ -700,6 +700,7 @@ impl TransportLayer {
             environment: Some(env_vars),
             startup_timeout: std::time::Duration::from_secs(30),
             shutdown_timeout: std::time::Duration::from_secs(10),
+            sigterm_grace: std::time::Duration::from_secs(2),
             max_message_size: 10 * 1024 * 1024, // 10MB
             buffer_size: 8192,
             kill_on_drop: true,
