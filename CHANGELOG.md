@@ -11,7 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upcoming features and improvements
 
 ### Changed
-- Upcoming changes
+- TurboMCP crates updated from 3.1.5 to 3.7.1.
+- Tauri updated to 2.12 and sqlx to 0.9 (bundled SQLite 3.54.1). Building from source now needs Rust 1.90 or later.
+
+### Security
+- Dependency updates clear every vulnerability `cargo audit` reported for `Cargo.lock`.
 
 ## [0.1.0] - 2025-10-16
 
